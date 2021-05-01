@@ -1,0 +1,45 @@
+﻿@page "/tickdata"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+<h3>Ticks</h3>
+<ul id="tickList">
+    @foreach (var tick in ticks)
+    {
+        <li>@tick</li>
+    }
+</ul>
+
+@code {
+    private HubConnection hubConnection;
+    private List<string> ticks = new List<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/tickdata"))
+            .Build();
+
+        hubConnection.On<decimal>("ReceiveTick", (tick) =>
+        {
+            var encodedTick = $"LTP: {tick}";
+            ticks.Add(encodedTick);
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.SendAsync("StartTicker");
+    }
+
+    public bool IsConnected =>
+        hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
+}

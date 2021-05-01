@@ -1,0 +1,100 @@
+﻿@page "/orders"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using TradeMaster6000.Shared
+@attribute [Authorize]
+@inject HttpClient Http
+
+@{
+    if (loginUrl == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else if (loginUrl.Uri != null && loginUrl.AccessToken == null)
+    {
+        <p>url: @loginUrl.Uri</p>
+
+        <EditForm Model="requestUrl" OnValidSubmit="@HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <InputText @bind-Value="requestUrl.Url" />
+
+            <button type="submit">Submit</button>
+        </EditForm>
+    }
+    else if (loginUrl.AccessToken != null)
+    {
+        <EditForm Model="tradeOrder" OnValidSubmit="@PlaceNewOrder">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <InputText @bind-Value="tradeOrder.StopLoss" />
+            <InputText @bind-Value="tradeOrder.Entry" />
+            <InputText @bind-Value="tradeOrder.TakeProfit" />
+
+            <button type="submit">New Order</button>
+        </EditForm>
+
+    }
+
+}
+
+
+@code {
+
+    private LoginUri loginUrl = null;
+    private RequestUrl requestUrl = new RequestUrl();
+    private TradeOrder tradeOrder = new TradeOrder();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            loginUrl = await Http.GetFromJsonAsync<LoginUri>("LoginUri");
+        }
+        catch (AccessTokenNotAvailableException exception)
+        {
+            exception.Redirect();
+        }
+    }
+
+    private async Task PlaceNewOrder(EditContext editContext)
+    {
+        var response = await Http.PostAsJsonAsync<TradeOrder>("TradeOrder", (TradeOrder)editContext.Model);
+    }
+
+    private async Task HandleValidSubmit(EditContext editContext)
+    {
+        //try
+        //{
+        var response = await Http.PostAsJsonAsync<RequestUrl>("RequestUrl", (RequestUrl)editContext.Model);
+
+
+        //var errors = await response.Content
+        //    .ReadFromJsonAsync<Dictionary<string, List<string>>>();
+
+        //    if (response.StatusCode == HttpStatusCode.BadRequest &&
+        //            errors.Count() > 0)
+        //    {
+        //        customValidation.DisplayErrors(errors);
+        //    }
+        //    else if (!response.IsSuccessStatusCode)
+        //    {
+        //        throw new HttpRequestException(
+        //            $"Validation failed. Status Code: {response.StatusCode}");
+        //    }
+        //    else
+        //    {
+        //        disabled = true;
+        //        messageStyles = "color:green";
+        //        message = "The form has been processed.";
+        //    }
+        //}
+        //catch ()
+        //{
+
+        //}
+    }
+}
