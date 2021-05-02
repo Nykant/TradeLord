@@ -7,8 +7,21 @@
 @attribute [Authorize]
 
 <h3>Ticks</h3>
+<button @onclick="@StartTicker">Start Ticker</button>
+<button @onclick="@StopTicker">Stop Ticker</button>
 <ul id="tickList">
     @foreach (var tick in ticks)
+    {
+        <li>@tick</li>
+    }
+</ul>
+
+<hr />
+
+<button @onclick="@StartTicker2">Start Ticker 2</button>
+<button @onclick="@StopTicker2">Stop Ticker 2</button>
+<ul id="tickList2">
+    @foreach (var tick in ticks2)
     {
         <li>@tick</li>
     }
@@ -17,6 +30,7 @@
 @code {
     private HubConnection hubConnection;
     private List<string> ticks = new List<string>();
+    private List<string> ticks2 = new List<string>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -31,12 +45,35 @@
             StateHasChanged();
         });
 
+        hubConnection.On<decimal>("ReceiveTick2", (tick) =>
+        {
+            var encodedTick = $"LTP: {tick}";
+            ticks2.Add(encodedTick);
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
+    }
+
+    private async Task StartTicker()
+    {
         await hubConnection.SendAsync("StartTicker");
+    }
+    private async Task StopTicker()
+    {
+        await hubConnection.SendAsync("StopTicker");
+    }
+    private async Task StartTicker2()
+    {
+        await hubConnection.SendAsync("StartTicker2");
+    }
+    private async Task StopTicker2()
+    {
+        await hubConnection.SendAsync("StopTicker2");
     }
 
     public bool IsConnected =>
-        hubConnection.State == HubConnectionState.Connected;
+hubConnection.State == HubConnectionState.Connected;
 
     public async ValueTask DisposeAsync()
     {

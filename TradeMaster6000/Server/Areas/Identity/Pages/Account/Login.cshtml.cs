@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Logging;
 using TradeMaster6000.Server.Models;
 using KiteConnect;
+using Microsoft.Extensions.Configuration;
+using TradeMaster6000.Server.Extensions;
 
 namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
 {
@@ -22,14 +24,17 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
+        private readonly IConfiguration Configuration;
 
         public LoginModel(SignInManager<ApplicationUser> signInManager, 
             ILogger<LoginModel> logger,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
+            Configuration = configuration;
         }
 
         [BindProperty]
@@ -84,8 +89,12 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
+                    Kite kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
+
+                    string accessToken = HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken"));
+                    //HttpContext.Session.Get<string>(Configuration.GetValue<string>("PublicTokenPassword"));
                     _logger.LogInformation("User logged in.");
-                    return LocalRedirect(returnUrl);
+                    return Redirect(kite.GetLoginURL());
                 }
                 if (result.RequiresTwoFactor)
                 {

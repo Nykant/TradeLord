@@ -17,9 +17,9 @@ namespace TradeMaster6000.Server.Controllers
     [Route("[controller]")]
     public class TradeOrderController : ControllerBase
     {
-        private readonly ILogger<RequestUrlController> logger;
+        private readonly ILogger<RequestUriController> logger;
 
-        public TradeOrderController(ILogger<RequestUrlController> logger, IConfiguration configuration)
+        public TradeOrderController(ILogger<RequestUriController> logger, IConfiguration configuration)
         {
             this.logger = logger;
             Configuration = configuration;

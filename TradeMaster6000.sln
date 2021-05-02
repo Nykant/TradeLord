@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31105.61
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeMaster6000.Server", "TradeMaster6000\Server\TradeMaster6000.Server.csproj", "{DD1F9EFD-58B7-4C23-AB23-5CFF63157A32}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeMaster6000.Server", "TradeMaster6000\Server\TradeMaster6000.Server.csproj", "{DD1F9EFD-58B7-4C23-AB23-5CFF63157A32}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeMaster6000.Client", "TradeMaster6000\Client\TradeMaster6000.Client.csproj", "{8314E34E-252C-4627-988F-CB8A778333EE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeMaster6000.Client", "TradeMaster6000\Client\TradeMaster6000.Client.csproj", "{8314E34E-252C-4627-988F-CB8A778333EE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradeMaster6000.Shared", "TradeMaster6000\Shared\TradeMaster6000.Shared.csproj", "{731F2EB6-8BDA-482B-9ACF-5E81260257E0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradeMaster6000.Shared", "TradeMaster6000\Shared\TradeMaster6000.Shared.csproj", "{731F2EB6-8BDA-482B-9ACF-5E81260257E0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

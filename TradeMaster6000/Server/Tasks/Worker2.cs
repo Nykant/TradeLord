@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.Extensions;
@@ -11,15 +13,15 @@ using TradeMaster6000.Server.Hubs;
 
 namespace TradeMaster6000.Server.Tasks
 {
-    public class Worker : IWorker
+    public class Worker2 : IWorker2
     {
-        private readonly ILogger<Worker> logger;
+        private readonly ILogger<Worker2> logger;
         private Ticker ticker;
         private IHttpContextAccessor _contextAccessor;
         private static IHubCallerClients clients;
         private static TickHub _tickhub;
 
-        public Worker(ILogger<Worker> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor)
+        public Worker2(ILogger<Worker2> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor)
         {
             this.logger = logger;
             Configuration = configuration;
@@ -31,8 +33,9 @@ namespace TradeMaster6000.Server.Tasks
         public async Task StartTicker(CancellationToken cancellationToken, IHubCallerClients clients, TickHub tickHub)
         {
             _tickhub = tickHub;
-            ticker = new Ticker(Configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
-            Worker.clients = clients;
+                ticker = new Ticker(Configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
+
+            Worker2.clients = clients;
             ticker.OnTick += onTick;
             //ticker.OnOrderUpdate += OnOrderUpdate;
             //ticker.OnReconnect += onReconnect;
@@ -50,7 +53,6 @@ namespace TradeMaster6000.Server.Tasks
             logger.LogInformation("ticker started");
 
         }
-        //maybe the start ticker needs a while loop or do ticker.close after source.cancel, maybe stopticker has source as parameter. maybe start ticker has source parameter
         public async Task StopTicker()
         {
             ticker.Close();
@@ -59,11 +61,11 @@ namespace TradeMaster6000.Server.Tasks
         }
         private static async void onTick(Tick TickData)
         {
-            await _tickhub.SendTick(TickData.LastPrice, clients);
+            await _tickhub.SendTick2(TickData.LastPrice, clients);
         }
     }
 
-    public interface IWorker
+    public interface IWorker2
     {
         Task StartTicker(CancellationToken cancellationToken, IHubCallerClients clients, TickHub tickHub);
         Task StopTicker();

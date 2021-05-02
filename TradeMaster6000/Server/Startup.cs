@@ -71,9 +71,11 @@ namespace TradeMaster6000.Server
                     new[] { "application/octet-stream" });
             });
 
+            //services.AddCors();
+
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.AddSingleton<IWorker, Worker>();
-
+            services.AddSingleton<IWorker2, Worker2>();
             //services.AddSingleton<ITickHub, TickHub>();
 
             services.Configure<ForwardedHeadersOptions>(options =>
@@ -111,6 +113,8 @@ namespace TradeMaster6000.Server
 
             app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();
+
+            //app.UseCors();
 
             app.UseRouting();
 

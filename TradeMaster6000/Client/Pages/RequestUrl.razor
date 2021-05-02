@@ -1,0 +1,48 @@
+﻿@page "/RequestUrl"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.WebUtilities;
+@using Microsoft.Extensions.Primitives;
+@inject NavigationManager navManager
+@using TradeMaster6000.Shared
+@attribute [Authorize]
+@inject HttpClient Http
+
+<p>hej</p>
+<p>@LogInStatus</p>
+
+@code {
+    public string request_token;
+    public string action;
+    public string status;
+
+    public string LogInStatus { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        StringValues request_token_out;
+        StringValues action_out;
+        StringValues status_out;
+
+        var uri = navManager.ToAbsoluteUri(navManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("request_token", out request_token_out))
+        {
+            request_token = request_token_out;
+        }
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("action", out action_out))
+        {
+            action = action_out;
+        }
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("status", out status_out))
+        {
+            status = status_out;
+        }
+
+        var response = await Http.PostAsJsonAsync<RequestUri>("RequestUri", new RequestUri { Request_token = request_token, Action = action, Status = status });
+        if (response.IsSuccessStatusCode)
+        {
+            LogInStatus = "Successfully logged in to api";
+            StateHasChanged();
+        }
+    }
+}
