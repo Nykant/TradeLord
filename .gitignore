@@ -367,3 +367,4 @@ Dockerfile
 *.pfx
 tempkey.rsa
 Config.cs
+SeedData.cs

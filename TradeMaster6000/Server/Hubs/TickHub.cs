@@ -31,14 +31,14 @@ namespace TradeMaster6000.Server.Hubs
         {
             source = new CancellationTokenSource();
 
-            await worker.StartTicker(source.Token, Clients, this);
+            await worker.StartTicker(Clients, this);
         }
 
         public async Task StopTicker()
         {
             await worker.StopTicker();
 
-            source.Cancel();
+            //source.Cancel();
         }
 
         public async Task SendTick(decimal tick, IHubCallerClients clients)
@@ -50,14 +50,14 @@ namespace TradeMaster6000.Server.Hubs
         {
             source2 = new CancellationTokenSource();
 
-            await worker2.StartTicker(source2.Token, Clients, this);
+            await worker2.StartTicker(Clients, this);
         }
 
         public async Task StopTicker2()
         {
-            await worker2.StopTicker();
+            //source2.Cancel();
 
-            source2.Cancel();
+            await worker2.StopTicker();
         }
 
         public async Task SendTick2(decimal tick, IHubCallerClients clients)

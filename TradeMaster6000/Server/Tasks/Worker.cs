@@ -28,10 +28,11 @@ namespace TradeMaster6000.Server.Tasks
 
         public IConfiguration Configuration { get; }
 
-        public async Task StartTicker(CancellationToken cancellationToken, IHubCallerClients clients, TickHub tickHub)
+        public async Task StartTicker(IHubCallerClients clients, TickHub tickHub)
         {
             _tickhub = tickHub;
             ticker = new Ticker(Configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
+
             Worker.clients = clients;
             ticker.OnTick += onTick;
             //ticker.OnOrderUpdate += OnOrderUpdate;
@@ -65,7 +66,7 @@ namespace TradeMaster6000.Server.Tasks
 
     public interface IWorker
     {
-        Task StartTicker(CancellationToken cancellationToken, IHubCallerClients clients, TickHub tickHub);
+        Task StartTicker(IHubCallerClients clients, TickHub tickHub);
         Task StopTicker();
     }
 }
