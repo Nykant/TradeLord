@@ -43,7 +43,7 @@ namespace TradeMaster6000.Server.Controllers
                     Kite kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
                     User user = kite.GenerateSession(requestUri.Request_token, Configuration.GetValue<string>("AppSecret"));
 
-                    kite.SetSessionExpiryHook(() => Console.WriteLine("Need to login again"));
+                    kite.SetSessionExpiryHook(() => logger.LogInformation("User need to log in again"));
 
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("AccessToken"), user.AccessToken);
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("PublicToken"), user.PublicToken);

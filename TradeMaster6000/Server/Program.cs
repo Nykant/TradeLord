@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using TradeMaster6000.Server.Data.Seed;
 
 namespace TradeMaster6000.Server
 {
@@ -14,6 +15,7 @@ namespace TradeMaster6000.Server
         public static void Main(string[] args)
         {
             CreateHostBuilder(args).Build().Run();
+
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>

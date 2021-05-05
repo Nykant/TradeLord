@@ -15,6 +15,9 @@ using TradeMaster6000.Server.Models;
 using KiteConnect;
 using Microsoft.Extensions.Configuration;
 using TradeMaster6000.Server.Extensions;
+using Microsoft.Extensions.DependencyInjection;
+using TradeMaster6000.Server.Services;
+using TradeMaster6000.Server.Data.Seed;
 
 namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
 {
@@ -25,16 +28,19 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
         private readonly IConfiguration Configuration;
-
+        private readonly IKiteService kiteService;
         public LoginModel(SignInManager<ApplicationUser> signInManager, 
             ILogger<LoginModel> logger,
+            IKiteService kiteService,
             UserManager<ApplicationUser> userManager,
+
             IConfiguration configuration)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             Configuration = configuration;
+            this.kiteService = kiteService;
         }
 
         [BindProperty]
@@ -63,6 +69,9 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
 
         public async Task OnGetAsync(string returnUrl = null)
         {
+            var seedData = new SeedData(_userManager);
+            seedData.EnsureSeedData();
+
             if (!string.IsNullOrEmpty(ErrorMessage))
             {
                 ModelState.AddModelError(string.Empty, ErrorMessage);
@@ -90,8 +99,7 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 if (result.Succeeded)
                 {
                     Kite kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
-
-                    string accessToken = HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken"));
+                    kiteService.SetKite(kite);
                     //HttpContext.Session.Get<string>(Configuration.GetValue<string>("PublicTokenPassword"));
                     _logger.LogInformation("User logged in.");
                     return Redirect(kite.GetLoginURL());

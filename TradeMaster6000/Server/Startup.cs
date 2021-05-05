@@ -21,6 +21,7 @@ using System.Threading;
 using TradeMaster6000.Server.Data;
 using TradeMaster6000.Server.Hubs;
 using TradeMaster6000.Server.Models;
+using TradeMaster6000.Server.Services;
 using TradeMaster6000.Server.Tasks;
 
 namespace TradeMaster6000.Server
@@ -72,10 +73,10 @@ namespace TradeMaster6000.Server
             });
 
             //services.AddCors();
-
+            services.AddSingleton<IKiteService, KiteService>();
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            services.AddSingleton<IWorker, Worker>();
-            services.AddSingleton<IWorker2, Worker2>();
+            //services.AddSingleton<IWorker, Worker>();
+            //services.AddSingleton<IWorker2, Worker2>();
             //services.AddSingleton<ITickHub, TickHub>();
 
             services.Configure<ForwardedHeadersOptions>(options =>
