@@ -18,33 +18,33 @@ namespace TradeMaster6000.Server.Tasks
     public class Worker : IWorker
     {
         private readonly ILogger<Worker> logger;
-        private IHttpContextAccessor _contextAccessor;
+        private readonly IHttpContextAccessor _contextAccessor;
         private IHubCallerClients clients;
-        //private static TickHub _tickhub;
+        private static TickHub _tickhub;
         private readonly IKiteService kiteService;
-        private Kite kite;
+        private static Kite kite;
         private static List<KiteConnect.Tick> ticks;
+        private readonly IConfiguration configuration;
 
         public Worker(ILogger<Worker> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService)
         {
             this.logger = logger;
-            Configuration = configuration;
+            this.configuration = configuration;
             _contextAccessor = contextAccessor;
             this.kiteService = kiteService;
             ticks = new List<KiteConnect.Tick>();
         }
 
-        public IConfiguration Configuration { get; }
 
         public async Task StartTicker(IHubCallerClients clients, TickHub tickHub, TradeOrder order, CancellationToken cancellationToken)
         {
-            //_tickhub = tickHub;
+            _tickhub = tickHub;
             if (kite == null)
             {
                 kite = kiteService.GetKite();
             }
 
-            Ticker ticker = new Ticker(Configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
+            Ticker ticker = new Ticker(configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(configuration.GetValue<string>("AccessToken")));
 
             this.clients = clients;
             ticker.OnTick += onTick;
@@ -58,14 +58,11 @@ namespace TradeMaster6000.Server.Tasks
             ticker.EnableReconnect(Interval: 5, Retries: 50);
             ticker.Connect();
 
-            ticker.Subscribe(Tokens: new UInt32[] { 60417 });
-            ticker.SetMode(Tokens: new UInt32[] { 60417 }, Mode: Constants.MODE_LTP);
+            ticker.Subscribe(Tokens: new UInt32[] { order.Instrument.Id });
+            ticker.SetMode(Tokens: new UInt32[] { order.Instrument.Id }, Mode: Constants.MODE_LTP);
 
-            int.TryParse(order.Entry, out int entry);
-            int.TryParse(order.StopLoss, out int stopLoss);
-            int.TryParse(order.TakeProfit, out int takeProfit);
-
-            await clients.Caller.SendAsync("ReceiveLog", "ticker starting...");
+            await _tickhub.AddLog($"log: order with id:{order.Id} starting...");
+            //await clients.Caller.SendAsync("ReceiveLog", $"log: order with id:{order.Id} starting...");
 
             decimal lsp = 0;
             // THIS PART MAYBE SHOULD BE IN ITS OWN ASYNC METHOD
@@ -80,21 +77,20 @@ namespace TradeMaster6000.Server.Tasks
                         logger.LogInformation($"LSP: {lsp}");
                     }
 
-                    if (lsp >= entry)
+                    if (lsp >= order.Entry)
                     {
-                        //logger.LogInformation("test3");
                         //Dictionary<string, dynamic> response = kite.PlaceOrder(
-                        //    Exchange: Constants.EXCHANGE_NSE,
-                        //    TradingSymbol: "ASIANPAINTS",
-                        //    TransactionType: Constants.TRANSACTION_TYPE_BUY,
-                        //    Quantity: 1,
-                        //    Price: 64.0000m,
+                        //    Exchange: order.Instrument.Exchange,
+                        //    TradingSymbol: order.Instrument.TradingSymbol,
+                        //    TransactionType: order.TransactionType.ToString(),
+                        //    Quantity: order.Quantity,
+                        //    Price: order.Entry,
 
-                        //    OrderType: Constants.ORDER_TYPE_LIMIT,
-                        //    Product: Constants.PRODUCT_MIS,
-                        //    StoplossValue: 63.0000m,
-                        //    TriggerPrice: 65.0000m,
-                        //    TrailingStoploss: 64.0000m
+                        //    OrderType: order.OrderType.ToString(),
+                        //    Product: order.Product.ToString(),
+                        //    StoplossValue: order.StopLoss,
+                        //    TriggerPrice: order.TakeProfit
+                            //TrailingStoploss: 64.0000m
                         //);
                     }
                 }
@@ -102,7 +98,8 @@ namespace TradeMaster6000.Server.Tasks
             }
 
             ticker.Close();
-            await clients.Caller.SendAsync("ReceiveLog", "ticker closed...");
+            await _tickhub.AddLog($"log: order with id:{order.Id} stopped...");
+            //await clients.Caller.SendAsync("ReceiveLog", $"log: order with id:{order.Id} stopped...");
         }
         //maybe the start ticker needs a while loop or do ticker.close after source.cancel, maybe stopticker has source as parameter. maybe start ticker has source parameter
         //public async Task StopTicker()

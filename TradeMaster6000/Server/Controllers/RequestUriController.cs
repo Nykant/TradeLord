@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.Extensions;
+using TradeMaster6000.Server.Services;
 using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.Controllers
@@ -18,11 +19,13 @@ namespace TradeMaster6000.Server.Controllers
     public class RequestUriController : ControllerBase
     {
         private readonly ILogger<RequestUriController> logger;
+        private readonly IKiteService kiteService;
 
-        public RequestUriController(ILogger<RequestUriController> logger, IConfiguration configuration)
+        public RequestUriController(ILogger<RequestUriController> logger, IConfiguration configuration, IKiteService _kiteService)
         {
             this.logger = logger;
             Configuration = configuration;
+            kiteService = _kiteService;
         }
 
         public IConfiguration Configuration { get; }
@@ -40,9 +43,11 @@ namespace TradeMaster6000.Server.Controllers
                 try
                 {
                     logger.LogInformation("trying to connect kite");
-                    Kite kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
+                    Kite kite = kiteService.GetKite();
+
                     User user = kite.GenerateSession(requestUri.Request_token, Configuration.GetValue<string>("AppSecret"));
 
+                    kite.SetAccessToken(user.AccessToken);
                     kite.SetSessionExpiryHook(() => logger.LogInformation("User need to log in again"));
 
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("AccessToken"), user.AccessToken);

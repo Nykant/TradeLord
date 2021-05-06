@@ -18,17 +18,19 @@ namespace TradeMaster6000.Server.Hubs
     public class TickHub : Hub
     {
         private static List<TradeOrder> orderList = new List<TradeOrder>();
+        private static List<string> logList = new List<string>();
         //private readonly IWorker worker;
         //private readonly IWorker2 worker2;
         private readonly ILogger<Worker> logger;
         private readonly IKiteService kiteService;
         private readonly IHttpContextAccessor _contextAccessor;
         private readonly IConfiguration _configuration;
+        private readonly IInstrumentService instrumentService;
         // måske gem tickers her inde i stedet for i worker
         private static int OrderCount { get; set; }
         // kan bruge samme worker 
 
-        public TickHub(/*IWorker worker, IWorker2 worker2, */ILogger<Worker> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService)
+        public TickHub(/*IWorker worker, IWorker2 worker2, */ILogger<Worker> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, IInstrumentService instrumentService)
         {
             //this.worker = worker;
             //this.worker2 = worker2;
@@ -36,20 +38,24 @@ namespace TradeMaster6000.Server.Hubs
             _configuration = configuration;
             _contextAccessor = contextAccessor;
             this.kiteService = kiteService;
+            this.instrumentService = instrumentService;
         }
 
-        public async Task StartTicker(TradeOrder tradeOrder)
+        public async Task StartTicker(TradeOrder order)
         {
             Worker worker = new Worker(logger, _configuration, _contextAccessor, kiteService);
-            var order = new TradeOrder {
-                 Entry = tradeOrder.Entry,
-                  StopLoss = tradeOrder.StopLoss,
-                   TakeProfit = tradeOrder.TakeProfit,
-                Id = OrderCount,
-                TokenSource = new CancellationTokenSource()
-            };
-            OrderCount = OrderCount + 1;
+            order.TokenSource = new CancellationTokenSource();
+            order.Id = OrderCount;
+            foreach(var instrument in instrumentService.GetInstruments())
+            {
+                if(instrument.TradingSymbol == order.TradeSymbol.ToString())
+                {
+                    order.Instrument = instrument;
+                }
+            }
+
             orderList.Add(order);
+            OrderCount = OrderCount + 1;
 
             await Clients.Caller.SendAsync("ReceiveList", orderList);
 
@@ -58,19 +64,33 @@ namespace TradeMaster6000.Server.Hubs
                 await worker.StartTicker(Clients, this, order, order.TokenSource.Token);
             });
         }
+        public async Task GetInstruments()
+        {
+            await Clients.Caller.SendAsync("ReceiveInstruments", instrumentService.GetInstruments());
+        }
 
         public async Task GetOrders()
         {
             await Clients.Caller.SendAsync("ReceiveList", orderList);
         }
+        public async Task GetLogList()
+        {
+            await Clients.Caller.SendAsync("ReceiveLogs", logList);
+        }
+        public async Task AddLog(string log)
+        {
+            logList.Add(log);
+            //await Clients.Caller.SendAsync("ReceiveLogs", logList);
+        }
 
-        public async Task StopTicker(TradeOrder tradeOrder)
+
+        public async Task StopTicker(int id)
         {
             if(orderList.Count > 0)
             {
                 for (int i = 0; i < orderList.Count; i++)
                 {
-                    if (orderList[i].Id == tradeOrder.Id)
+                    if (orderList[i].Id == id)
                     {
                         orderList[i].TokenSource.Cancel();
                         orderList.RemoveAt(i);

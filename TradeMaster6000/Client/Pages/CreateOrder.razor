@@ -1,5 +1,149 @@
-﻿<h3>CreateOrder</h3>
+﻿@page "/createorder"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
+@using TradeMaster6000.Shared
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+<style>
+    p {
+        display:inline;
+    }
+</style>
+
+<h3>New Order</h3>
+
+<div id="orderForm">
+    <EditForm Model="tradeOrder" OnValidSubmit="@HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <p>entry: </p><InputNumber @bind-Value="tradeOrder.Entry" />
+        <br />
+
+        <p>stoploss: </p><InputNumber @bind-Value="tradeOrder.StopLoss" />
+        <br />
+
+        <p>take profit: </p><InputNumber @bind-Value="tradeOrder.TakeProfit" />
+        <br />
+
+        <p>quantity: </p><InputNumber @bind-Value="tradeOrder.Quantity" />
+        <br />
+
+        <p>instrument: </p><InputSelect @bind-Value="tradeOrder.TradeSymbol">
+            @{
+                foreach (var type in Enum.GetValues(typeof(TradeSymbol)))
+                {
+                    <option value="@type">@type</option>
+                }
+            }
+
+        </InputSelect>
+        <br />
+
+        <p>order type: </p><InputSelect @bind-Value="tradeOrder.OrderType">
+            @{
+                foreach (var type in Enum.GetValues(typeof(OrderType)))
+                {
+                    <option value="@type">@type</option>
+                }
+            }
+        </InputSelect>
+        <br />
+
+        <p>product: </p><InputSelect @bind-Value="tradeOrder.Product">
+            @{
+                foreach (var type in Enum.GetValues(typeof(Product)))
+                {
+                    <option value="@type">@type</option>
+                }
+            }
+        </InputSelect>
+        <br />
+
+        <p>transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
+            @{
+                foreach (var type in Enum.GetValues(typeof(TransactionType)))
+                {
+                    <option value="@type">@type</option>
+                }
+            }
+        </InputSelect>
+        <br />
+
+        <button type="submit">Make Order</button>
+    </EditForm>
+</div>
 
 @code {
+    private HubConnection hubConnection;
+    private TradeOrder tradeOrder = new TradeOrder();
+    private TradeInstrument tradeInstrument = new TradeInstrument();
+    private List<TradeInstrument> instruments = new List<TradeInstrument>();
 
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/orders"))
+            .Build();
+
+        hubConnection.On<List<TradeInstrument>>("ReceiveInstruments", (instruments) =>
+        {
+            this.instruments = instruments;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+
+        await GetInstruments();
+    }
+
+    private async Task GetInstruments()
+    {
+        await hubConnection.SendAsync("GetInstruments");
+    }
+
+    private async Task HandleValidSubmit(EditContext editContext)
+    {
+        try
+        {
+            await hubConnection.SendAsync("StartTicker", (TradeOrder)editContext.Model);
+            //var response = await Http.PostAsJsonAsync<RequestUrl>("RequestUrl", (RequestUrl)editContext.Model);
+
+            //var errors = await response.Content
+            //    .ReadFromJsonAsync<Dictionary<string, List<string>>>();
+
+            //if (response.StatusCode == HttpStatusCode.BadRequest &&
+            //        errors.Count() > 0)
+            //{
+            //    customValidation.DisplayErrors(errors);
+            //}
+            //else if (!response.IsSuccessStatusCode)
+            //{
+            //    throw new HttpRequestException(
+            //        $"Validation failed. Status Code: {response.StatusCode}");
+            //}
+            //else
+            //{
+            //    disabled = true;
+            //    messageStyles = "color:green";
+            //    message = "The form has been processed.";
+            //}
+        }
+        catch (Exception e)
+        {
+
+        }
+        NavigationManager.NavigateTo("/orders");
+    }
+
+    public bool IsConnected =>
+hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
 }

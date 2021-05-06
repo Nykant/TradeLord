@@ -1,100 +1,175 @@
 ﻿@page "/orders"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
 @using TradeMaster6000.Shared
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
 @attribute [Authorize]
-@inject HttpClient Http
 
-@{
-    @*if (loginUrl == null)
+
+<button @onclick="@NewOrder">New Order</button>
+
+<ul id="orderList">
+    @foreach (var order in orders)
     {
-        <p><em>Loading...</em></p>
+        <li>@order.Id @order.Entry <button @onclick="() => StopTicker(order.Id)">stop</button> </li>
     }
-    else if (loginUrl.Uri != null && loginUrl.AccessToken == null)
+</ul>
+
+<hr />
+
+@*<ul id="tickList">
+    @foreach (var tick in ticks)
     {
-        <p>url: @loginUrl.Uri</p>
-
-        <EditForm Model="requestUrl" OnValidSubmit="@HandleValidSubmit">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
-
-            <InputText @bind-Value="requestUrl.Url" />
-
-            <button type="submit">Submit</button>
-        </EditForm>
+        <li>@tick</li>
     }
-    else if (loginUrl.AccessToken != null)
+</ul>*@
+
+<ul id="logsList">
+    @foreach (var log in logs)
     {
-        <EditForm Model="tradeOrder" OnValidSubmit="@PlaceNewOrder">
-            <DataAnnotationsValidator />
-            <ValidationSummary />
+        <li>@log</li>
+    }
+</ul>
 
-            <InputText @bind-Value="tradeOrder.StopLoss" />
-            <InputText @bind-Value="tradeOrder.Entry" />
-            <InputText @bind-Value="tradeOrder.TakeProfit" />
 
-            <button type="submit">New Order</button>
-        </EditForm>
 
-    }*@
-
-}
-
+@*<button @onclick="@StartTicker2">Start Ticker 2</button>
+    <button @onclick="@StopTicker2">Stop Ticker 2</button>
+    <ul id="tickList2">
+        @foreach (var tick in ticks2)
+        {
+            <li>@tick</li>
+        }
+    </ul>*@
 
 @code {
 
-    //private LoginUri loginUrl = null;
-    //private RequestUrl requestUrl = new RequestUrl();
-    //private TradeOrder tradeOrder = new TradeOrder();
+    private bool showForm = false;
+    private HubConnection hubConnection;
+    //private List<string> ticks = new List<string>();
+    //private List<string> ticks2 = new List<string>();
+    private List<TradeOrder> orders = new List<TradeOrder>();
+    private TradeOrder tradeOrder = new TradeOrder();
+    private List<string> logs = new List<string>();
 
 
-    //protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/orders"))
+            .Build();
+
+        //hubConnection.On<decimal>("ReceiveTick", (tick) =>
+        //{
+        //    var encodedTick = $"LTP: {tick}";
+        //    ticks.Add(encodedTick);
+        //    StateHasChanged();
+        //});
+        hubConnection.On<List<string>>("ReceiveLogs", (logs) =>
+        {
+            this.logs = logs;
+            StateHasChanged();
+        });
+
+        hubConnection.On<string>("ReceiveLog", (log) =>
+        {
+            logs.Add($"log: {log}");
+            StateHasChanged();
+        });
+
+        hubConnection.On<List<TradeOrder>>("ReceiveList", (list) =>
+        {
+            orders = list;
+            StateHasChanged();
+        });
+
+        //hubConnection.On<decimal>("ReceiveTick2", (tick) =>
+        //{
+        //    var encodedTick = $"LTP: {tick}";
+        //    ticks2.Add(encodedTick);
+        //    StateHasChanged();
+        //});
+
+        await hubConnection.StartAsync();
+
+        await GetOrders();
+        await GetLogList();
+
+    }
+
+    private void NewOrder()
+    {
+        NavigationManager.NavigateTo("/createorder");
+    }
+
+    private async Task GetOrders()
+    {
+        await hubConnection.SendAsync("GetOrders");
+    }
+    private async Task GetLogList()
+    {
+        await hubConnection.SendAsync("GetLogList");
+    }
+
+    //private async Task StopOrderHandler(EditContext editContext)
     //{
     //    try
     //    {
-    //        loginUrl = await Http.GetFromJsonAsync<LoginUri>("LoginUri");
+    //        await hubConnection.SendAsync("StopTicker", (TradeOrder)editContext.Model);
+
+
+    //        //var response = await Http.PostAsJsonAsync<RequestUrl>("RequestUrl", (RequestUrl)editContext.Model);
+
+    //        //var errors = await response.Content
+    //        //    .ReadFromJsonAsync<Dictionary<string, List<string>>>();
+
+    //        //if (response.StatusCode == HttpStatusCode.BadRequest &&
+    //        //        errors.Count() > 0)
+    //        //{
+    //        //    customValidation.DisplayErrors(errors);
+    //        //}
+    //        //else if (!response.IsSuccessStatusCode)
+    //        //{
+    //        //    throw new HttpRequestException(
+    //        //        $"Validation failed. Status Code: {response.StatusCode}");
+    //        //}
+    //        //else
+    //        //{
+    //        //    disabled = true;
+    //        //    messageStyles = "color:green";
+    //        //    message = "The form has been processed.";
+    //        //}
     //    }
-    //    catch (AccessTokenNotAvailableException exception)
+    //    catch (Exception e)
     //    {
-    //        exception.Redirect();
+
     //    }
     //}
 
-    //private async Task PlaceNewOrder(EditContext editContext)
+    //private async Task StartTicker()
     //{
-    //    var response = await Http.PostAsJsonAsync<TradeOrder>("TradeOrder", (TradeOrder)editContext.Model);
+    //    await hubConnection.SendAsync("StartTicker");
     //}
-
-    //private async Task HandleValidSubmit(EditContext editContext)
+    private async Task StopTicker(int id)
+    {
+        await hubConnection.SendAsync("StopTicker", id);
+    }
+    //private async Task StartTicker2()
     //{
-    //    //try
-    //    //{
-    //    var response = await Http.PostAsJsonAsync<RequestUrl>("RequestUrl", (RequestUrl)editContext.Model);
-
-
-    //var errors = await response.Content
-    //    .ReadFromJsonAsync<Dictionary<string, List<string>>>();
-
-    //    if (response.StatusCode == HttpStatusCode.BadRequest &&
-    //            errors.Count() > 0)
-    //    {
-    //        customValidation.DisplayErrors(errors);
-    //    }
-    //    else if (!response.IsSuccessStatusCode)
-    //    {
-    //        throw new HttpRequestException(
-    //            $"Validation failed. Status Code: {response.StatusCode}");
-    //    }
-    //    else
-    //    {
-    //        disabled = true;
-    //        messageStyles = "color:green";
-    //        message = "The form has been processed.";
-    //    }
+    //    await hubConnection.SendAsync("StartTicker2");
     //}
-    //catch ()
+    //private async Task StopTicker2()
     //{
-
+    //    await hubConnection.SendAsync("StopTicker2");
     //}
-}
+
+    public bool IsConnected =>
+hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
 }
