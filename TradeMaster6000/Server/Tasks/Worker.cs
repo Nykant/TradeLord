@@ -39,10 +39,9 @@ namespace TradeMaster6000.Server.Tasks
         public async Task StartTicker(IHubCallerClients clients, TickHub tickHub, TradeOrder order, CancellationToken cancellationToken)
         {
             _tickhub = tickHub;
-            if (kite == null)
-            {
-                kite = kiteService.GetKite();
-            }
+
+            kite = kiteService.GetKite();
+
 
             Ticker ticker = new Ticker(configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(configuration.GetValue<string>("AccessToken")));
 
@@ -64,6 +63,18 @@ namespace TradeMaster6000.Server.Tasks
             await _tickhub.AddLog($"log: order with id:{order.Id} starting...");
             //await clients.Caller.SendAsync("ReceiveLog", $"log: order with id:{order.Id} starting...");
 
+            Dictionary<string, dynamic> response = kite.PlaceOrder(
+                 Exchange: order.Instrument.Exchange,
+                 TradingSymbol: order.Instrument.TradingSymbol,
+                 TransactionType: order.TransactionType.ToString(),
+                 Quantity: order.Quantity,
+                 Price: order.Entry,
+                 Product: order.Product.ToString(),
+                 OrderType: order.OrderType.ToString(),
+                 Validity: Constants.VALIDITY_DAY,
+                 Variety: order.Variety.ToString(),
+                 Tag: "TradeLord Order"
+             );
             decimal lsp = 0;
             // THIS PART MAYBE SHOULD BE IN ITS OWN ASYNC METHOD
             while (!cancellationToken.IsCancellationRequested)
@@ -79,19 +90,27 @@ namespace TradeMaster6000.Server.Tasks
 
                     if (lsp >= order.Entry)
                     {
-                        //Dictionary<string, dynamic> response = kite.PlaceOrder(
-                        //    Exchange: order.Instrument.Exchange,
-                        //    TradingSymbol: order.Instrument.TradingSymbol,
-                        //    TransactionType: order.TransactionType.ToString(),
-                        //    Quantity: order.Quantity,
-                        //    Price: order.Entry,
+                        if (order.OrderType == OrderType.SLM)
+                        {
 
-                        //    OrderType: order.OrderType.ToString(),
-                        //    Product: order.Product.ToString(),
-                        //    StoplossValue: order.StopLoss,
-                        //    TriggerPrice: order.TakeProfit
-                            //TrailingStoploss: 64.0000m
-                        //);
+
+                        }
+                        else if (order.OrderType == OrderType.LIMIT)
+                        {
+                            //Dictionary<string, dynamic> response = kite.PlaceOrder(
+                            //     Exchange: order.Instrument.Exchange,
+                            //     TradingSymbol: order.Instrument.TradingSymbol,
+                            //     TransactionType: order.TransactionType.ToString(),
+                            //     Quantity: order.Quantity,
+                            //     Price: order.Entry,
+                            //     Variety: order.Variety.ToString(),
+                            //     OrderType: order.OrderType.ToString(),
+                            //     Product: order.Product.ToString(),
+                            //     StoplossValue: order.StopLoss,
+                            //     TriggerPrice: order.TriggerPrice
+                            // );
+                        }
+
                     }
                 }
                 Thread.Sleep(1000);
