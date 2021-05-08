@@ -20,19 +20,19 @@
         <DataAnnotationsValidator />
         <ValidationSummary />
 
-        <p>entry: </p><InputNumber @bind-Value="tradeOrder.Entry" />
+        <p>Entry: </p><InputNumber @bind-Value="tradeOrder.Entry" />
         <br />
 
-        <p>stoploss: </p><InputNumber @bind-Value="tradeOrder.StopLoss" />
+        <p>Stoploss: </p><InputNumber @bind-Value="tradeOrder.StopLoss" />
         <br />
 
-        <p>take profit: </p><InputNumber @bind-Value="tradeOrder.TriggerPrice" />
+        <p>Risk: </p><InputNumber @bind-Value="tradeOrder.Risk" />
         <br />
 
-        <p>quantity: </p><InputNumber @bind-Value="tradeOrder.Quantity" />
+        <p>Risk:Reward : </p><InputNumber @bind-Value="tradeOrder.RxR" />
         <br />
 
-        <p>instrument: </p><InputSelect @bind-Value="tradeOrder.TradeSymbol">
+        <p>Instrument: </p><InputSelect @bind-Value="tradeOrder.TradeSymbol">
             @{
                 foreach (var type in Enum.GetValues(typeof(TradeSymbol)))
                 {
@@ -43,7 +43,7 @@
         </InputSelect>
         <br />
 
-        <p>order type: </p><InputSelect @bind-Value="tradeOrder.OrderType">
+        <p>Order type: </p><InputSelect @bind-Value="tradeOrder.OrderType">
             @{
                 foreach (var type in Enum.GetValues(typeof(OrderType)))
                 {
@@ -53,7 +53,7 @@
         </InputSelect>
         <br />
 
-        <p>product: </p><InputSelect @bind-Value="tradeOrder.Product">
+        <p>Product: </p><InputSelect @bind-Value="tradeOrder.Product">
             @{
                 foreach (var type in Enum.GetValues(typeof(Product)))
                 {
@@ -63,7 +63,7 @@
         </InputSelect>
         <br />
 
-        <p>transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
+        <p>Transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
             @{
                 foreach (var type in Enum.GetValues(typeof(TransactionType)))
                 {
@@ -73,7 +73,7 @@
         </InputSelect>
         <br />
 
-        <p>variety: </p><InputSelect @bind-Value="tradeOrder.Variety">
+        <p>Variety: </p><InputSelect @bind-Value="tradeOrder.Variety">
             @{
                 foreach (var type in Enum.GetValues(typeof(Variety)))
                 {

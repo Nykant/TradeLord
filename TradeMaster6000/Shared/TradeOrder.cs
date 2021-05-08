@@ -8,10 +8,10 @@ namespace TradeMaster6000.Shared
     public class TradeOrder
     {
         public int Id { get; set; }
-        public int Quantity { get; set; }
         public int StopLoss { get; set; }
         public decimal Entry { get; set; }
-        public decimal TriggerPrice { get; set; }
+        public int Risk { get; set; }
+        public int RxR { get; set; }
         public TradeInstrument Instrument {get; set;}
         public TransactionType TransactionType { get; set; }
         public OrderType OrderType { get; set; }

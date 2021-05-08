@@ -7,15 +7,29 @@
 @implements IAsyncDisposable
 @attribute [Authorize]
 
+<h1>Orders</h1>
 
 <button @onclick="@NewOrder">New Order</button>
 
-<ul id="orderList">
+<table>
+    <tr>
+        <th>Id</th>
+        <th>Trading Symbol</th>
+        <th>Transaction Type</th>
+        <th>Entry</th>
+        <th></th>
+    </tr>
     @foreach (var order in orders)
     {
-        <li>@order.Id @order.Entry <button @onclick="() => StopTicker(order.Id)">stop</button> </li>
+        <tr>
+            <td>@order.Id</td>
+            <td>@order.Instrument.TradingSymbol</td>
+            <td>@order.TransactionType.ToString()</td>
+            <td>@order.Entry</td>
+            <td><button @onclick="() => StopTicker(order.Id)">stop</button></td>
+        </tr>
     }
-</ul>
+</table>
 
 <hr />
 

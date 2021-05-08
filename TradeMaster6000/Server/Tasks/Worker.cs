@@ -25,6 +25,18 @@ namespace TradeMaster6000.Server.Tasks
         private static Kite kite;
         private static List<KiteConnect.Tick> ticks;
         private readonly IConfiguration configuration;
+        private static string orderId_e;
+        private static string orderId_t;
+        private static string orderId_s;
+        private static DateTime? orderFilledTime;
+        private static decimal entry;
+        private static decimal high = 0;
+        private static decimal low = 0;
+        private static decimal target = 0;
+        private static int zonewidth;
+        private static int quantity;
+        private static decimal open;
+        private static decimal close;
 
         public Worker(ILogger<Worker> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService)
         {
@@ -42,7 +54,6 @@ namespace TradeMaster6000.Server.Tasks
 
             kite = kiteService.GetKite();
 
-
             Ticker ticker = new Ticker(configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(configuration.GetValue<string>("AccessToken")));
 
             this.clients = clients;
@@ -58,60 +69,87 @@ namespace TradeMaster6000.Server.Tasks
             ticker.Connect();
 
             ticker.Subscribe(Tokens: new UInt32[] { order.Instrument.Id });
-            ticker.SetMode(Tokens: new UInt32[] { order.Instrument.Id }, Mode: Constants.MODE_LTP);
+            ticker.SetMode(Tokens: new UInt32[] { order.Instrument.Id }, Mode: Constants.MODE_FULL);
 
             await _tickhub.AddLog($"log: order with id:{order.Id} starting...");
             //await clients.Caller.SendAsync("ReceiveLog", $"log: order with id:{order.Id} starting...");
+            
+            zonewidth = (int)order.Entry - order.StopLoss;
+            quantity = order.Risk / zonewidth;
 
             Dictionary<string, dynamic> response = kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
                  TransactionType: order.TransactionType.ToString(),
-                 Quantity: order.Quantity,
+                 Quantity: quantity,
                  Price: order.Entry,
                  Product: order.Product.ToString(),
                  OrderType: order.OrderType.ToString(),
                  Validity: Constants.VALIDITY_DAY,
-                 Variety: order.Variety.ToString(),
-                 Tag: "TradeLord Order"
+                 Variety: order.Variety.ToString()
              );
-            decimal lsp = 0;
-            // THIS PART MAYBE SHOULD BE IN ITS OWN ASYNC METHOD
+
+            await _tickhub.AddLog($"log: order placed... {DateTime.Now}");
+
+            response.TryGetValue("data", out dynamic value);
+            Dictionary<string, dynamic> data = value;
+            data.TryGetValue("order_id", out dynamic value2);
+            orderId_e = value2;
+
+            bool tickerOpen = false;
+            bool orderFilling = false;
+            bool findingHighLow = false;
+
             while (!cancellationToken.IsCancellationRequested)
             {
-                logger.LogInformation($"test");
-                if (ticks.Count > 0)
+                var orderHistory = kite.GetOrderHistory(orderId_e);
+
+                while (!tickerOpen)
                 {
-                    if(lsp != ticks[ticks.Count - 1].LastPrice)
+                    DateTime GST = DateTime.Now;
+                    DateTime IST = GST.AddHours(5).AddMinutes(30);
+                    if(IST.Hour == 8 && IST.Minute == 59)
                     {
-                        lsp = ticks[ticks.Count - 1].LastPrice;
-                        logger.LogInformation($"LSP: {lsp}");
+                        await _tickhub.AddLog($"log: ticker open... market: {IST} server: {DateTime.Now}");
+                        tickerOpen = true;
+                    }
+                    Thread.Sleep(500);
+                }
+                while (orderFilling == false)
+                {
+                    var orderHistory2 = kite.GetOrderHistory(orderId_e);
+                    if (orderHistory2[orderHistory2.Count - 1].FilledQuantity > 0)
+                    {
+                        entry = orderHistory2[orderHistory2.Count - 1].AveragePrice;
+                        orderFilledTime = orderHistory2[orderHistory2.Count - 1].OrderTimestamp;
+                        orderFilling = true;
+                    }
+                    Thread.Sleep(500);
+                }
+                while (orderFilling == true)
+                {
+                    await _tickhub.AddLog($"log: order filling... {DateTime.Now}");
+
+                    bool isTime15 = false;
+                    while (!isTime15)
+                    {
+                        DateTime GMT = DateTime.Now;
+                        DateTime IST = GMT.AddHours(5).AddMinutes(30);
+                        if (IST.Hour == 9 && IST.Minute == 15)
+                        {
+                            await _tickhub.AddLog($"log: ticker open... market: {IST} server: {DateTime.Now}");
+                            isTime15 = true;
+                        }
+                        if(IST.Hour == 9 && IST.Minute == 1 && IST.Second == 0 || IST.Hour == 9 && IST.Minute == 1 && IST.Second == 1 || IST.Hour == 9 && IST.Minute == 1 && IST.Second == 2)
+                        {
+                            high = ticks[ticks.Count - 1].High;
+                            low = ticks[ticks.Count - 1].Low;
+                            open = ticks[ticks.Count - 1].Open;
+                            close = ticks[ticks.Count - 1].Close;
+                        }
                     }
 
-                    if (lsp >= order.Entry)
-                    {
-                        if (order.OrderType == OrderType.SLM)
-                        {
-
-
-                        }
-                        else if (order.OrderType == OrderType.LIMIT)
-                        {
-                            //Dictionary<string, dynamic> response = kite.PlaceOrder(
-                            //     Exchange: order.Instrument.Exchange,
-                            //     TradingSymbol: order.Instrument.TradingSymbol,
-                            //     TransactionType: order.TransactionType.ToString(),
-                            //     Quantity: order.Quantity,
-                            //     Price: order.Entry,
-                            //     Variety: order.Variety.ToString(),
-                            //     OrderType: order.OrderType.ToString(),
-                            //     Product: order.Product.ToString(),
-                            //     StoplossValue: order.StopLoss,
-                            //     TriggerPrice: order.TriggerPrice
-                            // );
-                        }
-
-                    }
+                    Task.WaitAll(PlaceTarget(order), PlaceStopLoss());
                 }
                 Thread.Sleep(1000);
             }
@@ -119,6 +157,89 @@ namespace TradeMaster6000.Server.Tasks
             ticker.Close();
             await _tickhub.AddLog($"log: order with id:{order.Id} stopped...");
             //await clients.Caller.SendAsync("ReceiveLog", $"log: order with id:{order.Id} stopped...");
+        }
+
+        private async Task PlaceTarget(TradeOrder order)
+        {
+            await _tickhub.AddLog($"log: placing target... {DateTime.Now}");
+            target = (order.RxR * zonewidth) + entry;
+
+            bool placingTarget = true;
+            while (placingTarget)
+            {
+                Dictionary<string, dynamic> orderReponse = kite.PlaceOrder(
+                     Exchange: order.Instrument.Exchange,
+                     TradingSymbol: order.Instrument.TradingSymbol,
+                     TransactionType: order.TransactionType.ToString(),
+                     Quantity: quantity,
+                     Price: target,
+                     Product: order.Product.ToString(),
+                     OrderType: order.OrderType.ToString(),
+                     Validity: Constants.VALIDITY_DAY,
+                     Variety: order.Variety.ToString()
+                 );
+
+                orderReponse.TryGetValue("data", out dynamic value3);
+                Dictionary<string, dynamic> date2 = value3;
+                date2.TryGetValue("order_id", out dynamic value4);
+                orderId_t = value4;
+
+                bool checkingProximity = true;
+                decimal proximity = (target - entry) * (decimal)0.8;
+                while (checkingProximity)
+                {
+                    var orderHistory3 = kite.GetOrderHistory(orderId_e);
+                    if (ticks[ticks.Count - 1].High >= (proximity))
+                    {
+                        if (orderHistory3[orderHistory3.Count - 1].FilledQuantity < quantity)
+                        {
+                            kite.ModifyOrder(
+                                orderId_t,
+                                null,
+                                order.Instrument.Exchange,
+                                order.TradeSymbol.ToString(),
+                                Constants.TRANSACTION_TYPE_SELL,
+                                orderHistory3[orderHistory3.Count - 1].FilledQuantity.ToString(),
+                                target,
+                                order.Product.ToString(),
+                                order.OrderType.ToString(),
+                                Constants.VALIDITY_DAY,
+                                null,
+                                null,
+                                order.Variety.ToString());
+                        }
+                        checkingProximity = false;
+                    }
+                }
+            }
+        }
+        private async Task PlaceStopLoss()
+        {
+            //await _tickhub.AddLog($"log: placing stop loss... {DateTime.Now}");
+
+            //var start = (DateTime)ticks[2].Timestamp;
+            //var end = (DateTime)ticks[2].Timestamp;
+            //end.AddMinutes(1);
+
+            //await _tickhub.AddLog($"log: order filled at... {entry} - price");
+            //await _tickhub.AddLog($"log: order filled at... {orderFilledTime} - kite time");
+            //await _tickhub.AddLog($"log: order filled at... {DateTime.Now} - server time");
+            //findingHighLow = true;
+            //while (findingHighLow)
+            //{
+            //    if (DateTime.Compare(end, (DateTime)ticks[ticks.Count - 1].Timestamp) <= 0)
+            //    {
+            //        findingHighLow = false;
+            //    }
+            //    if (ticks[ticks.Count - 1].Low < low)
+            //    {
+            //        low = ticks[ticks.Count - 1].Low;
+            //    }
+            //    if (ticks[ticks.Count - 1].High > high)
+            //    {
+            //        high = ticks[ticks.Count - 1].High;
+            //    }
+            //}
         }
         //maybe the start ticker needs a while loop or do ticker.close after source.cancel, maybe stopticker has source as parameter. maybe start ticker has source parameter
         //public async Task StopTicker()
@@ -133,6 +254,10 @@ namespace TradeMaster6000.Server.Tasks
             //await _tickhub.SendTick(TickData.LastPrice, clients);
             //await clients.All.SendAsync("ReceiveTick", TickData.LastPrice);
         }
+        //private static void OnOrderUpdate(Order OrderData)
+        //{
+        //    orderDataList.Add(OrderData);
+        //}
     }
 
     public interface IWorker

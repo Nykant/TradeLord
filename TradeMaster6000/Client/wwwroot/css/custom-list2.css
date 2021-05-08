@@ -1,0 +1,48 @@
+﻿#list {
+    font-family: Lato, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+    #list td, #list th {
+        padding: 8px;
+    }
+
+    #list td {
+        cursor:pointer;
+    }
+
+    #list tr {
+        background-color:white;
+    }
+
+    #list tr:nth-child(even) {
+        background-color: #f2f2f2;
+    }
+
+    #list tr:hover {
+        background-color: #ddd;
+    }
+
+    #list th {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        text-align: center;
+        background-color: var(--blue);
+        color: black;
+    }
+
+.list-h1 {
+    padding: 20px;
+    padding-bottom: 50px;
+    font-size: 25px;
+}
+
+.cell-link {
+    position: absolute;
+    background-color: transparent;
+    height: 35.33px;
+    width: 66.66%;
+    z-index: 20;
+    transform:translate(-32px, -8px);
+}
