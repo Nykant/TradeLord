@@ -61,6 +61,8 @@ namespace TradeMaster6000.Server
                 options.Cookie.SameSite = SameSiteMode.Lax;
             });
 
+            services.TryAddSingleton<IInstrumentService, InstrumentService>();
+
             services.AddSignalR();
 
             services.AddControllersWithViews();
@@ -75,7 +77,7 @@ namespace TradeMaster6000.Server
             //services.AddCors();
             services.AddSingleton<IKiteService, KiteService>();
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            services.TryAddSingleton<IInstrumentService, InstrumentService>();
+
             //services.AddSingleton<IWorker, Worker>();
             //services.AddSingleton<IWorker2, Worker2>();
             //services.AddSingleton<ITickHub, TickHub>();

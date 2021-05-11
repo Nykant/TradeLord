@@ -20,12 +20,14 @@ namespace TradeMaster6000.Server.Controllers
     {
         private readonly ILogger<RequestUriController> logger;
         private readonly IKiteService kiteService;
+        private readonly IInstrumentService instrumentService;
 
-        public RequestUriController(ILogger<RequestUriController> logger, IConfiguration configuration, IKiteService _kiteService)
+        public RequestUriController(ILogger<RequestUriController> logger, IConfiguration configuration, IKiteService _kiteService, IInstrumentService instrumentService)
         {
             this.logger = logger;
             Configuration = configuration;
             kiteService = _kiteService;
+            this.instrumentService = instrumentService;
         }
 
         public IConfiguration Configuration { get; }
@@ -52,6 +54,19 @@ namespace TradeMaster6000.Server.Controllers
 
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("AccessToken"), user.AccessToken);
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("PublicToken"), user.PublicToken);
+
+                    //List<Instrument> kiteInstruments = kite.GetInstruments();
+                    //List<TradeInstrument> appInstruments = instrumentService.GetInstruments();
+                    //foreach(var instrument in kiteInstruments)
+                    //{
+                    //    foreach(var appInstrument in appInstruments)
+                    //    {
+                    //        if (instrument.TradingSymbol == appInstrument.TradingSymbol)
+                    //        {
+                    //            appInstrument.Id = instrument.InstrumentToken;
+                    //        }
+                    //    }
+                    //}
                 }
                 catch (Exception e)
                 {

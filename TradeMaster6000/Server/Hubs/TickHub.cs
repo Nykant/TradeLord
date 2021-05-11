@@ -73,7 +73,8 @@ namespace TradeMaster6000.Server.Hubs
         }
         public async Task GetInstruments()
         {
-            await Clients.Caller.SendAsync("ReceiveInstruments", instrumentService.GetInstruments());
+            var instruments = instrumentService.GetInstruments();
+            await Clients.Caller.SendAsync("ReceiveInstruments", instruments);
         }
 
         public async Task GetOrders()

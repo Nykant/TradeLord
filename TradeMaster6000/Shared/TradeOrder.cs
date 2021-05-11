@@ -8,9 +8,9 @@ namespace TradeMaster6000.Shared
     public class TradeOrder
     {
         public int Id { get; set; }
-        public int StopLoss { get; set; }
+        public decimal StopLoss { get; set; }
         public decimal Entry { get; set; }
-        public int Risk { get; set; }
+        public decimal Risk { get; set; }
         public int RxR { get; set; }
         public TradeInstrument Instrument {get; set;}
         public TransactionType TransactionType { get; set; }
@@ -23,8 +23,7 @@ namespace TradeMaster6000.Shared
     public enum Variety
     {
         amo,
-        REGULAR,
-        COVER
+        regular
     }
     public enum TransactionType
     {
@@ -33,19 +32,16 @@ namespace TradeMaster6000.Shared
     }
     public enum OrderType
     {
-        LIMIT,
-        SLM
+        LIMIT
     }
     public enum Product
     {
-        CNC,
         MIS,
         NRML
     }
     public enum TradeSymbol
     {
         ASIANPAINT,
-        CENTRUM,
-        CHENNPETRO
+        APOLLOTYRE
     }
 }

@@ -32,15 +32,19 @@
         <p>Risk:Reward : </p><InputNumber @bind-Value="tradeOrder.RxR" />
         <br />
 
-        <p>Instrument: </p><InputSelect @bind-Value="tradeOrder.TradeSymbol">
-            @{
-                foreach (var type in Enum.GetValues(typeof(TradeSymbol)))
+        <p>Instrument: </p><InputSelect @bind-Value="tradeOrder.Instrument.TradingSymbol">
+        @{
+
+            if (showInstruments)
+            {
+                foreach (var instrument in instruments)
                 {
-                    <option value="@type">@type</option>
+                    <option value="@instrument.TradingSymbol">@instrument.TradingSymbol</option>
                 }
             }
+        }
 
-        </InputSelect>
+</InputSelect>
         <br />
 
         <p>Order type: </p><InputSelect @bind-Value="tradeOrder.OrderType">
@@ -88,9 +92,10 @@
 </div>
 
 @code {
+    private bool showInstruments = false;
     private HubConnection hubConnection;
-    private TradeOrder tradeOrder = new TradeOrder();
-    private TradeInstrument tradeInstrument = new TradeInstrument();
+    private TradeOrder tradeOrder = new TradeOrder() { Instrument = new TradeInstrument() };
+    //private TradeInstrument tradeInstrument = new TradeInstrument();
     private List<TradeInstrument> instruments = new List<TradeInstrument>();
 
     protected override async Task OnInitializedAsync()
@@ -102,6 +107,7 @@
         hubConnection.On<List<TradeInstrument>>("ReceiveInstruments", (instruments) =>
         {
             this.instruments = instruments;
+            showInstruments = true;
             StateHasChanged();
         });
 
