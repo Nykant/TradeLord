@@ -32,18 +32,19 @@
         <p>Risk:Reward : </p><InputNumber @bind-Value="tradeOrder.RxR" />
         <br />
 
-        <p>Instrument: </p><InputSelect @bind-Value="tradeOrder.Instrument">
+        <p>Instrument: </p>
+        <InputSelect @bind-Value="tradeOrder.TradingSymbol">
         @{
+            <option>choose an instrument</option>                         
             if (instrumentsLoaded)
             {
                 foreach (var instrument in instruments)
                 {
-                    <option value="@instrument">@instrument.TradingSymbol</option>
+                    <option value="@instrument.TradingSymbol">symbol: @instrument.TradingSymbol - exchange: @instrument.Exchange</option>
                 }
             }
         }
-
-</InputSelect>
+        </InputSelect>
         <br />
 
         <p>Transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
@@ -63,7 +64,7 @@
 @code {
     private bool instrumentsLoaded = false;
     private HubConnection hubConnection;
-    private TradeOrder tradeOrder = new TradeOrder() { Instrument = new TradeInstrument() };
+    private TradeOrder tradeOrder = new TradeOrder();
     private List<TradeInstrument> instruments = new List<TradeInstrument>();
 
     protected override async Task OnInitializedAsync()

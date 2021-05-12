@@ -204,7 +204,7 @@ namespace TradeMaster6000.Server.Tasks
                     DateTime GST = DateTime.Now;
                     DateTime IST = GST.AddHours(5).AddMinutes(30);
                     DateTime opening = new DateTime(IST.Year, IST.Month, IST.Day, 9, 00, 00);
-                    DateTime closing = opening.AddHours(6).AddMinutes(45);
+                    DateTime closing = opening.AddHours(6).AddMinutes(15);
                     // if clock is 9 its time to get up and start the day!
                     if (DateTime.Compare(IST, opening) >= 0)
                     {
@@ -215,13 +215,13 @@ namespace TradeMaster6000.Server.Tasks
                         }
                     }
                     // if it is less than 7 we can sleep for a while longer :)
-                    else if (IST.Hour <= 7 || IST.Hour >= 16)
+                    if (IST.Hour <= 7 || IST.Hour >= 15)
                     {
                         _tickhub.AddLog($"{orderId} log: market still closed so sleeping for an hour... market: {IST} server: {DateTime.Now}");
                         Thread.Sleep(3600000);
                     }
                     // if it is 8:59 we can snooze for extra suffering...
-                    else if (IST.Hour == 8 && IST.Minute <= 59)
+                    if (IST.Hour == 8 && IST.Minute <= 59)
                     {
                         _tickhub.AddLog($"{orderId} log: market still closed but soon opening... snoozing for a min... market: {IST} server: {DateTime.Now}");
                         Thread.Sleep(60000);

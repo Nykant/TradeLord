@@ -11,6 +11,7 @@ namespace TradeMaster6000.Shared
         public decimal StopLoss { get; set; }
         public decimal Entry { get; set; }
         public decimal Risk { get; set; }
+        public string TradingSymbol { get; set; }
         public int RxR { get; set; }
         public TradeInstrument Instrument {get; set;}
         public TransactionType TransactionType { get; set; }

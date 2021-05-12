@@ -45,6 +45,15 @@ namespace TradeMaster6000.Server.Hubs
             order.TokenSource = new CancellationTokenSource();
             order.Id = OrderCount;
 
+            var instruments = instrumentService.GetInstruments();
+            foreach(var instrument in instruments)
+            {
+                if(instrument.TradingSymbol == order.TradingSymbol)
+                {
+                    order.Instrument = instrument;
+                }
+            }
+
             // add the OrderWork instance to a list (which stays for application lifetime)
             orderList.Add(order);
             OrderCount = OrderCount + 1;
