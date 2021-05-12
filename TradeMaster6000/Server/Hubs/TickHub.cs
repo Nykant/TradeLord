@@ -45,26 +45,18 @@ namespace TradeMaster6000.Server.Hubs
             order.TokenSource = new CancellationTokenSource();
             order.Id = OrderCount;
 
-            // set order instrument with tradingsymbol input from user
-            foreach(var instrument in instrumentService.GetInstruments())
-            {
-                if(instrument.TradingSymbol == order.TradeSymbol.ToString())
-                {
-                    order.Instrument = instrument;
-                }
-            }
-
             // add the OrderWork instance to a list (which stays for application lifetime)
             orderList.Add(order);
             OrderCount = OrderCount + 1;
 
+            // send list to client
             await Clients.Caller.SendAsync("ReceiveList", orderList);
 
             // get available threads and log amount
             ThreadPool.GetAvailableThreads(out int workerThreads, out int completionPortThreads);
             AddLog($"log: maximum number of threads available: {workerThreads}");
 
-            // start work in that instance which runs 
+            // start work in that instance which runs on the thread pool
             await Task.Run( () => 
             {
                 orderWork.StartWork(Clients, this, order, order.TokenSource.Token);

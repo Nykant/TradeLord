@@ -42,6 +42,8 @@ namespace TradeMaster6000.Server.Tasks
         private string orderId_m;
         private bool targetplaced;
         private bool hit;
+        private string exitTransactionType;
+        private bool rejected;
 
         public OrderWork(ILogger<OrderWork> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService)
         {
@@ -58,6 +60,34 @@ namespace TradeMaster6000.Server.Tasks
             if(_tickhub == null)
             {
                 _tickhub = tickHub;
+            }
+            if(order.TransactionType.ToString() == "BUY")
+            {
+                exitTransactionType = "SELL";
+            }
+            else
+            {
+                exitTransactionType = "BUY";
+            }
+
+            string variety = null;
+            DateTime GST1 = DateTime.Now;
+            DateTime IST1 = GST1.AddHours(5).AddMinutes(30);
+            DateTime opening1 = new DateTime(IST1.Year, IST1.Month, IST1.Day, 9, 0, 0);
+            DateTime closing1 = opening1.AddHours(6).AddMinutes(30);
+
+            if (DateTime.Compare(IST1, opening1) < 0)
+            {
+                variety = "amo";
+            }
+            else if(DateTime.Compare(IST1, opening1) >= 0)
+            {
+                variety = "regular";
+            }
+
+            if(DateTime.Compare(IST1, closing1) >= 0)
+            {
+                variety = "amo";
             }
 
             orderId = order.Id;
@@ -95,10 +125,10 @@ namespace TradeMaster6000.Server.Tasks
                  TransactionType: order.TransactionType.ToString(),
                  Quantity: quantity,
                  Price: order.Entry,
-                 Product: order.Product.ToString(),
-                 OrderType: order.OrderType.ToString(),
+                 Product: Constants.PRODUCT_MIS,
+                 OrderType: Constants.ORDER_TYPE_LIMIT,
                  Validity: Constants.VALIDITY_DAY,
-                 Variety: order.Variety.ToString()
+                 Variety: variety
              );
 
             _tickhub.AddLog($"{orderId} log: entry order placed... {DateTime.Now}");
@@ -109,18 +139,20 @@ namespace TradeMaster6000.Server.Tasks
             data.TryGetValue("order_id", out dynamic value1);
             orderId_e = value1;
 
+            // place slm amo order
             Dictionary<string, dynamic> responseS = kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
-                 TransactionType: Constants.TRANSACTION_TYPE_SELL,
+                 TransactionType: exitTransactionType,
                  Quantity: quantity,
                  TriggerPrice: order.StopLoss,
                  Product: Constants.PRODUCT_MIS,
                  OrderType: Constants.ORDER_TYPE_SLM,
                  Validity: Constants.VALIDITY_DAY,
-                 Variety: Constants.VARIETY_AMO
+                 Variety: variety
             );
 
+            // set id
             responseS.TryGetValue("data", out dynamic valueS);
             Dictionary<string, dynamic> dateS = valueS;
             dateS.TryGetValue("order_id", out dynamic value1S);
@@ -134,6 +166,33 @@ namespace TradeMaster6000.Server.Tasks
             isSL_amoCancelled = false;
             squareOff = false;
             hit = false;
+            rejected = false;
+
+            var orderHistoryQ = kite.GetOrderHistory(orderId_e);
+            var orderHistoryA = kite.GetOrderHistory(orderId_s_amo);
+            if (orderHistoryQ[orderHistoryQ.Count - 1].Status == "REJECTED")
+            {
+                _tickhub.AddLog($"{orderId} log: entry order rejected... {DateTime.Now}");
+                if (orderHistoryA[orderHistoryA.Count - 1].Status != "REJECTED")
+                {
+                    _tickhub.AddLog($"{orderId} log: slm order cancelled... {DateTime.Now}");
+                    kite.CancelOrder(orderId_s_amo, variety);
+                }
+                rejected = true;
+                goto Ending;
+            }
+
+            if(orderHistoryA[orderHistoryA.Count - 1].Status == "REJECTED")
+            {
+                _tickhub.AddLog($"{orderId} log: slm order rejected... {DateTime.Now}");
+                if (orderHistoryQ[orderHistoryQ.Count - 1].Status != "REJECTED")
+                {
+                    _tickhub.AddLog($"{orderId} log: entry order cancelled... {DateTime.Now}");
+                    kite.CancelOrder(orderId_e, variety);
+                }
+                rejected = true;
+                goto Ending;
+            }
 
             // while order is not stopped in app on orders page.
             while (!cancellationToken.IsCancellationRequested)
@@ -144,26 +203,32 @@ namespace TradeMaster6000.Server.Tasks
                     // check time once in a while, to figure out if it is time to wake up and go to work.
                     DateTime GST = DateTime.Now;
                     DateTime IST = GST.AddHours(5).AddMinutes(30);
-                    // if clock is 8:59 or 9 its time to get up and start the day!
-                    if (IST.Hour == 8 && IST.Minute == 59 || IST.Hour == 9)
+                    DateTime opening = new DateTime(IST.Year, IST.Month, IST.Day, 9, 00, 00);
+                    DateTime closing = opening.AddHours(6).AddMinutes(45);
+                    // if clock is 9 its time to get up and start the day!
+                    if (DateTime.Compare(IST, opening) >= 0)
                     {
-                        _tickhub.AddLog($"{orderId} log: pre market opening... market: {IST} server: {DateTime.Now}");
-                        tickerOpen = true;
+                        if(DateTime.Compare(IST, closing) < 0)
+                        {
+                            _tickhub.AddLog($"{orderId} log: pre market opening... market: {IST} server: {DateTime.Now}");
+                            tickerOpen = true;
+                        }
                     }
                     // if it is less than 7 we can sleep for a while longer :)
-                    else if (IST.Hour <= 7)
+                    else if (IST.Hour <= 7 || IST.Hour >= 16)
                     {
                         _tickhub.AddLog($"{orderId} log: market still closed so sleeping for an hour... market: {IST} server: {DateTime.Now}");
                         Thread.Sleep(3600000);
                     }
-                    // if it is 8:58 we can snooze for extra suffering...
-                    else if (IST.Hour == 8 && IST.Minute <= 58)
+                    // if it is 8:59 we can snooze for extra suffering...
+                    else if (IST.Hour == 8 && IST.Minute <= 59)
                     {
                         _tickhub.AddLog($"{orderId} log: market still closed but soon opening... snoozing for a min... market: {IST} server: {DateTime.Now}");
                         Thread.Sleep(60000);
                     }
                 }
 
+                _tickhub.AddLog($"{orderId} log: checking if entry order is filling... {DateTime.Now}");
                 // while order is not filling
                 while (!orderFilling)
                 {
@@ -172,10 +237,18 @@ namespace TradeMaster6000.Server.Tasks
                     if (orderHistory[orderHistory.Count - 1].FilledQuantity > 0)
                     {
                         _tickhub.AddLog($"{orderId} log: order filling... {DateTime.Now}");
-                        isOrderFilled = false;
+                        if(orderHistory[orderHistory.Count - 1].FilledQuantity == quantity)
+                        {
+                            isOrderFilled = true;
+                        }
+                        else
+                        {
+                            isOrderFilled = false;
+                        }
+
                         orderFilling = true;
                     }
-                    Thread.Sleep(500);
+                    Thread.Sleep(1000);
                 }
                 
                 // while pre market is open, but not yet the real deal
@@ -183,12 +256,18 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     DateTime GMT = DateTime.Now;
                     DateTime IST = GMT.AddHours(5).AddMinutes(30);
+                    DateTime opening = new DateTime(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                    DateTime closing = opening.AddHours(6).AddMinutes(45);
                     var orderHistory = kite.GetOrderHistory(orderId_e);
-                    if (IST.Hour == 9 && IST.Minute == 15)
+                    if (DateTime.Compare(IST, opening) >= 0)
                     {
-                        _tickhub.AddLog($"{orderId} log: market open... market: {IST} server: {DateTime.Now}");
-                        isMarketOpen = true;
+                        if(DateTime.Compare(IST, closing) < 0)
+                        {
+                            _tickhub.AddLog($"{orderId} log: market open... market: {IST} server: {DateTime.Now}");
+                            isMarketOpen = true;
+                        }
                     }
+
                     if (!isOrderFilled)
                     {
                         if (orderHistory[orderHistory.Count - 1].FilledQuantity == quantity)
@@ -197,26 +276,50 @@ namespace TradeMaster6000.Server.Tasks
 
                             if (orderHistory[orderHistory.Count - 1].AveragePrice < order.StopLoss)
                             {
-                                kite.CancelOrder(orderId_s_amo, "amo");
-                                _tickhub.AddLog($"{orderId} log: slm amo order cancelled...");
-                                isSL_amoCancelled = true;
+                                try
+                                {
+                                    kite.CancelOrder(orderId_s_amo);
+                                    _tickhub.AddLog($"{orderId} log: slm amo order cancelled...");
+                                    isSL_amoCancelled = true;
+                                }
+                                catch (KiteException e)
+                                {
+                                    _tickhub.AddLog($"{orderId} error: {e.Message}...");
+                                }
                             }
                             isOrderFilled = true;
                         }
                     }
+                    else if (isOrderFilled)
+                    {
+                        if (orderHistory[orderHistory.Count - 1].AveragePrice < order.StopLoss)
+                        {
+                            try
+                            {
+                                kite.CancelOrder(orderId_s_amo);
+                                _tickhub.AddLog($"{orderId} log: slm amo order cancelled...");
+                                isSL_amoCancelled = true;
+                            }
+                            catch (KiteException e)
+                            {
+                                _tickhub.AddLog($"{orderId} error: {e.Message}...");
+                            }
+                        }
+                    }
+
                     if(IST.Hour == 9 && IST.Minute == 14)
                     {
                         if (!isSL_amoCancelled)
                         {
                             if (orderHistory[orderHistory.Count - 1].AveragePrice < order.StopLoss)
                             {
-                                kite.CancelOrder(orderId_s_amo, "amo");
+                                kite.CancelOrder(orderId_s_amo);
                                 _tickhub.AddLog($"{orderId} log: slm amo order cancelled...");
                                 isSL_amoCancelled = true;
                             }
                         }
                     }
-                    Thread.Sleep(200);
+                    Thread.Sleep(500);
                 }
 
                 // market is open! lets place 2 orders simultaneously shall we? (find the functions below this one)
@@ -233,7 +336,7 @@ namespace TradeMaster6000.Server.Tasks
                         Dictionary<string, dynamic> placeOrderResponse = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
-                             TransactionType: Constants.TRANSACTION_TYPE_SELL,
+                             TransactionType: exitTransactionType,
                              Quantity: quantity,
                              Product: Constants.PRODUCT_MIS,
                              OrderType: Constants.ORDER_TYPE_MARKET,
@@ -246,7 +349,7 @@ namespace TradeMaster6000.Server.Tasks
                         dataMarket.TryGetValue("order_id", out dynamic valueMarket2);
                         orderId_m = valueMarket2;
 
-                        kite.CancelOrder(orderId_t, "regular");
+                        kite.CancelOrder(orderId_t);
 
                         crying = true;
                     }
@@ -273,7 +376,7 @@ namespace TradeMaster6000.Server.Tasks
                         if (orderHistoryS[orderHistoryS.Count - 1].FilledQuantity > 0 || orderHistoryS[orderHistoryS.Count - 1].Status == "COMPLETE")
                         {
                             _tickhub.AddLog($"{orderId} log: stop loss hit!... filled quantity: {orderHistoryS[orderHistoryS.Count - 1].FilledQuantity} --- status: {orderHistoryS[orderHistoryS.Count - 1].Status}...");
-                            kite.CancelOrder(orderId_t, "regular");
+                            kite.CancelOrder(orderId_t);
                             hit = true;
                         }
 
@@ -282,11 +385,11 @@ namespace TradeMaster6000.Server.Tasks
                             _tickhub.AddLog($"{orderId} log: target hit!... filled quantity: {orderHistoryT[orderHistoryT.Count - 1].FilledQuantity} --- status: {orderHistoryT[orderHistoryT.Count - 1].Status}...");
                             if (regularSLMplaced)
                             {
-                                kite.CancelOrder(orderId_s, "regular");
+                                kite.CancelOrder(orderId_s);
                             }
                             else
                             {
-                                kite.CancelOrder(orderId_s_amo, "amo");
+                                kite.CancelOrder(orderId_s_amo);
                             }
                             hit = true;
                         }
@@ -322,18 +425,35 @@ namespace TradeMaster6000.Server.Tasks
                 OHstoploss_regular = kite.GetOrderHistory(orderId_s);
             }
 
+            DateTime GMT3 = DateTime.Now;
+            DateTime IST3 = GMT3.AddHours(5).AddMinutes(30);
+            DateTime opening3 = new DateTime(IST3.Year, IST3.Month, IST3.Day, 9, 0, 0);
+            DateTime closing3 = opening3.AddHours(6).AddMinutes(15);
+
+            if(DateTime.Compare(IST3, opening3) < 0)
+            {
+                if(DateTime.Compare(IST3, closing3) > 0)
+                {
+                    variety = "amo";
+                }
+            }
+            else
+            {
+                variety = "regular";
+            }
+
             try
             {
                 if (OHentry[OHentry.Count - 1].Status != "COMPLETE")
                 {
-                    kite.CancelOrder(orderId_e, "amo");
+                    kite.CancelOrder(orderId_e, variety);
                 }
 
                 if (!isSL_amoCancelled)
                 {
                     if (OHstoploss_amo[OHstoploss_amo.Count - 1].Status != "COMPLETE")
                     {
-                        kite.CancelOrder(orderId_s_amo, "amo");
+                        kite.CancelOrder(orderId_s_amo, variety);
                     }
                 }
 
@@ -341,14 +461,14 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     if (OHtarget[OHtarget.Count - 1].Status != "COMPLETE")
                     {
-                        kite.CancelOrder(orderId_t, "regular");
+                        kite.CancelOrder(orderId_t);
                     }
                 }
                 if (regularSLMplaced)
                 {
                     if (OHstoploss_regular[OHstoploss_regular.Count - 1].Status != "COMPLETE")
                     {
-                        kite.CancelOrder(orderId_s, "regular");
+                        kite.CancelOrder(orderId_s);
                     }
                 }
             }
@@ -356,6 +476,9 @@ namespace TradeMaster6000.Server.Tasks
             {
                 _tickhub.AddLog($"{orderId} log: error cancelling orders: {e.Message}...");
             }
+
+            // go to when rejected
+            Ending:
 
             ticker.UnSubscribe(new[] { order.Instrument.Id });
             ticker.DisableReconnect();
@@ -376,7 +499,7 @@ namespace TradeMaster6000.Server.Tasks
             Dictionary<string, dynamic> orderReponse = kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
-                 TransactionType: Constants.TRANSACTION_TYPE_SELL,
+                 TransactionType: exitTransactionType,
                  Quantity: quantity,
                  Price: target,
                  Product: Constants.PRODUCT_MIS,
@@ -411,23 +534,11 @@ namespace TradeMaster6000.Server.Tasks
                 }
                 if (ticks[ticks.Count - 1].High >= proximity)
                 {
-                    var orderHistoryT = kite.GetOrderHistory(orderId_t);
-                    if (orderHistoryT[orderHistoryT.Count - 1].FilledQuantity != orderHistory[orderHistory.Count - 1].Quantity)
+                    if (orderHistory[orderHistory.Count - 1].FilledQuantity != quantity)
                     {
                         kite.ModifyOrder(
                             orderId_t,
-                            null,
-                            order.Instrument.Exchange,
-                            order.TradeSymbol.ToString(),
-                            Constants.TRANSACTION_TYPE_SELL,
-                            orderHistory[orderHistory.Count - 1].FilledQuantity.ToString(),
-                            target,
-                            Constants.PRODUCT_MIS,
-                            Constants.ORDER_TYPE_LIMIT,
-                            Constants.VALIDITY_DAY,
-                            null,
-                            null,
-                            Constants.VARIETY_REGULAR
+                            Quantity: orderHistory[orderHistory.Count - 1].FilledQuantity.ToString()
                         );
                         _tickhub.AddLog($"{orderId} log: target: {orderId_t} - quantity modified {orderHistory[orderHistory.Count - 1].FilledQuantity}... {DateTime.Now}");
                     }
@@ -496,27 +607,27 @@ namespace TradeMaster6000.Server.Tasks
         private void OnOrderUpdate(Order orderData)
         {
             TickHub.orderDataList.Add(orderData);
-            _tickhub.AddLog($"{orderId} log: order update: {orderData.StatusMessage} - at {DateTime.Now}");
+            _tickhub.AddLog($"{orderId} ticker order update: {orderData.StatusMessage} - at {DateTime.Now}");
         }
         private void OnError(string message)
         {
-            _tickhub.AddLog($"{orderId} log: error message: {message} - at {DateTime.Now}");
+            _tickhub.AddLog($"{orderId} ticker error: {message} - at {DateTime.Now}");
         }
         private void OnClose()
         {
-            _tickhub.AddLog($"{orderId} log: ticker connection closed - at {DateTime.Now}");
+            _tickhub.AddLog($"{orderId} ticker log: ticker connection closed - at {DateTime.Now}");
         }
         private void OnReconnect()
         {
-            _tickhub.AddLog($"{orderId} log: ticker connection reconnected - at {DateTime.Now}");
+            _tickhub.AddLog($"{orderId} ticker log: ticker connection reconnected - at {DateTime.Now}");
         }
         private void OnNoReconnect()
         {
-            _tickhub.AddLog($"{orderId} log: ticker connection reconnected - at {DateTime.Now}");
+            _tickhub.AddLog($"{orderId} ticker log: ticker connection not reconnected - at {DateTime.Now}");
         }
         private void OnConnect()
         {
-            _tickhub.AddLog($"{orderId} log: ticker connection connected - at {DateTime.Now}");
+            _tickhub.AddLog($"{orderId} ticker log: ticker connection connected - at {DateTime.Now}");
         }
     }
 }

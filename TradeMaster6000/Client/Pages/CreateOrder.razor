@@ -32,39 +32,18 @@
         <p>Risk:Reward : </p><InputNumber @bind-Value="tradeOrder.RxR" />
         <br />
 
-        <p>Instrument: </p><InputSelect @bind-Value="tradeOrder.Instrument.TradingSymbol">
+        <p>Instrument: </p><InputSelect @bind-Value="tradeOrder.Instrument">
         @{
-
-            if (showInstruments)
+            if (instrumentsLoaded)
             {
                 foreach (var instrument in instruments)
                 {
-                    <option value="@instrument.TradingSymbol">@instrument.TradingSymbol</option>
+                    <option value="@instrument">@instrument.TradingSymbol</option>
                 }
             }
         }
 
 </InputSelect>
-        <br />
-
-        <p>Order type: </p><InputSelect @bind-Value="tradeOrder.OrderType">
-            @{
-                foreach (var type in Enum.GetValues(typeof(OrderType)))
-                {
-                    <option value="@type">@type</option>
-                }
-            }
-        </InputSelect>
-        <br />
-
-        <p>Product: </p><InputSelect @bind-Value="tradeOrder.Product">
-            @{
-                foreach (var type in Enum.GetValues(typeof(Product)))
-                {
-                    <option value="@type">@type</option>
-                }
-            }
-        </InputSelect>
         <br />
 
         <p>Transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
@@ -77,25 +56,14 @@
         </InputSelect>
         <br />
 
-        <p>Variety: </p><InputSelect @bind-Value="tradeOrder.Variety">
-            @{
-                foreach (var type in Enum.GetValues(typeof(Variety)))
-                {
-                    <option value="@type">@type</option>
-                }
-            }
-        </InputSelect>
-        <br />
-
         <button type="submit">Make Order</button>
     </EditForm>
 </div>
 
 @code {
-    private bool showInstruments = false;
+    private bool instrumentsLoaded = false;
     private HubConnection hubConnection;
     private TradeOrder tradeOrder = new TradeOrder() { Instrument = new TradeInstrument() };
-    //private TradeInstrument tradeInstrument = new TradeInstrument();
     private List<TradeInstrument> instruments = new List<TradeInstrument>();
 
     protected override async Task OnInitializedAsync()
@@ -107,7 +75,7 @@
         hubConnection.On<List<TradeInstrument>>("ReceiveInstruments", (instruments) =>
         {
             this.instruments = instruments;
-            showInstruments = true;
+            instrumentsLoaded = true;
             StateHasChanged();
         });
 
@@ -123,15 +91,9 @@
 
     private async Task HandleValidSubmit(EditContext editContext)
     {
-        try
-        {
-            await hubConnection.SendAsync("StartOrderWork", (TradeOrder)editContext.Model);
 
-        }
-        catch (Exception e)
-        {
+        await hubConnection.SendAsync("StartOrderWork", (TradeOrder)editContext.Model);
 
-        }
         NavigationManager.NavigateTo("/orders");
     }
 
