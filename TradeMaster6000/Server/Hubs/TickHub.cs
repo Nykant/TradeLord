@@ -20,7 +20,7 @@ namespace TradeMaster6000.Server.Hubs
     {
         private static List<TradeOrder> orderList = new List<TradeOrder>();
         private static List<string> logList = new List<string>();
-        public static List<Order> orderDataList;
+        private static List<Order> orderDataList = new List<Order>();
         private readonly ILogger<OrderWork> logger;
         private readonly IKiteService kiteService;
         private readonly IHttpContextAccessor _contextAccessor;
@@ -61,15 +61,10 @@ namespace TradeMaster6000.Server.Hubs
             // send list to client
             await Clients.Caller.SendAsync("ReceiveList", orderList);
 
-            // get available threads and log amount
-            ThreadPool.GetAvailableThreads(out int workerThreads, out int completionPortThreads);
-            AddLog($"log: maximum number of threads available: {workerThreads}");
-
             // start work in that instance which runs on the thread pool
             await Task.Run( () => 
             {
                 orderWork.StartWork(Clients, this, order, order.TokenSource.Token);
-                AddLog($"log: Task {Task.CurrentId} has finished");
             });
         }
         public async Task GetInstruments()
@@ -93,6 +88,10 @@ namespace TradeMaster6000.Server.Hubs
         public void AddLog(string log)
         {
             logList.Add(log);
+        }
+        public void AddOrderUpdate(Order orderData)
+        {
+            orderDataList.Add(orderData);
         }
 
 

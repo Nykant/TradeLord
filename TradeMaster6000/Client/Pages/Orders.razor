@@ -46,12 +46,12 @@
 
 <hr />
 
-@*<ul id="orderDataList">
+<ul id="orderDataList">
     @foreach (var data in orderData)
     {
         <li>status message: @data.StatusMessage - status: @data.Status</li>
     }
-</ul>*@
+</ul>
 
 @code {
 
@@ -60,7 +60,7 @@
     private List<TradeOrder> orders = new List<TradeOrder>();
     private TradeOrder tradeOrder = new TradeOrder();
     private List<string> logs = new List<string>();
-    private List<KiteConnect.Order> orderData = new List<KiteConnect.Order>();
+    private List<Order> orderData = new List<Order>();
 
 
     protected override async Task OnInitializedAsync()
@@ -87,7 +87,7 @@
             StateHasChanged();
         });
 
-        hubConnection.On<List<KiteConnect.Order>>("ReceiveOrderData", (list) =>
+        hubConnection.On<List<Order>>("ReceiveOrderData", (list) =>
         {
             orderData = list;
             StateHasChanged();

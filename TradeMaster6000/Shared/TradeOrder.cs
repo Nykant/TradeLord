@@ -22,4 +22,8 @@ namespace TradeMaster6000.Shared
         BUY,
         SELL
     }
+    public enum Status
+    {
+
+    }
 }

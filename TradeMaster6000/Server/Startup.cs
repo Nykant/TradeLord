@@ -2,6 +2,7 @@ using KiteConnect;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -17,6 +18,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Logging;
 using System;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using TradeMaster6000.Server.Data;
 using TradeMaster6000.Server.Hubs;
@@ -28,11 +30,13 @@ namespace TradeMaster6000.Server
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        public Startup(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             Configuration = configuration;
+            Environment = webHostEnvironment;
         }
 
+        public IWebHostEnvironment Environment { get; }
         public IConfiguration Configuration { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
@@ -40,6 +44,26 @@ namespace TradeMaster6000.Server
         public void ConfigureServices(IServiceCollection services)
         {
             string connectionString = Configuration.GetConnectionString("DefaultConnection");
+            string keyConnection = Configuration.GetConnectionString("KeyConnection");
+
+            services.AddDbContext<MyKeysContext>(options =>
+                options.UseMySql(keyConnection, ServerVersion.AutoDetect(connectionString)));
+
+            if (Environment.IsDevelopment())
+            {
+                services.AddDataProtection()
+                    .PersistKeysToDbContext<MyKeysContext>()
+                    .SetApplicationName("TradeMaster6000")
+                    .ProtectKeysWithCertificate(new X509Certificate2("certificate.pfx", Configuration["Thumbprint"]));
+            }
+            else
+            {
+                services.AddDataProtection()
+                    .PersistKeysToDbContext<MyKeysContext>()
+                    .SetApplicationName("TradeMaster6000")
+                    .ProtectKeysWithCertificate(new X509Certificate2("/etc/ssl/letsencrypt/certificate.pfx", Configuration["Thumbprint"]));
+            }
+
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
