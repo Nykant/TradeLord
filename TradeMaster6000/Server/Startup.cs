@@ -64,7 +64,6 @@ namespace TradeMaster6000.Server
                     .ProtectKeysWithCertificate(new X509Certificate2("/etc/ssl/letsencrypt/certificate.pfx", Configuration["Thumbprint"]));
             }
 
-
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
@@ -157,7 +156,7 @@ namespace TradeMaster6000.Server
                 endpoints.MapRazorPages();
                 endpoints.MapControllers();
                 endpoints.MapHub<ChatHub>("/chatting");
-                endpoints.MapHub<TickHub>("/orders");
+                endpoints.MapHub<OrderHub>("/orders");
                 endpoints.MapFallbackToFile("index.html");
             });
         }

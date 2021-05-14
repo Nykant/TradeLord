@@ -16,7 +16,7 @@ using TradeMaster6000.Shared;
 namespace TradeMaster6000.Server.Hubs
 {
 
-    public class TickHub : Hub
+    public class OrderHub : Hub
     {
         private static List<TradeOrder> orderList = new List<TradeOrder>();
         private static List<string> logList = new List<string>();
@@ -28,7 +28,7 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IInstrumentService instrumentService;
         private static int OrderCount { get; set; }
 
-        public TickHub(ILogger<OrderWork> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, IInstrumentService instrumentService)
+        public OrderHub(ILogger<OrderWork> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, IInstrumentService instrumentService)
         {
             this.logger = logger;
             _configuration = configuration;
