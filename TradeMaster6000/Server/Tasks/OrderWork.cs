@@ -29,13 +29,13 @@ namespace TradeMaster6000.Server.Tasks
         private string orderId_t;
         private string orderId_s_amo;
         private string orderId_s;
-        private decimal low = 0;
+        private decimal triggerPrice = 0;
         private decimal target = 0;
         private decimal zonewidth;
         private int quantity;
         private bool orderFilling;
         private int orderId;
-        private bool isOrderFilled;
+        private bool isOrderFilling;
         private bool isSL_amoCancelled;
         private bool squareOff;
         private bool regularSLMplaced;
@@ -61,7 +61,7 @@ namespace TradeMaster6000.Server.Tasks
             isMarketOpen = false;
             targetplaced = false;
             hit = false;
-            isOrderFilled = false;
+            isOrderFilling = false;
             isSL_amoCancelled = false;
             squareOff = false;
             regularSLMplaced = false;
@@ -86,6 +86,9 @@ namespace TradeMaster6000.Server.Tasks
             {
                 exitTransactionType = "BUY";
             }
+
+            order.StopLoss = RoundUp(order.StopLoss, (decimal)0.05);
+            order.Entry = RoundUp(order.Entry, (decimal)0.05);
 
             string variety = null;
             DateTime GST1 = DateTime.Now;
@@ -143,6 +146,17 @@ namespace TradeMaster6000.Server.Tasks
                 quantity = (int)decQuantity;
             }
 
+            // wait untill we get a tick
+            bool anyTicks = false;
+            while (!anyTicks)
+            {
+                if (ticks.Count > 0)
+                {
+                    anyTicks = true;
+                }
+                Thread.Sleep(500);
+            }
+
             EntryPoint:
 
             // place entry limit order
@@ -166,18 +180,7 @@ namespace TradeMaster6000.Server.Tasks
             data.TryGetValue("order_id", out dynamic value1);
             orderId_e = value1;
 
-            // wait untill we get a tick
-            bool anyTicks = false;
-            while(!anyTicks)
-            {
-                if(ticks.Count > 0)
-                {
-                    anyTicks = true;
-                }
-                Thread.Sleep(500);
-            }
-
-            if(exitTransactionType == "SELL")
+            if (exitTransactionType == "SELL")
             {
                 // if last price is more than stop loss then place slm
                 if (ticks[ticks.Count - 1].LastPrice > order.StopLoss)
@@ -207,7 +210,7 @@ namespace TradeMaster6000.Server.Tasks
                     }
                     catch (KiteException e)
                     {
-                        _tickhub.AddLog(e.Message);
+                        _tickhub.AddLog($"{orderId} kite error {e.Message}");
                     }
                 }
                 // else tell app that slm order was cancelled, which means it has to find a new one after 1 min
@@ -247,7 +250,7 @@ namespace TradeMaster6000.Server.Tasks
                     }
                     catch (KiteException e)
                     {
-                        _tickhub.AddLog(e.Message);
+                        _tickhub.AddLog($"{orderId} kite error: {e.Message}");
                     }
                 }
                 // else tell app that slm order was cancelled, which means it has to find a new one after 1 min
@@ -311,6 +314,7 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         _tickhub.AddLog($"{orderId} log: pre market opening... market: {IST} server: {DateTime.Now}");
                         isPreMarketOpen = true;
+                        break;
                     }
                 }
 
@@ -372,6 +376,7 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         _tickhub.AddLog($"{orderId} log: market open... market: {IST} server: {DateTime.Now}");
                         isMarketOpen = true;
+                        break;
                     }
                 }
 
@@ -413,9 +418,9 @@ namespace TradeMaster6000.Server.Tasks
                     }
                 }
 
-                if (!isOrderFilled)
+                if (!isOrderFilling)
                 {
-                    if (orderHistory[orderHistory.Count - 1].FilledQuantity == quantity)
+                    if (orderHistory[orderHistory.Count - 1].FilledQuantity > 0)
                     {
                         _tickhub.AddLog($"{orderId} log: entry order filled... {DateTime.Now}");
 
@@ -425,13 +430,13 @@ namespace TradeMaster6000.Server.Tasks
                             {
                                 try
                                 {
-                                    kite.CancelOrder(orderId_s_amo);
+                                    kite.CancelOrder(orderId_s_amo, "amo");
                                     _tickhub.AddLog($"{orderId} log: slm amo order cancelled because average price of filled order was less than stop loss...");
                                     isSL_amoCancelled = true;
                                 }
                                 catch (KiteException e)
                                 {
-                                    _tickhub.AddLog($"{orderId} error: {e.Message}...");
+                                    _tickhub.AddLog($"{orderId} kite error: {e.Message}...");
                                 }
                             }
                         }
@@ -441,30 +446,17 @@ namespace TradeMaster6000.Server.Tasks
                             {
                                 try
                                 {
-                                    kite.CancelOrder(orderId_s_amo);
-                                    _tickhub.AddLog($"{orderId} log: slm amo order cancelled because average price of filled order was less than stop loss...");
+                                    kite.CancelOrder(orderId_s_amo, "amo");
+                                    _tickhub.AddLog($"{orderId} log: slm amo order cancelled because average price of filled order was more than stop loss...");
                                     isSL_amoCancelled = true;
                                 }
                                 catch (KiteException e)
                                 {
-                                    _tickhub.AddLog($"{orderId} error: {e.Message}...");
+                                    _tickhub.AddLog($"{orderId} kite error: {e.Message}...");
                                 }
                             }
                         }
-
-                        isOrderFilled = true;
-                    }
-                }
-                if (IST.Hour == 9 && IST.Minute == 14)
-                {
-                    if (!isSL_amoCancelled)
-                    {
-                        if (orderHistory[orderHistory.Count - 1].AveragePrice < order.StopLoss)
-                        {
-                            kite.CancelOrder(orderId_s_amo);
-                            _tickhub.AddLog($"{orderId} log: slm amo order cancelled because time is 9:14 and entry order still not filled. and average price of currently filled entry order is less than stop loss...");
-                            isSL_amoCancelled = true;
-                        }
+                        isOrderFilling = true;
                     }
                 }
 
@@ -673,6 +665,22 @@ namespace TradeMaster6000.Server.Tasks
                 _tickhub.AddLog($"{orderId} log: error cancelling orders: {e.Message}...");
             }
 
+            List<Order> OHentryLOL = kite.GetOrderHistory(orderId_e);
+
+            if(OHentryLOL[OHentryLOL.Count - 1].FilledQuantity > 0)
+            {
+                Dictionary<string, dynamic> placeOrderResponse = kite.PlaceOrder(
+                     Exchange: order.Instrument.Exchange,
+                     TradingSymbol: order.Instrument.TradingSymbol,
+                     TransactionType: exitTransactionType,
+                     Quantity: OHentryLOL[OHentryLOL.Count - 1].FilledQuantity,
+                     Product: Constants.PRODUCT_MIS,
+                     OrderType: Constants.ORDER_TYPE_MARKET,
+                     Validity: Constants.VALIDITY_DAY,
+                     Variety: Constants.VARIETY_REGULAR
+                );
+            }
+
             Ending:
 
             ticker.UnSubscribe(new[] { order.Instrument.Id });
@@ -684,33 +692,58 @@ namespace TradeMaster6000.Server.Tasks
         // place target
         private void PlaceTarget(TradeOrder order)
         {
-            _tickhub.AddLog($"{orderId} log: placing target... {DateTime.Now}");
+            List<Order> orderHistoryE = new List<Order>();
+            bool isFilling = false;
+            while (!isFilling)
+            {
+                orderHistoryE = kite.GetOrderHistory(orderId_e);
+                if(orderHistoryE[orderHistoryE.Count - 1].FilledQuantity > 0)
+                {
+                    isFilling = true;
+                }
+            }
 
-            var orderHistoryE = kite.GetOrderHistory(orderId_e);
-            target = (order.RxR * zonewidth) + orderHistoryE[orderHistoryE.Count - 1].AveragePrice;
-            decimal proximity = ((target - orderHistoryE[orderHistoryE.Count - 1].AveragePrice) * (decimal)0.8)
-                                        + orderHistoryE[orderHistoryE.Count - 1].AveragePrice;
+            decimal proximity = 0;
+            if (exitTransactionType == "SELL")
+            {
+                target = (order.RxR * zonewidth) + orderHistoryE[orderHistoryE.Count - 1].AveragePrice;
+                proximity = ((target - orderHistoryE[orderHistoryE.Count - 1].AveragePrice) * (decimal)0.8)
+                                            + orderHistoryE[orderHistoryE.Count - 1].AveragePrice;
+            }
+            else
+            {
+                target = orderHistoryE[orderHistoryE.Count - 1].AveragePrice - (order.RxR * zonewidth);
+                proximity = orderHistoryE[orderHistoryE.Count - 1].AveragePrice 
+                    - ((orderHistoryE[orderHistoryE.Count - 1].AveragePrice - target) * (decimal)0.8);
+            }
 
-            Dictionary<string, dynamic> orderReponse = kite.PlaceOrder(
-                 Exchange: order.Instrument.Exchange,
-                 TradingSymbol: order.Instrument.TradingSymbol,
-                 TransactionType: exitTransactionType,
-                 Quantity: quantity,
-                 Price: target,
-                 Product: Constants.PRODUCT_MIS,
-                 OrderType: Constants.ORDER_TYPE_LIMIT,
-                 Validity: Constants.VALIDITY_DAY,
-                 Variety: Constants.VARIETY_REGULAR
-             );
+            try
+            {
+                _tickhub.AddLog($"{orderId} log: placing target... {DateTime.Now}");
+                Dictionary<string, dynamic> orderReponse = kite.PlaceOrder(
+                     Exchange: order.Instrument.Exchange,
+                     TradingSymbol: order.Instrument.TradingSymbol,
+                     TransactionType: exitTransactionType,
+                     Quantity: quantity,
+                     Price: target,
+                     Product: Constants.PRODUCT_MIS,
+                     OrderType: Constants.ORDER_TYPE_LIMIT,
+                     Validity: Constants.VALIDITY_DAY,
+                     Variety: Constants.VARIETY_REGULAR
+                 );
+                targetplaced = true;
 
-            targetplaced = true;
+                orderReponse.TryGetValue("data", out dynamic value);
+                Dictionary<string, dynamic> data = value;
+                data.TryGetValue("order_id", out dynamic value1);
+                orderId_t = value1;
 
-            orderReponse.TryGetValue("data", out dynamic value);
-            Dictionary<string, dynamic> data = value;
-            data.TryGetValue("order_id", out dynamic value1);
-            orderId_t = value1;
-
-            _tickhub.AddLog($"{orderId} log: target: {orderId_t} placed... with target: {target} ... {DateTime.Now}");
+                _tickhub.AddLog($"{orderId} log: target: {orderId_t} placed... with target: {target} ... {DateTime.Now}");
+            }
+            catch (KiteException e)
+            {
+                _tickhub.AddLog($"{orderId} error: {e.Message}");
+            }
 
             _tickhub.AddLog($"{orderId} log: checking proximity: {proximity} of order: {orderId_e} ... {DateTime.Now}");
 
@@ -720,14 +753,15 @@ namespace TradeMaster6000.Server.Tasks
             while (checkingProximity)
             {
                 var orderHistory = kite.GetOrderHistory(orderId_e);
-                if (isOrderFilled || orderHistory[orderHistory.Count - 1].FilledQuantity == quantity)
+                if (isOrderFilling || orderHistory[orderHistory.Count - 1].FilledQuantity == quantity)
                 {
-                    if(isOrderFilled == false)
+                    if(isOrderFilling == false)
                     {
                         _tickhub.AddLog($"{orderId} log: whole entry order filled, stop checking proximity... {DateTime.Now}");
-                        isOrderFilled = true;
+                        isOrderFilling = true;
                     }
                     checkingProximity = false;
+                    break;
                 }
                 if (ticks[ticks.Count - 1].High >= proximity)
                 {
@@ -749,15 +783,16 @@ namespace TradeMaster6000.Server.Tasks
             // if entry order average price, is less than the stoploss input, then sleep for a minute for ticks to come in, so we can set the stoploss as the low. 
             if (isSL_amoCancelled)
             {
-                _tickhub.AddLog($"{orderId} log: average price is less than stop loss... sleeping for 1 minute for data...");
+                _tickhub.AddLog($"{orderId} log: average price is less than stop loss... waiting 1 minute for data...");
 
                 if (!slRejected)
                 {
                     DateTime now = DateTime.Now;
-                    DateTime min = now.AddMinutes(1);
+                    DateTime min = now.AddSeconds(56.5);
                     bool waiting = true;
                     while (waiting)
                     {
+                        now = DateTime.Now;
                         if (DateTime.Compare(now, min) >= 0)
                         {
                             waiting = false;
@@ -769,51 +804,119 @@ namespace TradeMaster6000.Server.Tasks
                     }
                 }
 
+                if (exitTransactionType == "BUY")
+                {
+                    triggerPrice = ticks[ticks.Count - 1].High;
+                    triggerPrice = triggerPrice * (decimal)1.00015;
+                    triggerPrice = RoundUp(triggerPrice, (decimal)0.05);
+                }
+                else
+                {
+                    triggerPrice = ticks[ticks.Count - 1].Low;
+                    triggerPrice = triggerPrice * (decimal)0.99985;
+                    triggerPrice = RoundDown(triggerPrice, (decimal)0.05);
+                }
+
+                _tickhub.AddLog($"{orderId} log: low found: {triggerPrice} ...");
+
                 bool isBullish = false;
-
-                low = ticks[ticks.Count - 1].Low;
-
-                _tickhub.AddLog($"{orderId} log: low found: {low} ...");
-
                 if (ticks[ticks.Count - 1].Open < ticks[ticks.Count - 1].Close)
                 {
                     _tickhub.AddLog($"{orderId} log: {order.Instrument.TradingSymbol} is bullish...");
                     isBullish = true;
                 }
 
-                if (isBullish)
+                if(exitTransactionType == "SELL")
                 {
-                    Dictionary<string, dynamic> response = kite.PlaceOrder(
-                         Exchange: order.Instrument.Exchange,
-                         TradingSymbol: order.Instrument.TradingSymbol,
-                         TransactionType: exitTransactionType,
-                         Quantity: quantity,
-                         TriggerPrice: low,
-                         Product: Constants.PRODUCT_MIS,
-                         OrderType: Constants.ORDER_TYPE_SLM,
-                         Validity: Constants.VALIDITY_DAY,
-                         Variety: Constants.VARIETY_REGULAR
-                    );
+                    if (isBullish)
+                    {
+                        try
+                        {
+                            Dictionary<string, dynamic> response = kite.PlaceOrder(
+                                 Exchange: order.Instrument.Exchange,
+                                 TradingSymbol: order.Instrument.TradingSymbol,
+                                 TransactionType: exitTransactionType,
+                                 Quantity: quantity,
+                                 TriggerPrice: triggerPrice,
+                                 Product: Constants.PRODUCT_MIS,
+                                 OrderType: Constants.ORDER_TYPE_SLM,
+                                 Validity: Constants.VALIDITY_DAY,
+                                 Variety: Constants.VARIETY_REGULAR
+                            );
 
-                    response.TryGetValue("data", out dynamic value);
-                    Dictionary<string, dynamic> date = value;
-                    date.TryGetValue("order_id", out dynamic value1);
-                    orderId_s = value1;
+                            response.TryGetValue("data", out dynamic value);
+                            Dictionary<string, dynamic> date = value;
+                            date.TryGetValue("order_id", out dynamic value1);
+                            orderId_s = value1;
 
-                    regularSLMplaced = true;
+                            regularSLMplaced = true;
 
-                    _tickhub.AddLog($"{orderId} log: SLM order: {orderId_s} placed... {DateTime.Now}");
+                            _tickhub.AddLog($"{orderId} log: regular SLM order: {orderId_s} placed... {DateTime.Now}");
+                        }
+                        catch (KiteException e)
+                        {
+                            _tickhub.AddLog($"{orderId} error: {e.Message}");
+                        }
+                    }
+                    else
+                    {
+                        squareOff = true;
+                    }
                 }
                 else
                 {
-                    squareOff = true;
-                }
+                    if (!isBullish)
+                    {
+                        try
+                        {
+                            Dictionary<string, dynamic> response = kite.PlaceOrder(
+                                 Exchange: order.Instrument.Exchange,
+                                 TradingSymbol: order.Instrument.TradingSymbol,
+                                 TransactionType: exitTransactionType,
+                                 Quantity: quantity,
+                                 TriggerPrice: triggerPrice,
+                                 Product: Constants.PRODUCT_MIS,
+                                 OrderType: Constants.ORDER_TYPE_SLM,
+                                 Validity: Constants.VALIDITY_DAY,
+                                 Variety: Constants.VARIETY_REGULAR
+                            );
 
+                            response.TryGetValue("data", out dynamic value);
+                            Dictionary<string, dynamic> date = value;
+                            date.TryGetValue("order_id", out dynamic value1);
+                            orderId_s = value1;
+
+                            regularSLMplaced = true;
+
+                            _tickhub.AddLog($"{orderId} log: SLM order: {orderId_s} placed... {DateTime.Now}");
+                        }
+                        catch (KiteException e)
+                        {
+                            _tickhub.AddLog($"{orderId} error: {e.Message}");
+                        }
+                    }
+                    else
+                    {
+                        squareOff = true;
+                    }
+                }
             }
             Ending:;
         }
-        
-        private void onTick(KiteConnect.Tick tickData)
+
+        private decimal RoundUp(decimal value, decimal step)
+        {
+            var multiplicand = Math.Ceiling(value / step);
+            return step * multiplicand;
+        }
+
+        private decimal RoundDown(decimal value, decimal step)
+        {
+            var multiplicand = Math.Floor(value / step);
+            return step * multiplicand;
+        }
+
+        private void onTick(Tick tickData)
         {
             ticks.Add(tickData);
         }
