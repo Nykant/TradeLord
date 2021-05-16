@@ -8,8 +8,17 @@
 @attribute [Authorize]
 @inject HttpClient Http
 
-<p>hej</p>
-<p>@LogInStatus</p>
+@{
+    if (LogInStatus == null)
+    {
+        <p>wait for api login status...</p>
+    }
+    else
+    {
+        <p>@LogInStatus</p>
+    }
+}
+
 
 @code {
     public string request_token;
@@ -42,6 +51,11 @@
         if (response.IsSuccessStatusCode)
         {
             LogInStatus = "Successfully logged in to api";
+            StateHasChanged();
+        }
+        else
+        {
+            LogInStatus = "Failure logging in to api";
             StateHasChanged();
         }
     }

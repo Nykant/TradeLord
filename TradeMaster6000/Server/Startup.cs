@@ -21,6 +21,7 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using TradeMaster6000.Server.Data;
+using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Hubs;
 using TradeMaster6000.Server.Models;
 using TradeMaster6000.Server.Services;
@@ -45,9 +46,10 @@ namespace TradeMaster6000.Server
         {
             string connectionString = Configuration.GetConnectionString("DefaultConnection");
             string keyConnection = Configuration.GetConnectionString("KeyConnection");
+            string tradeConnection = Configuration.GetConnectionString("TradeConnection");
 
             services.AddDbContext<MyKeysContext>(options =>
-                options.UseMySql(keyConnection, ServerVersion.AutoDetect(connectionString)));
+                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection)));
 
             if (Environment.IsDevelopment())
             {
@@ -66,6 +68,9 @@ namespace TradeMaster6000.Server
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+            services.AddDbContext<TradeDbContext>(options =>
+                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection)));
 
             services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
                 .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -97,13 +102,10 @@ namespace TradeMaster6000.Server
                     new[] { "application/octet-stream" });
             });
 
-            //services.AddCors();
+            services.AddSingleton<ITradeOrderHelper, TradeOrderHelper>();
+            services.AddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.AddSingleton<IKiteService, KiteService>();
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-
-            //services.AddSingleton<IWorker, Worker>();
-            //services.AddSingleton<IWorker2, Worker2>();
-            //services.AddSingleton<ITickHub, TickHub>();
 
             services.Configure<ForwardedHeadersOptions>(options =>
             {
@@ -118,7 +120,6 @@ namespace TradeMaster6000.Server
         {
             app.UseForwardedHeaders();
             app.UseResponseCompression();
-            //InitializeDatabase(app);
 
             if (env.IsDevelopment())
             {
@@ -133,15 +134,10 @@ namespace TradeMaster6000.Server
                 app.UseHsts();
             }
 
-            //app.UseCertificateForwarding();
             app.UseHttpsRedirection();
-
-            IdentityModelEventSource.ShowPII = true;
 
             app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();
-
-            //app.UseCors();
 
             app.UseRouting();
 
@@ -155,46 +151,9 @@ namespace TradeMaster6000.Server
             {
                 endpoints.MapRazorPages();
                 endpoints.MapControllers();
-                endpoints.MapHub<ChatHub>("/chatting");
-                endpoints.MapHub<OrderHub>("/orders");
+                endpoints.MapHub<OrderHub>("/orderhub");
                 endpoints.MapFallbackToFile("index.html");
             });
         }
-        //private void InitializeDatabase(IApplicationBuilder app)
-        //{
-        //    using (var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope())
-        //    {
-        //        serviceScope.ServiceProvider.GetRequiredService<PersistedGrantDbContext>().Database.Migrate();
-
-        //        var context = serviceScope.ServiceProvider.GetRequiredService<ConfigurationDbContext>();
-        //        context.Database.Migrate();
-        //        if (!context.Clients.Any())
-        //        {
-        //            foreach (var client in Config.Clients)
-        //            {
-        //                context.Clients.Add(client.ToEntity());
-        //            }
-        //            context.SaveChanges();
-        //        }
-
-        //        if (!context.IdentityResources.Any())
-        //        {
-        //            foreach (var resource in Config.IdentityResources)
-        //            {
-        //                context.IdentityResources.Add(resource.ToEntity());
-        //            }
-        //            context.SaveChanges();
-        //        }
-
-        //        if (!context.ApiScopes.Any())
-        //        {
-        //            foreach (var resource in Config.ApiScopes)
-        //            {
-        //                context.ApiScopes.Add(resource.ToEntity());
-        //            }
-        //            context.SaveChanges();
-        //        }
-        //    }
-        //}
     }
 }

@@ -41,7 +41,7 @@
 <ul id="logsList">
     @foreach (var log in logs)
     {
-        <li>@log</li>
+        <li>@log.Log</li>
     }
 </ul>
 
@@ -61,25 +61,19 @@
     private HubConnection hubConnection;
     private List<TradeOrder> orders = new List<TradeOrder>();
     private TradeOrder tradeOrder = new TradeOrder();
-    private List<string> logs = new List<string>();
+    private List<TradeLog> logs = new List<TradeLog>();
     private List<Order> orderData = new List<Order>();
 
 
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/orders"))
+            .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
             .Build();
 
-        hubConnection.On<List<string>>("ReceiveLogs", (logs) =>
+        hubConnection.On<List<TradeLog>>("ReceiveLogs", (logs) =>
         {
             this.logs = logs;
-            StateHasChanged();
-        });
-
-        hubConnection.On<string>("ReceiveLog", (log) =>
-        {
-            logs.Add($"log: {log}");
             StateHasChanged();
         });
 

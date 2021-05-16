@@ -5,12 +5,13 @@ using System.Text;
 
 namespace TradeMaster6000.Shared
 {
-    public class TradeInstrument
+    public class TradeLog
     {
         [Key]
         public int Id { get; set; }
-        public uint Token { get; set; }
-        public string TradingSymbol { get; set; }
-        public string Exchange { get; set; }
+        public TradeOrder TradeOrder { get; set; }
+        public int TradeOrderId { get; set; }
+        public string Log { get; set; }
+        public DateTime Timestamp { get; set; }
     }
 }
