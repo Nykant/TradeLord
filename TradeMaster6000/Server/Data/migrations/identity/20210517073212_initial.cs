@@ -2,7 +2,7 @@
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
-namespace TradeMaster6000.Server.data.migrations
+namespace TradeMaster6000.Server.data.migrations.identity
 {
     public partial class initial : Migration
     {

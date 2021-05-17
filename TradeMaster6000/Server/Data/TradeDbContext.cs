@@ -11,7 +11,6 @@ namespace TradeMaster6000.Server.Data
     {
         public TradeDbContext(DbContextOptions<TradeDbContext> options) : base(options)
         {
-            Database.Migrate();
         }
 
         public DbSet<TradeOrder> TradeOrders { get; set; }

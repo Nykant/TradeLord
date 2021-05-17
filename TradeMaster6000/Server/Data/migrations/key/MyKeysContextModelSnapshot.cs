@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TradeMaster6000.Server.Data;
 
-namespace TradeMaster6000.Server.data.migrations.keycontext
+namespace TradeMaster6000.Server.data.migrations.key
 {
     [DbContext(typeof(MyKeysContext))]
     partial class MyKeysContextModelSnapshot : ModelSnapshot

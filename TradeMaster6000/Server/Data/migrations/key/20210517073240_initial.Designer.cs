@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TradeMaster6000.Server.Data;
 
-namespace TradeMaster6000.Server.data.migrations.keycontext
+namespace TradeMaster6000.Server.data.migrations.key
 {
     [DbContext(typeof(MyKeysContext))]
-    [Migration("20210513155700_initial")]
+    [Migration("20210517073240_initial")]
     partial class initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
