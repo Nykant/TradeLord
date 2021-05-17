@@ -7,53 +7,55 @@
 @implements IAsyncDisposable
 @attribute [Authorize]
 
-<h1>Orders</h1>
+@{
 
-<br />
-
-<button @onclick="@NewOrder">New Order</button>
-
-<br />
-
-<table>
-    <tr>
-        <th>Id</th>
-        <th>Trading Symbol</th>
-        <th>Transaction Type</th>
-        <th>Entry</th>
-        <th></th>
-    </tr>
-    @foreach (var order in orders)
+    if (IsConnected)
     {
-        <tr>
-            <td>@order.Id</td>
-            <td>@order.Instrument.TradingSymbol</td>
-            <td>@order.TransactionType.ToString()</td>
-            <td>@order.Entry</td>
-            <td><button @onclick="() => StopTicker(order.Id)">stop</button></td>
-        </tr>
+        <h1>Orders</h1>
+
+        <br />
+
+        <button @onclick="@NewOrder">New Order</button>
+
+        <br />
+
+        <table>
+            <tr>
+                <th>Id</th>
+                <th>Trading Symbol</th>
+                <th>Transaction Type</th>
+                <th>Entry</th>
+                <th>Quantity</th>
+                <th>Status</th>
+                <th></th>
+                <th></th>
+            </tr>
+            @foreach (var order in orders)
+            {
+                <tr>
+                    <td>@order.Id</td>
+                    <td>@order.Instrument.TradingSymbol</td>
+                    <td>@order.TransactionType.ToString()</td>
+                    <td>@order.Entry</td>
+                    <td>@order.Quantity</td>
+                    <td>@order.Status</td>
+                    <td><a href="/orderdetails/@order.Id">See Logs</a></td>
+                    <td><button @onclick="() => StopTicker(order.Id)">Stop</button></td>
+                </tr>
+            }
+        </table>
+
+        <hr />
+
     }
-</table>
-
-<hr />
-
-<h1>Logs:</h1>
-<ul id="logsList">
-    @foreach (var log in logs)
+    else
     {
-        <li>@log.Log</li>
+        
+<h1>Connecting...</h1>
+        
     }
-</ul>
+}
 
-<hr />
-
-<h1>Order Data:</h1>
-<ul id="orderDataList">
-    @foreach (var data in orderData)
-    {
-        <li>status message: @data.StatusMessage - status: @data.Status</li>
-    }
-</ul>
 
 @code {
 
@@ -61,9 +63,6 @@
     private HubConnection hubConnection;
     private List<TradeOrder> orders = new List<TradeOrder>();
     private TradeOrder tradeOrder = new TradeOrder();
-    private List<TradeLog> logs = new List<TradeLog>();
-    private List<Order> orderData = new List<Order>();
-
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,49 +70,27 @@
             .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
             .Build();
 
-        hubConnection.On<List<TradeLog>>("ReceiveLogs", (logs) =>
-        {
-            this.logs = logs;
-            StateHasChanged();
-        });
-
         hubConnection.On<List<TradeOrder>>("ReceiveList", (list) =>
         {
             orders = list;
             StateHasChanged();
         });
 
-        hubConnection.On<List<Order>>("ReceiveOrderData", (list) =>
-        {
-            orderData = list;
-            StateHasChanged();
-        });
-
         await hubConnection.StartAsync();
 
         await GetOrders();
-        await GetLogList();
-        await GetOrderData();
+    }
+
+    private async Task GetOrders()
+    {
+
+        await hubConnection.SendAsync("GetOrders");
 
     }
 
     private void NewOrder()
     {
         NavigationManager.NavigateTo("/createorder");
-    }
-
-    private async Task GetOrders()
-    {
-        await hubConnection.SendAsync("GetOrders");
-    }
-
-    private async Task GetOrderData()
-    {
-        await hubConnection.SendAsync("GetOrderData");
-    }
-    private async Task GetLogList()
-    {
-        await hubConnection.SendAsync("GetLogList");
     }
 
     private async Task StopTicker(int id)

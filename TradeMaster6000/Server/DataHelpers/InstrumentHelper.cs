@@ -9,23 +9,36 @@ using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.DataHelpers
 {
-    public class InstrumentHelper : IInstrumentHelper
+    public class InstrumentHelper
     {
-        private readonly TradeDbContext context;
-        public InstrumentHelper(IInstrumentService instrumentService, TradeDbContext tradeDbContext)
+        private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        public InstrumentHelper(IInstrumentService instrumentService, IDbContextFactory<TradeDbContext> contextFactory)
         {
-            instrumentService.LoadInstruments();
-            context = tradeDbContext;
+            this.contextFactory = contextFactory;
+            LoadInstruments(instrumentService.GetInstruments());
         }
 
         public async Task<List<TradeInstrument>> GetTradeInstruments()
         {
-            return await context.TradeInstruments.ToListAsync();
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.TradeInstruments.ToListAsync();
+            }
         }
 
-    }
-    public interface IInstrumentHelper
-    {
-        Task<List<TradeInstrument>> GetTradeInstruments();
+        private void LoadInstruments(List<TradeInstrument> list)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                if (context.TradeInstruments.Count() == 0)
+                {
+                    foreach (var instrument in list)
+                    {
+                        context.TradeInstruments.Add(instrument);
+                    }
+                    context.SaveChanges();
+                }
+            }
+        }
     }
 }

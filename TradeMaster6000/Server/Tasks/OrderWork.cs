@@ -1,6 +1,7 @@
 ﻿using KiteConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
@@ -19,16 +20,19 @@ namespace TradeMaster6000.Server.Tasks
 {
     public class OrderWork
     {
-        private readonly ILogger<OrderWork> logger;
+        // private class variables
         private readonly IHttpContextAccessor _contextAccessor;
         private readonly IKiteService kiteService;
         private readonly IConfiguration configuration;
-        private readonly ITradeOrderHelper tradeOrderHelper;
-        private static OrderHub orderHub;
+        private readonly ITradeOrderHelper orderHelper;
+        private readonly ITradeLogHelper logHelper;
+        private readonly OrderHub orderHub;
 
-        private Kite kite;
-        private List<Tick> ticks;
-        private List<Order> orderUpdates;
+        private Order Entry { get; set; }
+        private Order SLM { get; set; }
+        private Order Target { get; set; }
+        private Kite Kite { get; set; }
+        private Tick Tick { get; set; }
 
         private string orderId_ent;
         private string orderId_tar;
@@ -49,16 +53,22 @@ namespace TradeMaster6000.Server.Tasks
         private bool isMarketOpen;
         private bool slRejected;
         private string variety;
+        private bool isTargetHit;
+        private bool finished;
+        private string statusCheck;
 
-        public OrderWork(ILogger<OrderWork> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, ITradeOrderHelper tradeOrderHelper)
+        // class constructor
+        public OrderWork(IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, ITradeOrderHelper tradeOrderHelper, ITradeLogHelper tradeLogHelper, OrderHub orderHub)
         {
-            this.logger = logger;
+            // constructor dependency injection
             this.configuration = configuration;
             _contextAccessor = contextAccessor;
             this.kiteService = kiteService;
-            this.tradeOrderHelper = tradeOrderHelper;
-            ticks = new List<Tick>();
-            orderUpdates = new List<Order>();
+            orderHelper = tradeOrderHelper;
+            logHelper = tradeLogHelper;
+            this.orderHub = orderHub;
+
+            //set values when constructor initialized
             isPreMarketOpen = false;
             isMarketOpen = false;
             targetplaced = false;
@@ -68,22 +78,16 @@ namespace TradeMaster6000.Server.Tasks
             squareOff = false;
             regularSLMplaced = false;
             slRejected = false;
+            isTargetHit = false;
+            statusCheck = null;
         }
 
-        // do the work
-        public async Task StartWork(IHubCallerClients clients, OrderHub _orderHub, TradeOrder order, CancellationToken cancellationToken)
+        public async Task StartWork(TradeOrder order)
         {
-            Ticker ticker = Initialize(order, _orderHub);
+            await logHelper.AddLog(order.Id, $"order starting...").ConfigureAwait(false);
+            Ticker ticker = Initialize(order, orderHub);
 
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"order starting...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
-
+            order.Status = Status.RUNNING;
             order.StopLoss = RoundUp(order.StopLoss, (decimal)0.05);
             order.Entry = RoundUp(order.Entry, (decimal)0.05);
 
@@ -101,19 +105,16 @@ namespace TradeMaster6000.Server.Tasks
                 quantity = (int)decQuantity;
             }
 
+            order.Quantity = quantity;
+            await orderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
+
             // wait untill we get a tick
-            bool anyTicks = false;
-            while (!anyTicks)
+            while (Tick.LastPrice == 0)
             {
-                if (ticks.Count > 0)
-                {
-                    anyTicks = true;
-                }
+                await Task.Delay(200);
             }
 
-            variety = GetCurrentVariety();
-
-            EntryPoint:
+            variety = await GetCurrentVariety();
 
             try
             {
@@ -121,20 +122,14 @@ namespace TradeMaster6000.Server.Tasks
             }
             catch (KiteException e)
             {
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog
-                    {
-                        TradeOrderId = order.Id,
-                        Log = $"kite error: {e.Message}...",
-                        Timestamp = DateTime.Now
-                    }
-                ).ConfigureAwait(false);
+                await logHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                goto Ending;
             }
 
             if (exitTransactionType == "SELL")
             {
                 // if last price is more than stop loss then place slm
-                if (ticks[ticks.Count - 1].LastPrice > order.StopLoss)
+                if (Tick.LastPrice > order.StopLoss)
                 {
                     try
                     {
@@ -142,34 +137,22 @@ namespace TradeMaster6000.Server.Tasks
                     }
                     catch (KiteException e)
                     {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"kite error: {e.Message}...",
-                                Timestamp = DateTime.Now
-                            }
-                        ).ConfigureAwait(false);
+                        await logHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        await CancelEntry();
+                        goto Ending;
                     }
                 }
                 // else tell app that slm order was cancelled, which means it has to find a new one after 1 min
                 else
                 {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"pre slm was cancelled...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
+                    await logHelper.AddLog(order.Id, $"slm was cancelled...").ConfigureAwait(false);
                     is_pre_slm_cancelled = true;
                 }
             }
             else
             {
                 // if last price is more than stop loss then place slm
-                if (ticks[ticks.Count - 1].LastPrice < order.StopLoss)
+                if (Tick.LastPrice < order.StopLoss)
                 {
                     try
                     {
@@ -177,59 +160,23 @@ namespace TradeMaster6000.Server.Tasks
                     }
                     catch (KiteException e)
                     {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"kite error: {e.Message}...",
-                                Timestamp = DateTime.Now
-                            }
-                        ).ConfigureAwait(false);
+                        await logHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        await CancelEntry();
+                        goto Ending;
                     }
                 }
                 // else tell app that slm order was cancelled, which means it has to find a new one after 1 min
                 else
                 {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"pre slm was cancelled...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
+                    await logHelper.AddLog(order.Id, $"slm was cancelled...").ConfigureAwait(false);
                     is_pre_slm_cancelled = true;
-                }
-            }
-
-            while(!AnyOrderUpdates(orderId_ent))
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    goto Stopping;
-                }
-            }
-            if (!is_pre_slm_cancelled)
-            {
-                while (!AnyOrderUpdates(orderId_slm))
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        goto Stopping;
-                    }
                 }
             }
 
             // do while pre market is not open
             do
             {
-                switch (await CheckOrderStatuses())
-                {
-                    case "entrypoint":
-                        goto EntryPoint;
-                    case "continue":
-                        break;
-                }
+                await CheckOrderStatuses(order).ConfigureAwait(false);
 
                 if (await IsPreMarketOpen())
                 {
@@ -237,365 +184,156 @@ namespace TradeMaster6000.Server.Tasks
                     break;
                 }
 
-                if (cancellationToken.IsCancellationRequested)
+                if (order.TokenSource.IsCancellationRequested)
                 {
                     goto Stopping;
                 }
 
-                Thread.Sleep(5000);
+                if (finished)
+                {
+                    goto Ending;
+                }
+
+                await Task.Delay(5000);
             }
             while (!isPreMarketOpen);
 
-            // while market is not open
-            while (!isMarketOpen)
+            // do while pre market is open
+            do
             {
+                await CheckOrderStatuses(order).ConfigureAwait(false);
+
                 if (await IsMarketOpen())
                 {
                     isMarketOpen = true;
                     break;
                 }
 
-                switch (await CheckOrderStatuses())
-                {
-                    case "entrypoint":
-                        goto EntryPoint;
-                    case "continue":
-                        break;
-                }
-
                 if (!isOrderFilling)
                 {
-                    await CheckIfFilling(order);
+                    await Task.Run(()=>CheckIfFilling(order)).ConfigureAwait(false);
                 }
 
-                if (cancellationToken.IsCancellationRequested)
+                if (finished)
                 {
-                    goto Stopping;
+                    goto Ending;
                 }
-            }
 
-            switch (await CheckOrderStatuses())
-            {
-                case "entrypoint":
-                    goto EntryPoint;
-                case "continue":
-                    break;
+                await Task.Delay(500);
             }
+            while (!isMarketOpen);
 
             await Task.Run(() =>
             {
                 Parallel.Invoke(async () => await PlaceTarget(order), async () => await PlaceStopLoss(order));
             }).ConfigureAwait(false);
 
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"monitoring orders...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
-            // monitoring the orders 
-            while (!cancellationToken.IsCancellationRequested)
+            await logHelper.AddLog(order.Id, $"monitoring orders...").ConfigureAwait(false);
+
+            // monitoring the orders
+            while (true)
             {
-                if (squareOff)
+                await CheckOrderStatuses(order).ConfigureAwait(false);
+
+                if (!is_pre_slm_cancelled)
                 {
-
-                    Dictionary<string, dynamic> placeOrderResponse = kite.PlaceOrder(
-                         Exchange: order.Instrument.Exchange,
-                         TradingSymbol: order.Instrument.TradingSymbol,
-                         TransactionType: exitTransactionType,
-                         Quantity: quantity,
-                         Product: Constants.PRODUCT_MIS,
-                         OrderType: Constants.ORDER_TYPE_MARKET,
-                         Validity: Constants.VALIDITY_DAY,
-                         Variety: Constants.VARIETY_REGULAR
-                    );
-
-                    kite.CancelOrder(orderId_tar);
-
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"squared off...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-
-                    goto Ending;
-                }
-
-                var orderHistoryS = GetLatestOrderUpdate(orderId_slm);
-                var orderHistoryT = GetLatestOrderUpdate(orderId_tar);
-
-                if (!hit)
-                {
-                    if (orderHistoryS.FilledQuantity > 0)
+                    if (SLM.FilledQuantity > 0)
                     {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"slm hit...",
-                                Timestamp = DateTime.Now
-                            }
-                        ).ConfigureAwait(false);
-                        kite.CancelOrder(orderId_tar);
+                        await logHelper.AddLog(order.Id, $"slm hit...").ConfigureAwait(false);
+                        Kite.CancelOrder(orderId_tar);
                         goto Ending;
                     }
-
-                    if (orderHistoryT.FilledQuantity > 0)
+                }
+                else if (regularSLMplaced)
+                {
+                    if (SLM.FilledQuantity > 0)
                     {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"target hit...",
-                                Timestamp = DateTime.Now
-                            }
-                        ).ConfigureAwait(false);
-                        if (regularSLMplaced)
-                        {
-                            kite.CancelOrder(orderId_slm);
-                        }
-                        else
-                        {
-                            kite.CancelOrder(orderId_slm);
-                        }
+                        await logHelper.AddLog(order.Id, $"slm hit...").ConfigureAwait(false);
+                        Kite.CancelOrder(orderId_tar);
                         goto Ending;
                     }
                 }
 
-                if (orderHistoryS.Status == "REJECTED")
-                {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"slm rejected...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-                    slRejected = true;
-                    await Task.Run(async () =>
-                    {
-                        await PlaceStopLoss(order);
-                    }).ConfigureAwait(false);
-                }
-
-                if (orderHistoryT.Status == "REJECTED")
-                {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"target rejected...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-                    await Task.Run(async () =>
-                    {
-                        await PlaceTarget(order);
-                    }).ConfigureAwait(false);
-                }
-            }
-
-            // go to when order is stopped
-            Stopping:
-
-            // gracefully ending the order, in app
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"stopping order...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
-
-            Order OHtarget = new Order();
-            Order OHentry = GetLatestOrderUpdate(orderId_ent);
-            Order OHstoploss = GetLatestOrderUpdate(orderId_slm);
-
-            if (targetplaced)
-            {
-                OHtarget = GetLatestOrderUpdate(orderId_tar);
-            }
-
-            variety = GetCurrentVariety();
-
-            if (OHentry.Status != "COMPLETE" && OHentry.Status != "REJECTED")
-            {
-                try
-                {
-                    kite.CancelOrder(orderId_ent, variety);
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"entry order cancelled...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-                }
-                catch (KiteException e)
-                {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"kite error: {e.Message}...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-                }
-            }
-
-
-            if (OHstoploss.Status != "COMPLETE" && OHstoploss.Status != "REJECTED")
-            {
-                try
-                {
-                    kite.CancelOrder(orderId_slm, variety);
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"slm order cancelled...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-                }
-                catch (KiteException e)
-                {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"kite error: {e.Message}...",
-                            Timestamp = DateTime.Now
-                        }
-                    ).ConfigureAwait(false);
-                }
-            }
-
-
-            if (targetplaced)
-            {
-                if (OHtarget.Status != "COMPLETE" && OHtarget.Status != "REJECTED")
-                {
-                    try
-                    {
-                        kite.CancelOrder(orderId_tar, variety);
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"target order cancelled...",
-                                Timestamp = DateTime.Now
-                            }
-                        ).ConfigureAwait(false);
-                    }
-                    catch (KiteException e)
-                    {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"kite error: {e.Message}...",
-                                Timestamp = DateTime.Now
-                            }
-                        ).ConfigureAwait(false);
-                    }
-
-                }
-            }
-
-            OHentry = GetLatestOrderUpdate(orderId_ent);
-            OHstoploss = GetLatestOrderUpdate(orderId_slm);
-            if (targetplaced)
-            {
-                OHtarget = GetLatestOrderUpdate(orderId_tar);
-            }
-
-            if (OHentry.FilledQuantity > 0)
-            {
-                int squareoffamount = OHentry.FilledQuantity;
-                if (OHstoploss.FilledQuantity > 0)
-                {
-                    squareoffamount = OHentry.FilledQuantity - OHstoploss.FilledQuantity;
-                }
                 if (targetplaced)
                 {
-                    if (OHtarget.FilledQuantity > 0)
+                    if (!isTargetHit)
                     {
-                        squareoffamount = OHentry.FilledQuantity - OHtarget.FilledQuantity;
+                        if (Target.FilledQuantity > 0)
+                        {
+                            isTargetHit = true;
+                            await logHelper.AddLog(order.Id, $"target hit...").ConfigureAwait(false);
+                            if (!is_pre_slm_cancelled)
+                            {
+                                Kite.CancelOrder(orderId_slm);
+                            }
+                            else if (regularSLMplaced)
+                            {
+                                Kite.CancelOrder(orderId_slm);
+                            }
+
+                            await Task.Run(() => WatchingTarget(order)).ConfigureAwait(false);
+                        }
                     }
                 }
 
-                Dictionary<string, dynamic> placeOrderResponse = kite.PlaceOrder(
-                     Exchange: order.Instrument.Exchange,
-                     TradingSymbol: order.Instrument.TradingSymbol,
-                     TransactionType: exitTransactionType,
-                     Quantity: squareoffamount,
-                     Product: Constants.PRODUCT_MIS,
-                     OrderType: Constants.ORDER_TYPE_MARKET,
-                     Validity: Constants.VALIDITY_DAY,
-                     Variety: Constants.VARIETY_REGULAR
-                );
+                if (order.TokenSource.IsCancellationRequested)
+                {
+                    if (!isTargetHit)
+                    {
+                        goto Stopping;
+                    }
+                }
+
+                if (finished)
+                {
+                    goto Ending;
+                }
             }
 
+            // go to when trade order is stopped
+            Stopping:
+
+            await CancelEntry();
+            await CancelStopLoss();
+            await CancelTarget();
+
+            SquareOff(order);
+
+            // go to when trade order is ending
             Ending:
 
             ticker.UnSubscribe(new[] { order.Instrument.Token });
             ticker.DisableReconnect();
             ticker.Close();
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"order stopped...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
         }
 
         // place target
         private async Task PlaceTarget(TradeOrder order)
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"doing target logic...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(order.Id, $"doing target logic...").ConfigureAwait(false);
 
             while (!isOrderFilling)
             {
-                CheckIfFilling(order);
+                await Task.Run(() => CheckIfFilling(order));
             }
 
-            Order orderHistoryE = GetLatestOrderUpdate(orderId_ent);
             decimal proximity = 0;
             if (exitTransactionType == "SELL")
             {
-                target = (order.RxR * zonewidth) + orderHistoryE.AveragePrice;
-                proximity = ((target - orderHistoryE.AveragePrice) * (decimal)0.8)
-                                            + orderHistoryE.AveragePrice;
+                target = (order.RxR * zonewidth) + Entry.AveragePrice;
+                proximity = ((target - Entry.AveragePrice) * (decimal)0.8)
+                                            + Entry.AveragePrice;
             }
             else
             {
-                target = orderHistoryE.AveragePrice - (order.RxR * zonewidth);
-                proximity = orderHistoryE.AveragePrice 
-                    - ((orderHistoryE.AveragePrice - target) * (decimal)0.8);
+                target = Entry.AveragePrice - (order.RxR * zonewidth);
+                proximity = Entry.AveragePrice 
+                    - ((Entry.AveragePrice - target) * (decimal)0.8);
             }
 
             try
             {
-                Dictionary<string, dynamic> orderReponse = kite.PlaceOrder(
+                Dictionary<string, dynamic> orderReponse = Kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
                      TransactionType: exitTransactionType,
@@ -606,6 +344,7 @@ namespace TradeMaster6000.Server.Tasks
                      Validity: Constants.VALIDITY_DAY,
                      Variety: Constants.VARIETY_REGULAR
                  );
+
                 targetplaced = true;
 
                 orderReponse.TryGetValue("data", out dynamic value);
@@ -613,59 +352,33 @@ namespace TradeMaster6000.Server.Tasks
                 data.TryGetValue("order_id", out dynamic value1);
                 orderId_tar = value1;
 
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog
-                    {
-                        TradeOrderId = order.Id,
-                        Log = $"target placed...",
-                        Timestamp = DateTime.Now
-                    }
-                ).ConfigureAwait(false);
+                await logHelper.AddLog(order.Id, $"target placed...").ConfigureAwait(false);
             }
             catch (KiteException e)
             {
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog { 
-                        TradeOrderId = order.Id, 
-                        Log = $"kite error: {e.Message}...", 
-                        Timestamp = DateTime.Now }
-                 ).ConfigureAwait(false);
+                await logHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
             }
 
             bool checkingProximity = true;
             // check proximity until order is fully filled. to modify the target order in case tick price is closing in on it.
             while (checkingProximity)
             {
-                var orderHistory = GetLatestOrderUpdate(orderId_ent);
-                if (orderHistory.FilledQuantity == quantity)
+                if (Entry.FilledQuantity == quantity)
                 {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"entry order filled...",
-                            Timestamp = DateTime.Now
-                        }
-                     ).ConfigureAwait(false);
+                    await logHelper.AddLog(order.Id, $"entry order filled...").ConfigureAwait(false);
                     break;
                 }
-                if (ticks[ticks.Count - 1].High >= proximity)
+                if (Tick.High >= proximity)
                 {
-                    if (orderHistory.FilledQuantity != quantity)
+                    if (Entry.FilledQuantity != quantity)
                     {
-                        kite.ModifyOrder(
+                        Kite.ModifyOrder(
                             orderId_tar,
-                            Quantity: orderHistory.FilledQuantity.ToString()
+                            Quantity: Entry.FilledQuantity.ToString()
                         );
 
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = order.Id,
-                                Log = $"target modified quantity = {orderHistory.FilledQuantity}...",
-                                Timestamp = DateTime.Now
-                            }
-                         ).ConfigureAwait(false);
+                        await logHelper.AddLog(order.Id, $"target modified quantity = {Entry.FilledQuantity}...").ConfigureAwait(false);
+
                     }
                 }
             }
@@ -674,29 +387,15 @@ namespace TradeMaster6000.Server.Tasks
         // place stop loss
         private async Task PlaceStopLoss(TradeOrder order)
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"doing stop loss logic...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(order.Id, $"doing stoploss logic...").ConfigureAwait(false);
 
             // if entry order average price, is less than the stoploss input, then sleep for a minute for ticks to come in, so we can set the stoploss as the low. 
             if (is_pre_slm_cancelled)
             {
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog
-                    {
-                        TradeOrderId = order.Id,
-                        Log = $"average price is less than stop loss, waiting 1 min for data...",
-                        Timestamp = DateTime.Now
-                    }
-                 ).ConfigureAwait(false);
-
                 if (!slRejected)
                 {
+                    await logHelper.AddLog(order.Id, $"average price is less than stop loss, waiting 1 min for data...").ConfigureAwait(false);
+
                     DateTime now = DateTime.Now;
                     DateTime min = now.AddSeconds(55);
                     bool waiting = true;
@@ -711,33 +410,30 @@ namespace TradeMaster6000.Server.Tasks
                         {
                             goto Ending;
                         }
+                        if (isTargetHit)
+                        {
+                            goto Ending;
+                        }
                     }
                 }
 
                 if (exitTransactionType == "BUY")
                 {
-                    triggerPrice = ticks[ticks.Count - 1].High;
+                    triggerPrice = Tick.High;
                     triggerPrice = triggerPrice * (decimal)1.00015;
                     triggerPrice = RoundUp(triggerPrice, (decimal)0.05);
                 }
                 else
                 {
-                    triggerPrice = ticks[ticks.Count - 1].Low;
+                    triggerPrice = Tick.Low;
                     triggerPrice = triggerPrice * (decimal)0.99985;
                     triggerPrice = RoundDown(triggerPrice, (decimal)0.05);
                 }
 
                 bool isBullish = false;
-                if (ticks[ticks.Count - 1].Open < ticks[ticks.Count - 1].Close)
+                if (Tick.Open < Tick.Close)
                 {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = order.Id,
-                            Log = $"{order.Instrument.TradingSymbol} is bullish...",
-                            Timestamp = DateTime.Now
-                        }
-                     ).ConfigureAwait(false);
+                    await logHelper.AddLog(order.Id, $"{order.Instrument.TradingSymbol} is bullish...").ConfigureAwait(false);
                     isBullish = true;
                 }
 
@@ -747,7 +443,7 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         try
                         {
-                            Dictionary<string, dynamic> response = kite.PlaceOrder(
+                            Dictionary<string, dynamic> response = Kite.PlaceOrder(
                                  Exchange: order.Instrument.Exchange,
                                  TradingSymbol: order.Instrument.TradingSymbol,
                                  TransactionType: exitTransactionType,
@@ -766,30 +462,31 @@ namespace TradeMaster6000.Server.Tasks
 
                             regularSLMplaced = true;
 
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = order.Id,
-                                    Log = $"SLM order placed...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            await logHelper.AddLog(order.Id, $"SLM order placed...").ConfigureAwait(false);
                         }
                         catch (KiteException e)
                         {
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = order.Id,
-                                    Log = $"kite error: {e.Message}...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            await logHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
                         }
                     }
                     else
                     {
-                        squareOff = true;
+                        Dictionary<string, dynamic> placeOrderResponse = Kite.PlaceOrder(
+                             Exchange: order.Instrument.Exchange,
+                             TradingSymbol: order.Instrument.TradingSymbol,
+                             TransactionType: exitTransactionType,
+                             Quantity: quantity,
+                             Product: Constants.PRODUCT_MIS,
+                             OrderType: Constants.ORDER_TYPE_MARKET,
+                             Validity: Constants.VALIDITY_DAY,
+                             Variety: Constants.VARIETY_REGULAR
+                         );
+
+                        Kite.CancelOrder(orderId_tar);
+
+                        await logHelper.AddLog(order.Id, $"squared off...").ConfigureAwait(false);
+
+                        finished = true;
                     }
                 }
                 else
@@ -798,7 +495,7 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         try
                         {
-                            Dictionary<string, dynamic> response = kite.PlaceOrder(
+                            Dictionary<string, dynamic> response = Kite.PlaceOrder(
                                  Exchange: order.Instrument.Exchange,
                                  TradingSymbol: order.Instrument.TradingSymbol,
                                  TransactionType: exitTransactionType,
@@ -817,30 +514,31 @@ namespace TradeMaster6000.Server.Tasks
 
                             regularSLMplaced = true;
 
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = order.Id,
-                                    Log = $"SLM order placed...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            await logHelper.AddLog(order.Id, $"SLM order placed...").ConfigureAwait(false);
                         }
                         catch (KiteException e)
                         {
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = order.Id,
-                                    Log = $"kite error: {e.Message}...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            await logHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
                         }
                     }
                     else
                     {
-                        squareOff = true;
+                        Dictionary<string, dynamic> placeOrderResponse = Kite.PlaceOrder(
+                         Exchange: order.Instrument.Exchange,
+                         TradingSymbol: order.Instrument.TradingSymbol,
+                         TransactionType: exitTransactionType,
+                         Quantity: quantity,
+                         Product: Constants.PRODUCT_MIS,
+                         OrderType: Constants.ORDER_TYPE_MARKET,
+                         Validity: Constants.VALIDITY_DAY,
+                         Variety: Constants.VARIETY_REGULAR
+                        );
+
+                        Kite.CancelOrder(orderId_tar);
+
+                        await logHelper.AddLog(order.Id, $"squared off...").ConfigureAwait(false);
+
+                        finished = true;
                     }
                 }
             }
@@ -850,7 +548,7 @@ namespace TradeMaster6000.Server.Tasks
         private Ticker Initialize(TradeOrder order, OrderHub orderHub)
         {
             orderId = order.Id;
-            kite = kiteService.GetKite();
+            Kite = kiteService.GetKite();
 
             // new ticker instance 
             Ticker ticker = new Ticker(configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(configuration.GetValue<string>("AccessToken")));
@@ -870,11 +568,6 @@ namespace TradeMaster6000.Server.Tasks
             ticker.Subscribe(Tokens: new UInt32[] { order.Instrument.Token });
             ticker.SetMode(Tokens: new UInt32[] { order.Instrument.Token }, Mode: Constants.MODE_FULL);
 
-            if (OrderWork.orderHub == null)
-            {
-                OrderWork.orderHub = orderHub;
-            }
-
             if (order.TransactionType.ToString() == "BUY")
             {
                 exitTransactionType = "SELL";
@@ -891,7 +584,7 @@ namespace TradeMaster6000.Server.Tasks
         private async Task PlaceEntry(TradeOrder order)
         {
             // place entry limit order
-            Dictionary<string, dynamic> response = kite.PlaceOrder(
+            Dictionary<string, dynamic> response = Kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
                  TransactionType: order.TransactionType.ToString(),
@@ -909,20 +602,13 @@ namespace TradeMaster6000.Server.Tasks
             data.TryGetValue("order_id", out dynamic value1);
             orderId_ent = value1;
 
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"entry order placed...",
-                    Timestamp = DateTime.Now
-                }
-             ).ConfigureAwait(false);
+            await logHelper.AddLog(order.Id, $"entry order placed...").ConfigureAwait(false);
         }
 
         private async Task PlacePreSLM(TradeOrder order)
         {
             // place slm order
-            Dictionary<string, dynamic> responseS = kite.PlaceOrder(
+            Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
                  TransactionType: exitTransactionType,
@@ -940,158 +626,180 @@ namespace TradeMaster6000.Server.Tasks
             dateS.TryGetValue("order_id", out dynamic value1S);
             orderId_slm = value1S;
 
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = order.Id,
-                    Log = $"pre SLM order placed...",
-                    Timestamp = DateTime.Now
-                }
-             ).ConfigureAwait(false);
+            await logHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
         }
 
-        private async Task<string> CheckOrderStatuses()
+        private Task CheckOrderStatuses(TradeOrder order)
         {
-            // get order update
-            Order orderHistoryQ = GetLatestOrderUpdate(orderId_ent);
-            Order orderHistoryA = new Order();
-            if (!is_pre_slm_cancelled)
+            return Task.Run(async () =>
             {
-                orderHistoryA = GetLatestOrderUpdate(orderId_slm);
-            }
+                var variety = await GetCurrentVariety();
 
-            // check if entry status is rejected
-            if (orderHistoryQ.Status == "REJECTED")
-            {
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog
+                // check if entry status is rejected
+                if (Entry.Status == "REJECTED")
+                {
+                    await logHelper.AddLog(orderId, $"entry order rejected...").ConfigureAwait(false);
+                    if (!is_pre_slm_cancelled)
                     {
-                        TradeOrderId = orderId,
-                        Log = $"entry order rejected...",
-                        Timestamp = DateTime.Now
+                        // if slm is not rejected then cancel it
+                        if (SLM.Status != "REJECTED")
+                        {
+                            Kite.CancelOrder(orderId_slm, variety);
+                            await logHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                        }
                     }
-                 ).ConfigureAwait(false);
+                    else if (regularSLMplaced)
+                    {
+                        // if slm is not rejected then cancel it
+                        if (SLM.Status != "REJECTED")
+                        {
+                            Kite.CancelOrder(orderId_slm, variety);
+                            await logHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                        }
+                    }
+                    finished = true;
+                    goto End;
+                }
+
                 if (!is_pre_slm_cancelled)
                 {
-                    // if slm is not rejected then cancel it
-                    if (orderHistoryA.Status != "REJECTED")
+                    if (SLM.Status == "REJECTED")
                     {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = orderId,
-                                Log = $"slm order rejected...",
-                                Timestamp = DateTime.Now
-                            }
-                         ).ConfigureAwait(false);
-                        kite.CancelOrder(orderId_slm, GetCurrentVariety());
+                        await logHelper.AddLog(orderId, $"slm order rejected...").ConfigureAwait(false);
+
+                        if (Entry.Status != "REJECTED")
+                        {
+                            await logHelper.AddLog(orderId, $"entry order cancelled...").ConfigureAwait(false);
+                            Kite.CancelOrder(orderId_ent, variety);
+                        }
+                        finished = true;
+                        goto End;
                     }
                 }
-                return "entrypoint";
-            }
-            if (orderHistoryA.Status == "REJECTED")
-            {
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog
-                    {
-                        TradeOrderId = orderId,
-                        Log = $"entry order rejected...",
-                        Timestamp = DateTime.Now
-                    }
-                 ).ConfigureAwait(false);
-                if (!is_pre_slm_cancelled)
+
+                else if (regularSLMplaced)
                 {
-                    // if slm is not rejected then cancel it
-                    if (orderHistoryQ.Status != "REJECTED")
+                    if (SLM.Status == "REJECTED")
                     {
-                        await tradeDbContext.TradeLogs.AddAsync(
-                            new TradeLog
-                            {
-                                TradeOrderId = orderId,
-                                Log = $"entry order rejected...",
-                                Timestamp = DateTime.Now
-                            }
-                         ).ConfigureAwait(false);
-                        kite.CancelOrder(orderId_ent, GetCurrentVariety());
+                        await logHelper.AddLog(orderId, $"slm order rejected...").ConfigureAwait(false);
+                        slRejected = true;
+                        regularSLMplaced = false;
+                        await Task.Run(async () => await PlaceStopLoss(order)).ConfigureAwait(false);
                     }
                 }
-                return "entrypoint";
-            }
-            return "continue";
+
+                if (targetplaced)
+                {
+                    if (Target.Status == "REJECTED")
+                    {
+                        await logHelper.AddLog(orderId, $"target order rejected...").ConfigureAwait(false);
+                        targetplaced = false;
+                        await Task.Run(async () => await PlaceTarget(order)).ConfigureAwait(false);
+                    }
+                }
+                End:;
+            });
         }
 
+        private async Task WatchingTarget(TradeOrder order)
+        {
+            while (!finished)
+            {
+                if (exitTransactionType == "SELL")
+                {
+                    if (Tick.LastPrice < (Entry.AveragePrice + (0.5m * (target - Entry.AveragePrice))))
+                    {
+                        await Task.Run(() => Parallel.Invoke(async () => await CancelEntry(), async () => await CancelStopLoss(), async () => await CancelTarget()));
+
+                        await Task.Run(() =>
+                        {
+                            var squareOffQuantity = Entry.FilledQuantity - Target.FilledQuantity;
+
+                            Kite.PlaceOrder(
+                                 Exchange: order.Instrument.Exchange,
+                                 TradingSymbol: order.Instrument.TradingSymbol,
+                                 TransactionType: exitTransactionType,
+                                 Quantity: squareOffQuantity,
+                                 Product: Constants.PRODUCT_MIS,
+                                 OrderType: Constants.ORDER_TYPE_MARKET,
+                                 Validity: Constants.VALIDITY_DAY,
+                                 Variety: Constants.VARIETY_REGULAR
+                            );
+
+                            finished = true;
+                        }).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    if (Tick.LastPrice > (Entry.AveragePrice - (0.5m * (target - Entry.AveragePrice))))
+                    {
+                        Parallel.Invoke(async () => await CancelEntry(), async () => await CancelStopLoss(), async () => await CancelTarget());
+
+                        await Task.Run(() =>
+                        {
+                            var squareOffQuantity = Entry.FilledQuantity - Target.FilledQuantity;
+
+                            Kite.PlaceOrder(
+                                 Exchange: order.Instrument.Exchange,
+                                 TradingSymbol: order.Instrument.TradingSymbol,
+                                 TransactionType: exitTransactionType,
+                                 Quantity: squareOffQuantity,
+                                 Product: Constants.PRODUCT_MIS,
+                                 OrderType: Constants.ORDER_TYPE_MARKET,
+                                 Validity: Constants.VALIDITY_DAY,
+                                 Variety: Constants.VARIETY_REGULAR
+                            );
+
+                            finished = true;
+                        }).ConfigureAwait(false);
+                    }
+                }
+
+                if (Entry.FilledQuantity == Target.FilledQuantity)
+                {
+                    finished = true;
+                    break;
+                }
+            }
+        }
         private async Task CheckIfFilling(TradeOrder order)
         {
-            var variety = GetCurrentVariety();
-            Order orderHistory = GetLatestOrderUpdate(orderId_ent);
-            if (orderHistory.FilledQuantity > 0)
+            var variety = await GetCurrentVariety();
+
+            if (Entry.FilledQuantity > 0)
             {
-                await tradeDbContext.TradeLogs.AddAsync(
-                    new TradeLog
-                    {
-                        TradeOrderId = orderId,
-                        Log = $"entry order filling...",
-                        Timestamp = DateTime.Now
-                    }
-                 ).ConfigureAwait(false);
+                await logHelper.AddLog(orderId, $"entry order filling...").ConfigureAwait(false);
 
                 if (exitTransactionType == "SELL")
                 {
-                    if (orderHistory.AveragePrice < order.StopLoss)
+                    if (Entry.AveragePrice < order.StopLoss)
                     {
                         try
                         {
-                            kite.CancelOrder(orderId_slm, variety);
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = orderId,
-                                    Log = $"slm order cancelled...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            Kite.CancelOrder(orderId_slm, variety);
+                            await logHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
                             is_pre_slm_cancelled = true;
                         }
                         catch (KiteException e)
                         {
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = orderId,
-                                    Log = $"kite error {e.Message}...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            await logHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
                         }
                     }
                 }
                 else
                 {
-                    if (orderHistory.AveragePrice > order.StopLoss)
+                    if (Entry.AveragePrice > order.StopLoss)
                     {
                         try
                         {
-                            kite.CancelOrder(orderId_slm, "amo");
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = orderId,
-                                    Log = $"slm order cancelled...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            Kite.CancelOrder(orderId_slm, variety);
+                            await logHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
                             is_pre_slm_cancelled = true;
                         }
                         catch (KiteException e)
                         {
-                            await tradeDbContext.TradeLogs.AddAsync(
-                                new TradeLog
-                                {
-                                    TradeOrderId = orderId,
-                                    Log = $"kite error: {e.Message}...",
-                                    Timestamp = DateTime.Now
-                                }
-                             ).ConfigureAwait(false);
+                            await logHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
                         }
                     }
                 }
@@ -1108,19 +816,105 @@ namespace TradeMaster6000.Server.Tasks
             {
                 if (DateTime.Compare(IST, closing) < 0)
                 {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = orderId,
-                            Log = $"market is open...",
-                            Timestamp = DateTime.Now
-                        }
-                     ).ConfigureAwait(false);
+                    await logHelper.AddLog(orderId, $"market is open...").ConfigureAwait(false);
                     return true;
                 }
             }
             return false;
         }
+
+        private async Task CancelEntry()
+        {
+            variety = await GetCurrentVariety();
+
+            if (Entry.Status != "COMPLETE" && Entry.Status != "REJECTED")
+            {
+                try
+                {
+                    Kite.CancelOrder(orderId_ent, variety);
+                    await logHelper.AddLog(orderId, $"entry order cancelled...").ConfigureAwait(false);
+                }
+                catch (KiteException e)
+                {
+                    await logHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                }
+            }
+        }
+
+        private async Task CancelStopLoss()
+        {
+            variety = await GetCurrentVariety();
+
+            if (!is_pre_slm_cancelled)
+            {
+                if (SLM.Status != "COMPLETE" && SLM.Status != "REJECTED")
+                {
+                    try
+                    {
+                        Kite.CancelOrder(orderId_slm, variety);
+                        await logHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                    }
+                    catch (KiteException e)
+                    {
+                        await logHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                    }
+                }
+            }
+            else if (regularSLMplaced)
+            {
+                if (SLM.Status != "COMPLETE" && SLM.Status != "REJECTED")
+                {
+                    try
+                    {
+                        Kite.CancelOrder(orderId_slm, variety);
+                        await logHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                    }
+                    catch (KiteException e)
+                    {
+                        await logHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                    }
+                }
+            }
+        }
+
+        private async Task CancelTarget()
+        {
+            variety = await GetCurrentVariety();
+
+            if (targetplaced)
+            {
+                if (Target.Status != "COMPLETE" && Target.Status != "REJECTED")
+                {
+                    try
+                    {
+                        Kite.CancelOrder(orderId_tar, variety);
+                        await logHelper.AddLog(orderId, $"target order cancelled...").ConfigureAwait(false);
+                    }
+                    catch (KiteException e)
+                    {
+                        await logHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                    }
+                }
+            }
+        }
+        
+        private void SquareOff(TradeOrder order)
+        {
+            if(Entry.FilledQuantity > 0)
+            {
+                Dictionary<string, dynamic> placeOrderResponse = Kite.PlaceOrder(
+                     Exchange: order.Instrument.Exchange,
+                     TradingSymbol: order.Instrument.TradingSymbol,
+                     TransactionType: exitTransactionType,
+                     Quantity: Entry.FilledQuantity,
+                     Product: Constants.PRODUCT_MIS,
+                     OrderType: Constants.ORDER_TYPE_MARKET,
+                     Validity: Constants.VALIDITY_DAY,
+                     Variety: Constants.VARIETY_REGULAR
+                );
+            }
+        }
+
         private async Task<bool> IsPreMarketOpen()
         {
             // check time once in a while, to figure out if it is time to wake up and go to work.
@@ -1133,67 +927,39 @@ namespace TradeMaster6000.Server.Tasks
             {
                 if (DateTime.Compare(IST, closing) < 0)
                 {
-                    await tradeDbContext.TradeLogs.AddAsync(
-                        new TradeLog
-                        {
-                            TradeOrderId = orderId,
-                            Log = $"pre market opening...",
-                            Timestamp = DateTime.Now
-                        }
-                     ).ConfigureAwait(false);
+                    await logHelper.AddLog(orderId, $"pre market is opening...").ConfigureAwait(false);
                     return true;
                 }
             }
             return false;
         }
 
-        private string GetCurrentVariety()
+        private async Task<string> GetCurrentVariety()
         {
-            string variety = null;
-
-            DateTime GST1 = DateTime.Now;
-            DateTime IST1 = GST1.AddHours(5).AddMinutes(30);
-            DateTime opening1 = new DateTime(IST1.Year, IST1.Month, IST1.Day, 9, 15, 0);
-            DateTime closing1 = opening1.AddHours(6).AddMinutes(15);
-
-            if (DateTime.Compare(IST1, opening1) < 0)
+            return await Task.Run(() =>
             {
-                variety = "amo";
-            }
-            else if (DateTime.Compare(IST1, opening1) >= 0)
-            {
-                variety = "regular";
-            }
-            if (DateTime.Compare(IST1, closing1) >= 0)
-            {
-                variety = "amo";
-            }
+                string variety = null;
 
-            return variety;
-        }
+                DateTime GST1 = DateTime.Now;
+                DateTime IST1 = GST1.AddHours(5).AddMinutes(30);
+                DateTime opening1 = new DateTime(IST1.Year, IST1.Month, IST1.Day, 9, 15, 0);
+                DateTime closing1 = opening1.AddHours(6).AddMinutes(15);
 
-        private bool AnyOrderUpdates(string id)
-        {
-            foreach(var update in orderUpdates)
-            {
-                if(update.OrderId == id)
+                if (DateTime.Compare(IST1, opening1) < 0)
                 {
-                    return true;
+                    variety = "amo";
                 }
-            }
-            return false;
-        }
-
-        private Order GetLatestOrderUpdate(string id)
-        {
-            for(int i = orderUpdates.Count - 1; i > 0; i--)
-            {
-                if(orderUpdates[i].OrderId == id)
+                else if (DateTime.Compare(IST1, opening1) >= 0)
                 {
-                    return orderUpdates[i];
+                    variety = "regular";
                 }
-            }
-            throw new Exception($"order update not found with id {id}");
+                if (DateTime.Compare(IST1, closing1) >= 0)
+                {
+                    variety = "amo";
+                }
+
+                return variety;
+            });
         }
 
         private static decimal RoundUp(decimal value, decimal step)
@@ -1210,66 +976,42 @@ namespace TradeMaster6000.Server.Tasks
 
         private void onTick(Tick tickData)
         {
-            ticks.Add(tickData);
+            Tick = tickData;
         }
         private void OnOrderUpdate(Order orderData)
         {
-            orderUpdates.Add(orderData);
+            if(orderData.OrderId == orderId_ent)
+            {
+                Entry = orderData;
+            }
+            else if(orderData.OrderId == orderId_slm)
+            {
+                SLM = orderData;
+            }
+            else if(orderData.OrderId == orderId_tar)
+            {
+                Target = orderData;
+            }
         }
         private async void OnError(string message)
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = orderId,
-                    Log = $"error: {message}...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(orderId, $"error: {message}...").ConfigureAwait(false);
         }
         private async void OnClose()
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = orderId,
-                    Log = $"ticker connection closed...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(orderId, $"ticker connection closed...").ConfigureAwait(false);
         }
         private async void OnReconnect()
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = orderId,
-                    Log = $"ticker connection reconnected...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(orderId, $"ticker connection reconnected...").ConfigureAwait(false);
         }
         private async void OnNoReconnect()
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = orderId,
-                    Log = $"ticker connection failed to reconnect...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(orderId, $"ticker connection failed to reconnect...").ConfigureAwait(false);
         }
         private async void OnConnect()
         {
-            await tradeDbContext.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = orderId,
-                    Log = $"ticker connected...",
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            await logHelper.AddLog(orderId, $"ticker connected...").ConfigureAwait(false);
         }
     }
 }

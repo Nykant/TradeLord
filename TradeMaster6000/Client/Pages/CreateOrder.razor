@@ -70,7 +70,7 @@
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/orders"))
+            .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
             .Build();
 
         hubConnection.On<List<TradeInstrument>>("ReceiveInstruments", (instruments) =>

@@ -69,7 +69,7 @@ namespace TradeMaster6000.Server
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-            services.AddDbContext<TradeDbContext>(options =>
+            services.AddDbContextFactory<TradeDbContext>(options =>
                 options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection)));
 
             services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
@@ -90,6 +90,7 @@ namespace TradeMaster6000.Server
             });
 
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
+            services.TryAddSingleton<IKiteService, KiteService>();
 
             services.AddSignalR();
 
@@ -102,9 +103,6 @@ namespace TradeMaster6000.Server
                     new[] { "application/octet-stream" });
             });
 
-            services.AddSingleton<ITradeOrderHelper, TradeOrderHelper>();
-            services.AddSingleton<IInstrumentHelper, InstrumentHelper>();
-            services.AddSingleton<IKiteService, KiteService>();
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
             services.Configure<ForwardedHeadersOptions>(options =>

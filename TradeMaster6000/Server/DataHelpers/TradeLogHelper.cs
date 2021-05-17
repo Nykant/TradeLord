@@ -10,31 +10,40 @@ namespace TradeMaster6000.Server.DataHelpers
 {
     public class TradeLogHelper : ITradeLogHelper
     {
-        private readonly TradeDbContext context;
-        public TradeLogHelper(TradeDbContext tradeDbContext)
+        private readonly IDbContextFactory<TradeDbContext> contextFactory;
+
+        public TradeLogHelper(IDbContextFactory<TradeDbContext> contextFactory)
         {
-            context = tradeDbContext;
+            this.contextFactory = contextFactory;
         }
 
-        public async Task<List<TradeLog>> GetTradeLogs()
+        public async Task<List<TradeLog>> GetTradeLogs(int orderId)
         {
-            return await context.TradeLogs.ToListAsync();
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.TradeLogs.Where(x => x.TradeOrderId == orderId).ToListAsync();
+            }
         }
 
         public async Task AddLog(int tradeOrderId, string log)
         {
-            await context.TradeLogs.AddAsync(
-                new TradeLog
-                {
-                    TradeOrderId = tradeOrderId,
-                    Log = log,
-                    Timestamp = DateTime.Now
-                }
-            ).ConfigureAwait(false);
+            using (var context = contextFactory.CreateDbContext())
+            {
+                await context.TradeLogs.AddAsync(
+                    new TradeLog
+                    {
+                        TradeOrderId = tradeOrderId,
+                        Log = log,
+                        Timestamp = DateTime.Now
+                    }
+                );
+                await context.SaveChangesAsync();
+            }
         }
     }
     public interface ITradeLogHelper
     {
-        Task<List<TradeLog>> GetTradeLogs();
+        Task<List<TradeLog>> GetTradeLogs(int id);
+        Task AddLog(int tradeOrderId, string log);
     }
 }

@@ -24,12 +24,12 @@ namespace TradeMaster6000.Shared
         public TransactionType TransactionType { get; set; }
         public Status Status { get; set; }
         public TradeInstrument Instrument {get; set;}
-        public int TradeInstrumentId { get; set; }
         public CancellationTokenSource TokenSource { get; set; }
         public bool EntryHit { get; set; }
         public bool SLMHit { get; set; }
         public bool TargetHit { get; set; }
         public int QuantityFilled { get; set; }
+        public int Quantity { get; set; }
         public List<TradeLog> TradeLogs { get; set; }
     }
     public enum TransactionType
@@ -39,7 +39,9 @@ namespace TradeMaster6000.Shared
     }
     public enum Status
     {
+        STARTING,
         RUNNING,
+        STOPPING,
         DONE
     }
 }

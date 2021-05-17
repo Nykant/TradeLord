@@ -1,6 +1,7 @@
 ﻿using KiteConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -20,31 +21,31 @@ namespace TradeMaster6000.Server.Hubs
 
     public class OrderHub : Hub
     {
-        private readonly ILogger<OrderWork> logger;
         private readonly IKiteService kiteService;
         private readonly IHttpContextAccessor _contextAccessor;
         private readonly IConfiguration _configuration;
-        private readonly ITradeOrderHelper tradeOrderHelper;
-        private readonly IInstrumentHelper instrumentHelper;
-        private readonly ITradeLogHelper tradeLogHelper;
+        private readonly TradeOrderHelper tradeOrderHelper;
+        private readonly InstrumentHelper instrumentHelper;
+        private readonly TradeLogHelper tradeLogHelper;
         private static List<TradeOrder> runningOrders;
+        private readonly IDbContextFactory<TradeDbContext> contextFactory;
 
-        public OrderHub(ILogger<OrderWork> logger, IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, ITradeOrderHelper tradeOrderHelper, IInstrumentHelper instrumentHelper, ITradeLogHelper tradeLogHelper)
+        public OrderHub(IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, IInstrumentService instrumentService, IDbContextFactory<TradeDbContext> contextFactory)
         {
-            this.logger = logger;
             _configuration = configuration;
             _contextAccessor = contextAccessor;
             this.kiteService = kiteService;
-            this.tradeOrderHelper = tradeOrderHelper;
-            this.instrumentHelper = instrumentHelper;
-            this.tradeLogHelper = tradeLogHelper;
+            this.contextFactory = contextFactory;
+            instrumentHelper = new InstrumentHelper(instrumentService, this.contextFactory);
+            tradeOrderHelper = new TradeOrderHelper(this.contextFactory);
+            tradeLogHelper = new TradeLogHelper(this.contextFactory);
             runningOrders = new List<TradeOrder>();
         }
 
         // start order work with inputs from user 
         public async Task StartOrderWork(TradeOrder order)
         {
-            OrderWork orderWork = new OrderWork(logger, _configuration, _contextAccessor, kiteService, tradeOrderHelper);
+            OrderWork orderWork = new OrderWork(_configuration, _contextAccessor, kiteService, tradeOrderHelper, tradeLogHelper, this);
             order.TokenSource = new CancellationTokenSource();
 
             foreach(var instrument in await instrumentHelper.GetTradeInstruments())
@@ -55,19 +56,23 @@ namespace TradeMaster6000.Server.Hubs
                 }
             }
 
-            var tradeorder = tradeOrderHelper.AddTradeOrder(order);
-
-            order.Id = tradeorder.Id;
+            order.Status = Status.STARTING;
+            var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
+            order = tradeorder;
             runningOrders.Add(order);
 
             await Clients.Caller.SendAsync("ReceiveList", await tradeOrderHelper.GetTradeOrders()).ConfigureAwait(false);
 
-            await Task.Run(async ()
-                => await orderWork.StartWork(Clients, this, order, order.TokenSource.Token)
-                // what to do after task is done
-
-                ).ConfigureAwait(false);
+            await Task.Run(async () =>
+            {
+                await orderWork.StartWork(order);
+                await StopOrderWork(order.Id);
+                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
+                order.Status = Status.DONE;
+                await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
+
         public async Task GetInstruments()
         {
             await Clients.Caller.SendAsync("ReceiveInstruments", await instrumentHelper.GetTradeInstruments());
@@ -75,28 +80,32 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetOrders()
         {
-            await Clients.Caller.SendAsync("ReceiveList", await tradeOrderHelper.GetTradeOrders());
+            await Clients.Caller.SendAsync("ReceiveList", runningOrders);
         }
 
-        public async Task GetLogList()
+        public async Task GetLogs(int orderId)
         {
-            await Clients.Caller.SendAsync("ReceiveLogs", await tradeLogHelper.GetTradeLogs());
+            var logs = await tradeLogHelper.GetTradeLogs(orderId);
+            await Clients.Caller.SendAsync("ReceiveLogs", logs);
         }
 
         public async Task StopOrderWork(int id)
         {
-            if(runningOrders.Count > 0)
+            await Task.Run(() =>
             {
-                for (int i = 0; i < runningOrders.Count; i++)
+                if (runningOrders.Count > 0)
                 {
-                    if (runningOrders[i].Id == id)
+                    for (int i = 0; i < runningOrders.Count; i++)
                     {
-                        runningOrders[i].TokenSource.Cancel();
-                        runningOrders.RemoveAt(i);
-                        break;
+                        if (runningOrders[i].Id == id)
+                        {
+                            runningOrders[i].TokenSource.Cancel();
+                            runningOrders.RemoveAt(i);
+                            break;
+                        }
                     }
                 }
-            }
+            }).ConfigureAwait(false);
         }
     }
 }

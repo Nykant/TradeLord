@@ -14,6 +14,7 @@ namespace TradeMaster6000.Server
     {
         public static void Main(string[] args)
         {
+            
             CreateHostBuilder(args).Build().Run();
 
         }

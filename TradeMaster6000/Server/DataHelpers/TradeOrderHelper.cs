@@ -11,56 +11,59 @@ namespace TradeMaster6000.Server.DataHelpers
 {
     public class TradeOrderHelper : ITradeOrderHelper
     {
-        private readonly object updatelock = new object();
-        private readonly object addlock = new object();
-        private readonly object savelock = new object();
-        private readonly TradeDbContext context;
+        private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        private readonly object tradelock = new object();
 
-        public TradeOrderHelper(TradeDbContext tradeDbContext, IInstrumentService instrumentService)
+        public TradeOrderHelper(IDbContextFactory<TradeDbContext> contextFactory)
         {
-            context = tradeDbContext;
-            instrumentService.LoadInstruments();
+            this.contextFactory = contextFactory;
         }
 
         public async Task<TradeOrder> GetTradeOrder(int id)
         {
-            return await context.TradeOrders.FindAsync(id);
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.TradeOrders.FindAsync(id);
+            }
         }
 
         public async Task<List<TradeOrder>> GetTradeOrders()
         {
-            return await context.TradeOrders.ToListAsync();
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.TradeOrders.ToListAsync();
+            }
         }
 
-        public void UpdateTradeOrder(TradeOrder tradeOrder)
+        public async Task UpdateTradeOrder(TradeOrder tradeOrder)
         {
-            lock (updatelock)
+            using (var context = contextFactory.CreateDbContext())
             {
                 context.TradeOrders.Update(tradeOrder);
+                await context.SaveChangesAsync();
             }
-            SaveChanges();
         }
 
-        public TradeOrder AddTradeOrder(TradeOrder tradeOrder)
+        public async Task<TradeOrder> AddTradeOrder(TradeOrder tradeOrder)
         {
-            var response = context.TradeOrders.Add(tradeOrder);
-            SaveChanges();
-            return response.Entity;
-        }
+            TradeOrder order;
 
-        private void SaveChanges()
-        {
-            lock (savelock)
+            using (var context = contextFactory.CreateDbContext())
             {
-                context.SaveChangesAsync();
+                order = context.TradeOrders.Add(tradeOrder).Entity;
+                await context.SaveChangesAsync();
             }
+
+            return order;
         }
     }
+
     public interface ITradeOrderHelper
     {
-        TradeOrder AddTradeOrder(TradeOrder tradeOrder);
-        void UpdateTradeOrder(TradeOrder tradeOrder);
+        Task<TradeOrder> AddTradeOrder(TradeOrder tradeOrder);
+        Task UpdateTradeOrder(TradeOrder tradeOrder);
         Task<TradeOrder> GetTradeOrder(int id);
         Task<List<TradeOrder>> GetTradeOrders();
+
     }
 }

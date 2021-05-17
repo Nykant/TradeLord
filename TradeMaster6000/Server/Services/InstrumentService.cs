@@ -10,10 +10,8 @@ namespace TradeMaster6000.Server.Services
     public class InstrumentService : IInstrumentService
     {
         private static List<TradeInstrument> instruments;
-        private readonly TradeDbContext tradeDbContext;
-        public InstrumentService(TradeDbContext tradeDbContext)
+        public InstrumentService()
         {
-            this.tradeDbContext = tradeDbContext;
             instruments = new List<TradeInstrument>() {
                 new TradeInstrument
                 {
@@ -618,21 +616,13 @@ new TradeInstrument
             };
         }
 
-        public void LoadInstruments()
+        public List<TradeInstrument> GetInstruments()
         {
-            if(tradeDbContext.TradeInstruments.Count() == 0)
-            {
-                foreach (var instrument in instruments)
-                {
-                    tradeDbContext.TradeInstruments.Add(instrument);
-                }
-                tradeDbContext.SaveChanges();
-            }
+            return instruments;
         }
     }
-
     public interface IInstrumentService
     {
-        void LoadInstruments();
+        List<TradeInstrument> GetInstruments();
     }
 }

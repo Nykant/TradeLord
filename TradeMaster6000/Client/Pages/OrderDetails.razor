@@ -1,0 +1,65 @@
+﻿@page "/orderdetails/{OrderId}"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
+@using TradeMaster6000.Shared
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+
+<table>
+    <tr>
+        <th>Message</th>
+        <th>Timestamp</th>
+    </tr>
+    @foreach (var log in tradeLogs)
+    {
+        <tr>
+            <td>@log.Log</td>
+            <td>@log.Timestamp</td>
+
+        </tr>
+    }
+</table>
+
+
+@code {
+    [Parameter]
+    public string OrderId { get; set; }
+
+    private List<TradeLog> tradeLogs = new List<TradeLog>();
+    private HubConnection hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
+            .Build();
+
+        hubConnection.On<List<TradeLog>>("ReceiveLogs", (list) =>
+        {
+            tradeLogs = list;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+
+        await GetLogs();
+    }
+
+    private async Task GetLogs()
+    {
+
+        await hubConnection.SendAsync("GetLogs", OrderId);
+
+    }
+
+    public bool IsConnected =>
+hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
+}
