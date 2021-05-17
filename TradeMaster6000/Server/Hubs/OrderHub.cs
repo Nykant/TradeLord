@@ -29,31 +29,36 @@ namespace TradeMaster6000.Server.Hubs
         private readonly TradeLogHelper tradeLogHelper;
         private static List<TradeOrder> runningOrders;
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        private readonly ITickerService tickerService;
+        private readonly IServiceProvider serviceProvider;
 
-        public OrderHub(IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, IInstrumentService instrumentService, IDbContextFactory<TradeDbContext> contextFactory)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider)
         {
-            _configuration = configuration;
-            _contextAccessor = contextAccessor;
-            this.kiteService = kiteService;
-            this.contextFactory = contextFactory;
-            instrumentHelper = new InstrumentHelper(instrumentService, this.contextFactory);
-            tradeOrderHelper = new TradeOrderHelper(this.contextFactory);
-            tradeLogHelper = new TradeLogHelper(this.contextFactory);
-            runningOrders = new List<TradeOrder>();
+            this.tickerService = tickerService;
+            this.serviceProvider = serviceProvider;
         }
 
         // start order work with inputs from user 
         public async Task StartOrderWork(TradeOrder order)
         {
-            OrderWork orderWork = new OrderWork(_configuration, _contextAccessor, kiteService, tradeOrderHelper, tradeLogHelper, this);
+            OrderWork orderWork = new OrderWork(this, serviceProvider);
             order.TokenSource = new CancellationTokenSource();
 
-            foreach(var instrument in await instrumentHelper.GetTradeInstruments())
+            Task t = Task.Run(async() =>
             {
-                if(instrument.TradingSymbol == order.TradingSymbol)
+                foreach (var instrument in await instrumentHelper.GetTradeInstruments())
                 {
-                    order.Instrument = instrument;
+                    if (instrument.TradingSymbol == order.TradingSymbol)
+                    {
+                        order.Instrument = instrument;
+                        break;
+                    }
                 }
+            });
+
+            if (!tickerService.IsStarted())
+            {
+                tickerService.Start();
             }
 
             order.Status = Status.STARTING;
@@ -61,14 +66,17 @@ namespace TradeMaster6000.Server.Hubs
             order = tradeorder;
             runningOrders.Add(order);
 
-            await Clients.Caller.SendAsync("ReceiveList", await tradeOrderHelper.GetTradeOrders()).ConfigureAwait(false);
+            tickerService.Subscribe(order.Instrument.Token);
 
+            await Clients.Caller.SendAsync("ReceiveList", runningOrders).ConfigureAwait(false);
+
+            await t;
             await Task.Run(async () =>
             {
                 await orderWork.StartWork(order);
                 await StopOrderWork(order.Id);
-                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
                 order.Status = Status.DONE;
+                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
                 await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
             }).ConfigureAwait(false);
         }

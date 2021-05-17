@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,12 +10,16 @@ using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.DataHelpers
 {
-    public class InstrumentHelper
+    public class InstrumentHelper : IInstrumentHelper
     {
-        private readonly IDbContextFactory<TradeDbContext> contextFactory;
-        public InstrumentHelper(IInstrumentService instrumentService, IDbContextFactory<TradeDbContext> contextFactory)
+        private IDbContextFactory<TradeDbContext> contextFactory { get; }
+        private IInstrumentService instrumentService { get; set; }
+        private IServiceProvider service { get; set; }
+        public InstrumentHelper(IServiceProvider serviceProvider)
         {
-            this.contextFactory = contextFactory;
+            service = serviceProvider;
+            instrumentService = service.GetRequiredService<IInstrumentService>();
+            contextFactory = service.GetRequiredService<IDbContextFactory<TradeDbContext>>();
             LoadInstruments(instrumentService.GetInstruments());
         }
 
@@ -40,5 +45,9 @@ namespace TradeMaster6000.Server.DataHelpers
                 context.SaveChanges();
             }
         }
+    }
+    public interface IInstrumentHelper
+    {
+        Task<List<TradeInstrument>> GetTradeInstruments();
     }
 }

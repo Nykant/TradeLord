@@ -34,7 +34,7 @@
             {
                 <tr>
                     <td>@order.Id</td>
-                    <td>@order.Instrument.TradingSymbol</td>
+                    <td>@order.TradingSymbol</td>
                     <td>@order.TransactionType.ToString()</td>
                     <td>@order.Entry</td>
                     <td>@order.Quantity</td>
@@ -61,7 +61,7 @@
 
     private bool showForm = false;
     private HubConnection hubConnection;
-    private List<TradeOrder> orders = new List<TradeOrder>();
+    private static List<TradeOrder> orders = new List<TradeOrder>();
     private TradeOrder tradeOrder = new TradeOrder();
 
     protected override async Task OnInitializedAsync()
@@ -83,9 +83,7 @@
 
     private async Task GetOrders()
     {
-
         await hubConnection.SendAsync("GetOrders");
-
     }
 
     private void NewOrder()

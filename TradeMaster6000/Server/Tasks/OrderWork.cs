@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -21,18 +22,13 @@ namespace TradeMaster6000.Server.Tasks
     public class OrderWork
     {
         // private class variables
-        private readonly IHttpContextAccessor _contextAccessor;
-        private readonly IKiteService kiteService;
-        private readonly IConfiguration configuration;
-        private readonly ITradeOrderHelper orderHelper;
-        private readonly ITradeLogHelper logHelper;
-        private readonly OrderHub orderHub;
-
-        private Order Entry { get; set; }
-        private Order SLM { get; set; }
-        private Order Target { get; set; }
+        private IHttpContextAccessor _contextAccessor { get; set; }
+        private IKiteService kiteService { get; set; }
+        private ITradeOrderHelper orderHelper { get; set; }
+        private ITradeLogHelper logHelper { get; set; }
+        private OrderHub orderHub { get; set; }
         private Kite Kite { get; set; }
-        private Tick Tick { get; set; }
+
 
         private string orderId_ent;
         private string orderId_tar;
@@ -58,15 +54,15 @@ namespace TradeMaster6000.Server.Tasks
         private string statusCheck;
 
         // class constructor
-        public OrderWork(IConfiguration configuration, IHttpContextAccessor contextAccessor, IKiteService kiteService, ITradeOrderHelper tradeOrderHelper, ITradeLogHelper tradeLogHelper, OrderHub orderHub)
+        public OrderWork(OrderHub orderHub, IServiceProvider service)
         {
-            // constructor dependency injection
-            this.configuration = configuration;
-            _contextAccessor = contextAccessor;
-            this.kiteService = kiteService;
-            orderHelper = tradeOrderHelper;
-            logHelper = tradeLogHelper;
             this.orderHub = orderHub;
+
+            // constructor dependency injection
+            _contextAccessor = service.GetRequiredService<IHttpContextAccessor>();
+            kiteService = service.GetRequiredService<IKiteService>();
+            orderHelper = service.GetRequiredService<ITradeOrderHelper>();
+            //logHelper = tradeLogHelper;
 
             //set values when constructor initialized
             isPreMarketOpen = false;
@@ -550,24 +546,6 @@ namespace TradeMaster6000.Server.Tasks
             orderId = order.Id;
             Kite = kiteService.GetKite();
 
-            // new ticker instance 
-            Ticker ticker = new Ticker(configuration.GetValue<string>("APIKey"), _contextAccessor.HttpContext.Session.Get<string>(configuration.GetValue<string>("AccessToken")));
-
-            // ticker event handlers
-            ticker.OnTick += onTick;
-            ticker.OnOrderUpdate += OnOrderUpdate;
-            ticker.OnNoReconnect += OnNoReconnect;
-            ticker.OnError += OnError;
-            ticker.OnReconnect += OnReconnect;
-            ticker.OnClose += OnClose;
-            ticker.OnConnect += OnConnect;
-
-            // set ticker settings
-            ticker.EnableReconnect(Interval: 5, Retries: 50);
-            ticker.Connect();
-            ticker.Subscribe(Tokens: new UInt32[] { order.Instrument.Token });
-            ticker.SetMode(Tokens: new UInt32[] { order.Instrument.Token }, Mode: Constants.MODE_FULL);
-
             if (order.TransactionType.ToString() == "BUY")
             {
                 exitTransactionType = "SELL";
@@ -974,44 +952,6 @@ namespace TradeMaster6000.Server.Tasks
             return step * multiplicand;
         }
 
-        private void onTick(Tick tickData)
-        {
-            Tick = tickData;
-        }
-        private void OnOrderUpdate(Order orderData)
-        {
-            if(orderData.OrderId == orderId_ent)
-            {
-                Entry = orderData;
-            }
-            else if(orderData.OrderId == orderId_slm)
-            {
-                SLM = orderData;
-            }
-            else if(orderData.OrderId == orderId_tar)
-            {
-                Target = orderData;
-            }
-        }
-        private async void OnError(string message)
-        {
-            await logHelper.AddLog(orderId, $"error: {message}...").ConfigureAwait(false);
-        }
-        private async void OnClose()
-        {
-            await logHelper.AddLog(orderId, $"ticker connection closed...").ConfigureAwait(false);
-        }
-        private async void OnReconnect()
-        {
-            await logHelper.AddLog(orderId, $"ticker connection reconnected...").ConfigureAwait(false);
-        }
-        private async void OnNoReconnect()
-        {
-            await logHelper.AddLog(orderId, $"ticker connection failed to reconnect...").ConfigureAwait(false);
-        }
-        private async void OnConnect()
-        {
-            await logHelper.AddLog(orderId, $"ticker connected...").ConfigureAwait(false);
-        }
+
     }
 }
