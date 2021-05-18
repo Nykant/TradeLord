@@ -151,7 +151,7 @@ namespace TradeMaster6000.Server.Tasks
             // do while pre market is not open
             do
             {
-                await CheckOrderStatuses(order).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(order));
 
                 if (await IsPreMarketOpen())
                 {
@@ -176,7 +176,7 @@ namespace TradeMaster6000.Server.Tasks
             // do while pre market is open
             do
             {
-                await CheckOrderStatuses(order).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(order));
 
                 if (await IsMarketOpen())
                 {
@@ -186,7 +186,7 @@ namespace TradeMaster6000.Server.Tasks
 
                 if (!isOrderFilling)
                 {
-                    await Task.Run(()=>CheckIfFilling(order)).ConfigureAwait(false);
+                    await Task.Run(()=>CheckIfFilling(order));
                 }
 
                 if (finished)
@@ -208,7 +208,7 @@ namespace TradeMaster6000.Server.Tasks
             // monitoring the orders
             while (true)
             {
-                await CheckOrderStatuses(order).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(order));
 
                 if (!is_pre_slm_cancelled)
                 {
@@ -272,7 +272,7 @@ namespace TradeMaster6000.Server.Tasks
             await CancelStopLoss();
             await CancelTarget();
 
-            SquareOff(order);
+            await SquareOff(order);
 
             // go to when trade order is ending
             Ending:;
@@ -608,10 +608,9 @@ namespace TradeMaster6000.Server.Tasks
             await LogHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
         }
 
-        private Task CheckOrderStatuses(TradeOrder order)
+        private async Task CheckOrderStatuses(TradeOrder order)
         {
-            return Task.Run(async () =>
-            {
+
                 var variety = await GetCurrentVariety();
                 var tickTask = Task.Run(() => TickService.LastTick(order.Instrument.Token));
                 var entryTask = Task.Run(() => TickService.GetOrder(orderId_ent));
@@ -684,7 +683,6 @@ namespace TradeMaster6000.Server.Tasks
                     }
                 }
                 End:;
-            });
         }
 
         private async Task WatchingTarget(TradeOrder order)
@@ -765,35 +763,38 @@ namespace TradeMaster6000.Server.Tasks
             {
                 await LogHelper.AddLog(orderId, $"entry order filling...").ConfigureAwait(false);
 
-                if (exitTransactionType == "SELL")
+                if (!is_pre_slm_cancelled)
                 {
-                    if (entry.AveragePrice < order.StopLoss)
+                    if (exitTransactionType == "SELL")
                     {
-                        try
+                        if (entry.AveragePrice < order.StopLoss)
                         {
-                            Kite.CancelOrder(orderId_slm, variety);
-                            await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
-                            is_pre_slm_cancelled = true;
-                        }
-                        catch (KiteException e)
-                        {
-                            await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                            try
+                            {
+                                Kite.CancelOrder(orderId_slm, variety);
+                                await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                                is_pre_slm_cancelled = true;
+                            }
+                            catch (KiteException e)
+                            {
+                                await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                            }
                         }
                     }
-                }
-                else
-                {
-                    if (entry.AveragePrice > order.StopLoss)
+                    else
                     {
-                        try
+                        if (entry.AveragePrice > order.StopLoss)
                         {
-                            Kite.CancelOrder(orderId_slm, variety);
-                            await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
-                            is_pre_slm_cancelled = true;
-                        }
-                        catch (KiteException e)
-                        {
-                            await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                            try
+                            {
+                                Kite.CancelOrder(orderId_slm, variety);
+                                await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                                is_pre_slm_cancelled = true;
+                            }
+                            catch (KiteException e)
+                            {
+                                await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                            }
                         }
                     }
                 }
