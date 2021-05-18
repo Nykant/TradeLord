@@ -62,12 +62,12 @@ namespace TradeMaster6000.Server.Hubs
                 tickerService.Start();
             }
 
+            tickerService.Subscribe(order.Instrument.Token);
+
             order.Status = Status.STARTING;
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order = tradeorder;
             RunningOrders.Add(order);
-
-            tickerService.Subscribe(order.Instrument.Token);
 
             await Clients.Caller.SendAsync("ReceiveList", RunningOrders).ConfigureAwait(false);
 
