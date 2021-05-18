@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -21,21 +22,21 @@ namespace TradeMaster6000.Server.Hubs
 
     public class OrderHub : Hub
     {
-        private readonly IKiteService kiteService;
-        private readonly IHttpContextAccessor _contextAccessor;
-        private readonly IConfiguration _configuration;
-        private readonly TradeOrderHelper tradeOrderHelper;
-        private readonly InstrumentHelper instrumentHelper;
-        private readonly TradeLogHelper tradeLogHelper;
-        private static List<TradeOrder> runningOrders;
-        private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        private readonly ITradeOrderHelper tradeOrderHelper;
+        private readonly IInstrumentHelper instrumentHelper;
+        private readonly ITradeLogHelper tradeLogHelper;
         private readonly ITickerService tickerService;
         private readonly IServiceProvider serviceProvider;
+
+        private List<TradeOrder> RunningOrders { get; set; } = new List<TradeOrder>();
 
         public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider)
         {
             this.tickerService = tickerService;
             this.serviceProvider = serviceProvider;
+            tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
+            tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
+            instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
         }
 
         // start order work with inputs from user 
@@ -64,11 +65,11 @@ namespace TradeMaster6000.Server.Hubs
             order.Status = Status.STARTING;
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order = tradeorder;
-            runningOrders.Add(order);
+            RunningOrders.Add(order);
 
             tickerService.Subscribe(order.Instrument.Token);
 
-            await Clients.Caller.SendAsync("ReceiveList", runningOrders).ConfigureAwait(false);
+            await Clients.Caller.SendAsync("ReceiveList", RunningOrders).ConfigureAwait(false);
 
             await t;
             await Task.Run(async () =>
@@ -88,7 +89,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetOrders()
         {
-            await Clients.Caller.SendAsync("ReceiveList", runningOrders);
+            await Clients.Caller.SendAsync("ReceiveList", RunningOrders);
         }
 
         public async Task GetLogs(int orderId)
@@ -101,14 +102,14 @@ namespace TradeMaster6000.Server.Hubs
         {
             await Task.Run(() =>
             {
-                if (runningOrders.Count > 0)
+                if (RunningOrders.Count > 0)
                 {
-                    for (int i = 0; i < runningOrders.Count; i++)
+                    for (int i = 0; i < RunningOrders.Count; i++)
                     {
-                        if (runningOrders[i].Id == id)
+                        if (RunningOrders[i].Id == id)
                         {
-                            runningOrders[i].TokenSource.Cancel();
-                            runningOrders.RemoveAt(i);
+                            RunningOrders[i].TokenSource.Cancel();
+                            RunningOrders.RemoveAt(i);
                             break;
                         }
                     }

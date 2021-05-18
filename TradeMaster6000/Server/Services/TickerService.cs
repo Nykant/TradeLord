@@ -19,9 +19,9 @@ namespace TradeMaster6000.Server.Services
         private IConfiguration Configuration { get; set; }
         private IHttpContextAccessor ContextAccessor { get; set; }
         private Ticker Ticker { get; set; } = null;
-        private List<Order> OrderUpdates { get; set; }
-        private List<Tick> Ticks { get; set; }
-        private List<string> TickerLogs { get; set; }
+        private List<Order> OrderUpdates { get; set; } = new List<Order>();
+        private List<Tick> Ticks { get; set; } = new List<Tick>();
+        private List<string> TickerLogs { get; set; } = new List<string>();
         private bool Started { get; set; } = false;
         public TickerService(IServiceProvider services)
         {
@@ -55,6 +55,33 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
+        public Tick LastTick(uint token)
+        {
+            Tick dick = new Tick();
+            foreach(var tick in Ticks)
+            {
+                if(tick.InstrumentToken == token)
+                {
+                    dick = tick;
+                    break;
+                }
+            }
+            return dick;
+        }
+        public Order GetOrder(string Id)
+        {
+            Order order = new Order();
+            foreach(var update in OrderUpdates)
+            {
+                if(update.OrderId == Id)
+                {
+                    order = update;
+                    break;
+                }
+            }
+            return order;
+        }
+
         public void Stop()
         {
             Ticker.Close();
@@ -82,23 +109,39 @@ namespace TradeMaster6000.Server.Services
             Ticker.UnSubscribe(Tokens: new UInt32[] { token });
         }
 
-        private void onTick(Tick tickData)
-        {
-            Ticks.Add(tickData);
-        }
-
         // events
+        private async void onTick(Tick tickData)
+        {
+            await Task.Run(() =>
+            {
+                bool found = false;
+                for (int i = 0; i < Ticks.Count; i++)
+                {
+                    if (Ticks[i].InstrumentToken == tickData.InstrumentToken)
+                    {
+                        Ticks[i] = tickData;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    Ticks.Add(tickData);
+                }
+            }).ConfigureAwait(false);
+        }
         private async void OnOrderUpdate(Order orderData)
         {
             await Task.Run(() =>
             {
                 bool found = false;
-                for (int i = 0; i < OrderUpdates.Count - 1; i++)
+                for (int i = 0; i < OrderUpdates.Count; i++)
                 {
                     if (OrderUpdates[i].OrderId == orderData.OrderId)
                     {
                         OrderUpdates[i] = orderData;
                         found = true;
+                        break;
                     }
                 }
                 if (!found)
@@ -130,6 +173,8 @@ namespace TradeMaster6000.Server.Services
     }
     public interface ITickerService
     {
+        Order GetOrder(string id);
+        Tick LastTick(uint token);
         bool IsConnected();
         void Subscribe(uint token);
         void UnSubscribe(uint token);
