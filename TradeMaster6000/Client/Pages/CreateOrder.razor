@@ -4,12 +4,13 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using TradeMaster6000.Shared
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
 @implements IAsyncDisposable
 @attribute [Authorize]
 
 <style>
     p {
-        display:inline;
+        display: inline;
     }
 </style>
 
@@ -32,18 +33,18 @@
         <p>Risk:Reward : </p><InputNumber @bind-Value="tradeOrder.RxR" />
         <br />
 
-        <p>Instrument: </p>
-        <InputSelect @bind-Value="tradeOrder.TradingSymbol">
-        @{
-            <option>choose an instrument</option>                         
-            if (instrumentsLoaded)
-            {
-                foreach (var instrument in instruments)
+        <p>Instrument:  LTP: @LTP</p> 
+        <InputSelect @oninput="@((e) => GetTick((string)e.Value))" @bind-Value="tradeOrder.TradingSymbol">
+            @{
+                <option>choose an instrument</option>
+                if (instrumentsLoaded)
                 {
-                    <option value="@instrument.TradingSymbol">symbol: @instrument.TradingSymbol - exchange: @instrument.Exchange</option>
+                    foreach (var instrument in instruments)
+                    {
+                        <option value="@instrument.TradingSymbol">symbol: @instrument.TradingSymbol - exchange: @instrument.Exchange</option>
+                    }
                 }
             }
-        }
         </InputSelect>
         <br />
 
@@ -66,6 +67,7 @@
     private HubConnection hubConnection;
     private TradeOrder tradeOrder = new TradeOrder();
     private List<TradeInstrument> instruments = new List<TradeInstrument>();
+    private decimal LTP { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,9 +82,20 @@
             StateHasChanged();
         });
 
+        hubConnection.On<decimal>("ReceiveTick", (tick) =>
+        {
+            LTP = tick;
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
 
         await GetInstruments();
+    }
+
+    private async void GetTick(string symbol)
+    {
+        await hubConnection.SendAsync("GetTick", symbol);
     }
 
     private async Task GetInstruments()

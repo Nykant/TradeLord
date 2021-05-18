@@ -27,25 +27,28 @@ namespace TradeMaster6000.Server.Hubs
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly ITickerService tickerService;
         private readonly IServiceProvider serviceProvider;
+        private readonly IRunningOrderService running;
+        private IKiteService KiteService { get; set; }
+        private Kite Kite { get; set; }
 
-        private List<TradeOrder> RunningOrders { get; set; } = new List<TradeOrder>();
-
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IRunningOrderService runningOrderService, IKiteService kiteService)
         {
             this.tickerService = tickerService;
             this.serviceProvider = serviceProvider;
+            running = runningOrderService;
+            KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
+            Kite = KiteService.GetKite();
         }
 
-        // start order work with inputs from user 
         public async Task StartOrderWork(TradeOrder order)
         {
             OrderWork orderWork = new OrderWork(this, serviceProvider);
             order.TokenSource = new CancellationTokenSource();
 
-            Task t = Task.Run(async() =>
+            await Task.Run(async() =>
             {
                 foreach (var instrument in await instrumentHelper.GetTradeInstruments())
                 {
@@ -62,16 +65,13 @@ namespace TradeMaster6000.Server.Hubs
                 tickerService.Start();
             }
 
-            tickerService.Subscribe(order.Instrument.Token);
-
             order.Status = Status.STARTING;
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
-            order = tradeorder;
-            RunningOrders.Add(order);
+            order.Id = tradeorder.Id;
+            running.Add(order);
 
-            await Clients.Caller.SendAsync("ReceiveList", RunningOrders).ConfigureAwait(false);
+            tickerService.Subscribe(order.Instrument.Token);
 
-            await t;
             await Task.Run(async () =>
             {
                 await orderWork.StartWork(order);
@@ -82,6 +82,26 @@ namespace TradeMaster6000.Server.Hubs
             }).ConfigureAwait(false);
         }
 
+        public async Task GetTick(string symbol)
+        {
+            TradeInstrument tradeInstrument = new TradeInstrument();
+            foreach(var instrument in await instrumentHelper.GetTradeInstruments())
+            {
+                if(instrument.TradingSymbol == symbol)
+                {
+                    tradeInstrument = instrument;
+                }
+            }
+            var dick = Kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
+            dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
+            await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
+        }
+
+        public async Task GetOrderHistory()
+        {
+            await Clients.Caller.SendAsync("ReceiveOrderHistory", await tradeOrderHelper.GetTradeOrders());
+        }
+
         public async Task GetInstruments()
         {
             await Clients.Caller.SendAsync("ReceiveInstruments", await instrumentHelper.GetTradeInstruments());
@@ -89,31 +109,36 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetOrders()
         {
-            await Clients.Caller.SendAsync("ReceiveList", RunningOrders);
+            await Clients.Caller.SendAsync("ReceiveList", running.Get());
         }
 
         public async Task GetLogs(int orderId)
         {
-            var logs = await tradeLogHelper.GetTradeLogs(orderId);
-            await Clients.Caller.SendAsync("ReceiveLogs", logs);
+            await Clients.Caller.SendAsync("ReceiveLogs", await tradeLogHelper.GetTradeLogs(orderId));
         }
 
         public async Task StopOrderWork(int id)
         {
             await Task.Run(() =>
             {
-                if (RunningOrders.Count > 0)
+                var orders = running.Get();
+                var tOrder = new TradeOrder();
+                var found = false;
+                foreach (var order in orders)
                 {
-                    for (int i = 0; i < RunningOrders.Count; i++)
+                    if(order.Id == id)
                     {
-                        if (RunningOrders[i].Id == id)
-                        {
-                            RunningOrders[i].TokenSource.Cancel();
-                            RunningOrders.RemoveAt(i);
-                            break;
-                        }
+                        tOrder = order;
+                        found = true;
+                        break;
                     }
                 }
+                if (found)
+                {
+                    tOrder.TokenSource.Cancel();
+                    running.Remove(tOrder);
+                }
+
             }).ConfigureAwait(false);
         }
     }

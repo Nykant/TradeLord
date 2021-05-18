@@ -22,6 +22,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using TradeMaster6000.Server.Data;
 using TradeMaster6000.Server.DataHelpers;
+using TradeMaster6000.Server.Helpers;
 using TradeMaster6000.Server.Hubs;
 using TradeMaster6000.Server.Models;
 using TradeMaster6000.Server.Services;
@@ -89,12 +90,18 @@ namespace TradeMaster6000.Server
                 options.Cookie.SameSite = SameSiteMode.Lax;
             });
 
+            services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
             services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
             services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
             services.TryAddSingleton<ITickerService, TickerService>();
+            services.TryAddSingleton<ITradeHelper, TradeHelper>();
+            services.TryAddSingleton<ITimeHelper, TimeHelper>();
+            services.TryAddSingleton<ITargetHelper, TargetHelper>();
+            services.TryAddSingleton<ISLMHelper, SLMHelper>();
+            services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
 
             services.AddSignalR();
 

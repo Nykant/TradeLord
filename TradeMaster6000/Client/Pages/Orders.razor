@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using TradeMaster6000.Shared
 @inject NavigationManager NavigationManager
+@inject ILogger<Orders> Logger
 @implements IAsyncDisposable
 @attribute [Authorize]
 
@@ -11,64 +12,54 @@
 
     if (IsConnected)
     {
-        <h1>Orders</h1>
-
-        <br />
 
         <button @onclick="@NewOrder">New Order</button>
 
         <br />
 
-        <table>
-            <tr>
-                <th>Id</th>
-                <th>Trading Symbol</th>
-                <th>Transaction Type</th>
-                <th>Entry</th>
-                <th>Quantity</th>
-                <th>Status</th>
-                <th></th>
-                <th></th>
-            </tr>
-            @foreach (var order in orders)
-            {
-                <tr>
-                    <td>@order.Id</td>
-                    <td>@order.TradingSymbol</td>
-                    <td>@order.TransactionType.ToString()</td>
-                    <td>@order.Entry</td>
-                    <td>@order.Quantity</td>
-                    <td>@order.Status</td>
-                    <td><a href="/orderdetails/@order.Id">See Logs</a></td>
-                    <td><button @onclick="() => StopTicker(order.Id)">Stop</button></td>
-                </tr>
-            }
-        </table>
-
-        <hr />
+        <RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                        Data="@orders" TItem="TradeOrder">
+            <Columns>
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Id" Title="Id" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+                    <Template Context="data">
+                        <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="help" Click=@(() => GoToOrder(data.Id)) Text="Details" />
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TradingSymbol" Title="Trading Symbol" />
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TransactionType" Title="Transaction Type" />
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Entry" Title="Entry" />
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Quantity" Title="Quantity" />
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Status" Title="Status" />
+                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Title="Stop" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+                    <Template Context="data">
+                        <RadzenButton ButtonStyle="ButtonStyle.Warning" Click=@(() => StopTicker(data.Id)) Text="Stop" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
 
     }
     else
     {
-        
-<h1>Connecting...</h1>
-        
+
+        <h1>Connecting...</h1>
+
     }
 }
 
 
 @code {
-
+    RadzenDataGrid<TradeOrder> ordersGrid;
     private bool showForm = false;
     private HubConnection hubConnection;
-    private List<TradeOrder> orders = new List<TradeOrder>();
+    private IList<TradeOrder> orders = new List<TradeOrder>();
     private TradeOrder tradeOrder = new TradeOrder();
 
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
-            .Build();
+        .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
+        .Build();
 
         hubConnection.On<List<TradeOrder>>("ReceiveList", (list) =>
         {
@@ -80,6 +71,10 @@
 
         await GetOrders();
     }
+    private void GoToOrder(int id)
+        {
+        NavigationManager.NavigateTo($"/OrderDetails/{id}");
+        }
 
     private async Task GetOrders()
     {

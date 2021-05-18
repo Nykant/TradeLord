@@ -1,0 +1,64 @@
+﻿@page "/orderhistory"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
+@using TradeMaster6000.Shared
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+<RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                Data="@orders" TItem="TradeOrder">
+    <Columns>
+        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Id" Title="Id" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+            <Template Context="data">
+                <RadzenButton ButtonStyle="ButtonStyle.Info" Click=@(() => GoToOrder(data.Id)) Text="Go To" />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TradingSymbol" Title="Trading Symbol" />
+        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TransactionType" Title="Transaction Type" />
+        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Entry" Title="Entry" />
+        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Quantity" Title="Quantity" />
+        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Status" Title="Status" />
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    RadzenDataGrid<TradeOrder> ordersGrid;
+    private HubConnection hubConnection;
+    private IList<TradeOrder> orders = new List<TradeOrder>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
+        .Build();
+
+        hubConnection.On<List<TradeOrder>>("ReceiveOrderHistory", (list) =>
+        {
+            orders = list;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+
+        await GetOrders();
+    }
+    private void GoToOrder(int id)
+    {
+        NavigationManager.NavigateTo($"/OrderDetails/{id}");
+    }
+
+    private async Task GetOrders()
+    {
+        await hubConnection.SendAsync("GetOrderHistory");
+    }
+
+    public bool IsConnected =>
+hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
+}

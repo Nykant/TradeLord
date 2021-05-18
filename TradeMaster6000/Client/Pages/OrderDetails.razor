@@ -8,27 +8,21 @@
 @attribute [Authorize]
 
 
-<table>
-    <tr>
-        <th>Message</th>
-        <th>Timestamp</th>
-    </tr>
-    @foreach (var log in tradeLogs)
-    {
-        <tr>
-            <td>@log.Log</td>
-            <td>@log.Timestamp</td>
-
-        </tr>
-    }
-</table>
+<RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                Data="@tradeLogs" TItem="TradeLog">
+    <Columns>
+        <RadzenDataGridColumn Width="400px" TItem="TradeLog" Property="Log" Title="Log Message" />
+        <RadzenDataGridColumn Width="100px" TItem="TradeLog" Property="Timestamp" Title="Timestamp" />
+    </Columns>
+</RadzenDataGrid>
 
 
 @code {
     [Parameter]
     public string OrderId { get; set; }
 
-    private List<TradeLog> tradeLogs = new List<TradeLog>();
+    RadzenDataGrid<TradeLog> ordersGrid;
+    private IList<TradeLog> tradeLogs = new List<TradeLog>();
     private HubConnection hubConnection;
 
     protected override async Task OnInitializedAsync()
@@ -50,8 +44,8 @@
 
     private async Task GetLogs()
     {
-
-        await hubConnection.SendAsync("GetLogs", OrderId);
+        int.TryParse(OrderId, out int orderId);
+        await hubConnection.SendAsync("GetLogs", orderId);
 
     }
 
