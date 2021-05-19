@@ -50,6 +50,7 @@
 
         <p>Transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
             @{
+                <option>choose transaction type</option>
                 foreach (var type in Enum.GetValues(typeof(TransactionType)))
                 {
                     <option value="@type">@type</option>

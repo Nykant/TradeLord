@@ -15,7 +15,7 @@ namespace TradeMaster6000.Server.Services
     {
         private static object key = new object();
 
-        private IServiceProvider Services { get; }
+        private IServiceProvider Services { get; set; }
         private IConfiguration Configuration { get; set; }
         private IHttpContextAccessor ContextAccessor { get; set; }
         private Ticker Ticker { get; set; } = null;

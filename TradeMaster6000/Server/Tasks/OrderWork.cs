@@ -397,77 +397,89 @@ namespace TradeMaster6000.Server.Tasks
 
         private async Task CheckOrderStatuses(TradeOrder order)
         {
-                var entryTask = Task.Run(() => TickService.GetOrder(orderId_ent));
-                var slmTask = Task.Run(() => TickService.GetOrder(orderId_slm));
-                var targetTask = Task.Run(() => TickService.GetOrder(orderId_tar));
-                var entry = await entryTask;
-                var targetO = await targetTask;
-                var slm = await slmTask;
-                // check if entry status is rejected
-                if (entry.Status == "REJECTED")
-                {
-                    await LogHelper.AddLog(orderId, $"entry order rejected...").ConfigureAwait(false);
-                    if (!is_pre_slm_cancelled)
-                    {
-                        // if slm is not rejected then cancel it
-                        if (slm.Status != "REJECTED")
-                        {
-                            await TradeHelper.CancelStopLoss(orderId_slm, is_pre_slm_cancelled, regularSLMplaced, orderId).ConfigureAwait(false);
-                            await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
-                        }
-                    }
-                    else if (regularSLMplaced)
-                    {
-                        // if slm is not rejected then cancel it
-                        if (slm.Status != "REJECTED")
-                        {
-                            await TradeHelper.CancelStopLoss(orderId_slm, is_pre_slm_cancelled, regularSLMplaced, orderId).ConfigureAwait(false);
-                            await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
-                        }
-                    }
+            var entry = await Task.Run(() => TickService.GetOrder(orderId_ent));
 
-                    finished = true;
-                    goto End;
-                }
+            Order slm = new Order();
+            if (!is_pre_slm_cancelled)
+            {
+                slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
+            }
+            else if (regularSLMplaced)
+            {
+                slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
+            }
 
+            Order targetO = new Order();
+            if (targetplaced)
+            {
+                targetO = await Task.Run(() => TickService.GetOrder(orderId_tar));
+            }
+
+            // check if entry status is rejected
+            if (entry.Status == "REJECTED")
+            {
+                await LogHelper.AddLog(orderId, $"entry order rejected...").ConfigureAwait(false);
                 if (!is_pre_slm_cancelled)
                 {
-                    if (slm.Status == "REJECTED")
+                    // if slm is not rejected then cancel it
+                    if (slm.Status != "REJECTED")
                     {
-                        await LogHelper.AddLog(orderId, $"slm order rejected...").ConfigureAwait(false);
+                        await TradeHelper.CancelStopLoss(orderId_slm, is_pre_slm_cancelled, regularSLMplaced, orderId).ConfigureAwait(false);
+                        await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                    }
+                }
+                else if (regularSLMplaced)
+                {
+                    // if slm is not rejected then cancel it
+                    if (slm.Status != "REJECTED")
+                    {
+                        await TradeHelper.CancelStopLoss(orderId_slm, is_pre_slm_cancelled, regularSLMplaced, orderId).ConfigureAwait(false);
+                        await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                    }
+                }
 
-                        if (entry.Status != "REJECTED")
-                        {
+                finished = true;
+                goto End;
+            }
+
+            if (!is_pre_slm_cancelled)
+            {
+                if (slm.Status == "REJECTED")
+                {
+                    await LogHelper.AddLog(orderId, $"slm order rejected...").ConfigureAwait(false);
+
+                    if (entry.Status != "REJECTED")
+                    {
                         await TradeHelper.CancelEntry(orderId_ent, orderId).ConfigureAwait(false);
                         await LogHelper.AddLog(orderId, $"entry order cancelled...").ConfigureAwait(false);
 
                     }
-                        finished = true;
-                        goto End;
-                    }
+                    finished = true;
+                    goto End;
                 }
+            }
 
-                else if (regularSLMplaced)
+            else if (regularSLMplaced)
+            {
+                if (slm.Status == "REJECTED")
                 {
-                    if (slm.Status == "REJECTED")
-                    {
-                        await LogHelper.AddLog(orderId, $"slm order rejected...").ConfigureAwait(false);
-                        slRejected = true;
-                        regularSLMplaced = false;
-                        await Task.Run(async () => await PlaceStopLoss(order)).ConfigureAwait(false);
-                    }
+                    await LogHelper.AddLog(orderId, $"slm order rejected...").ConfigureAwait(false);
+                    slRejected = true;
+                    regularSLMplaced = false;
+                    await Task.Run(async () => await PlaceStopLoss(order)).ConfigureAwait(false);
                 }
+            }
 
-                if (targetplaced)
+            if (targetplaced)
+            {
+                if (targetO.Status == "REJECTED")
                 {
-                    if (targetO.Status == "REJECTED")
-                    {
-                        await LogHelper.AddLog(orderId, $"target order rejected...").ConfigureAwait(false);
-                        targetplaced = false;
-                        await Task.Run(async () => await PlaceTarget(order)).ConfigureAwait(false);
-                    }
+                    await LogHelper.AddLog(orderId, $"target order rejected...").ConfigureAwait(false);
+                    targetplaced = false;
+                    await Task.Run(async () => await PlaceTarget(order)).ConfigureAwait(false);
                 }
-                End:;
+            }
+            End:;
         }
 
         private async Task WatchingTarget(TradeOrder order)
