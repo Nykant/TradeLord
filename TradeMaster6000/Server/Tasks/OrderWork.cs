@@ -504,8 +504,7 @@ namespace TradeMaster6000.Server.Tasks
 
                         await Task.Run(() =>
                         {
-
-
+                            WatchingTargetHelper.SquareOff(entry, targetO, order, exitTransactionType);
                             finished = true;
                         }).ConfigureAwait(false);
                     }
