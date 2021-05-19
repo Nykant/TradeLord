@@ -100,7 +100,7 @@ namespace TradeMaster6000.Server.Tasks
             orderId_slm = await TradeHelper.PlacePreSLM(order, exitTransactionType, orderId_ent);
             if(orderId_slm == "cancelled")
             {
-                goto Ending;
+                is_pre_slm_cancelled = true;
             }
 
             // do while pre market is not open
