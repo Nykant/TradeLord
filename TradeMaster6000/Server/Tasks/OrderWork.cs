@@ -103,10 +103,23 @@ namespace TradeMaster6000.Server.Tasks
                 is_pre_slm_cancelled = true;
             }
 
+            while (!TickService.AnyOrder(orderId_ent))
+            {
+                Thread.Sleep(500);
+            }
+
+            if (!is_pre_slm_cancelled)
+            {
+                while (!TickService.AnyOrder(orderId_slm))
+                {
+                    Thread.Sleep(500);
+                }
+            }
+
             // do while pre market is not open
             do
             {
-                await Task.Run(() => CheckOrderStatuses(order));
+                await CheckOrderStatuses(order);
 
                 if (await TimeHelper.IsPreMarketOpen(orderId))
                 {
@@ -393,26 +406,24 @@ namespace TradeMaster6000.Server.Tasks
             return order;
         }
 
-
-
         private async Task CheckOrderStatuses(TradeOrder order)
         {
-            var entry = await Task.Run(() => TickService.GetOrder(orderId_ent));
+            var entry = TickService.GetOrder(orderId_ent);
 
             Order slm = new Order();
             if (!is_pre_slm_cancelled)
             {
-                slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
+                slm = TickService.GetOrder(orderId_slm);
             }
             else if (regularSLMplaced)
             {
-                slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
+                slm = TickService.GetOrder(orderId_slm);
             }
 
             Order targetO = new Order();
             if (targetplaced)
             {
-                targetO = await Task.Run(() => TickService.GetOrder(orderId_tar));
+                targetO = TickService.GetOrder(orderId_tar);
             }
 
             // check if entry status is rejected
@@ -437,7 +448,6 @@ namespace TradeMaster6000.Server.Tasks
                         await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
                     }
                 }
-
                 finished = true;
                 goto End;
             }
@@ -452,7 +462,6 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         await TradeHelper.CancelEntry(orderId_ent, orderId).ConfigureAwait(false);
                         await LogHelper.AddLog(orderId, $"entry order cancelled...").ConfigureAwait(false);
-
                     }
                     finished = true;
                     goto End;

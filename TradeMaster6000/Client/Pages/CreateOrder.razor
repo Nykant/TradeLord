@@ -36,7 +36,7 @@
         <p>Instrument:  LTP: @LTP</p> 
         <InputSelect @oninput="@((e) => GetTick((string)e.Value))" @bind-Value="tradeOrder.TradingSymbol">
             @{
-                <option>choose an instrument</option>
+                <option value="0">choose an instrument</option>
                 if (instrumentsLoaded)
                 {
                     foreach (var instrument in instruments)
@@ -50,7 +50,6 @@
 
         <p>Transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
             @{
-                <option>choose transaction type</option>
                 foreach (var type in Enum.GetValues(typeof(TransactionType)))
                 {
                     <option value="@type">@type</option>

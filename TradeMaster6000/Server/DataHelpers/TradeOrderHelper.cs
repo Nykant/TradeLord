@@ -12,7 +12,6 @@ namespace TradeMaster6000.Server.DataHelpers
     public class TradeOrderHelper : ITradeOrderHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
-        private readonly object tradelock = new object();
 
         public TradeOrderHelper(IDbContextFactory<TradeDbContext> contextFactory)
         {

@@ -15,26 +15,23 @@ namespace TradeMaster6000.Server.Services
     {
         private static object key = new object();
 
-        private IServiceProvider Services { get; set; }
         private IConfiguration Configuration { get; set; }
         private IHttpContextAccessor ContextAccessor { get; set; }
-        private Ticker Ticker { get; set; } = null;
-        private List<Order> OrderUpdates { get; set; } = new List<Order>();
-        private List<Tick> Ticks { get; set; } = new List<Tick>();
-        private List<string> TickerLogs { get; set; } = new List<string>();
-        private bool Started { get; set; } = false;
-        public TickerService(IServiceProvider services)
+        private static Ticker Ticker { get; set; }
+        private static List<Order> OrderUpdates { get; set; } = new List<Order>();
+        private static List<Tick> Ticks { get; set; } = new List<Tick>();
+        private static List<string> TickerLogs { get; set; } = new List<string>();
+        private static bool Started { get; set; } = false;
+        public TickerService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
-            Services = services;
+            Configuration = configuration;
+            ContextAccessor = httpContextAccessor;
         }
 
         public void Start()
         {
             lock (key)
             {
-                // get DI services
-                ContextAccessor = Services.GetRequiredService<IHttpContextAccessor>();
-                Configuration = Services.GetRequiredService<IConfiguration>();
 
                 // new ticker instance 
                 Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), ContextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
@@ -68,18 +65,31 @@ namespace TradeMaster6000.Server.Services
             }
             return dick;
         }
-        public Order GetOrder(string Id)
+        public Order GetOrder(string id)
         {
             Order order = new Order();
             foreach(var update in OrderUpdates)
             {
-                if(update.OrderId == Id)
+                if(update.OrderId == id)
                 {
                     order = update;
                     break;
                 }
             }
             return order;
+        }
+        public bool AnyOrder(string id)
+        {
+            bool any = false;
+            foreach (var update in OrderUpdates)
+            {
+                if (update.OrderId == id)
+                {
+                    any = true;
+                    break;
+                }
+            }
+            return any;
         }
 
         public void Stop()
@@ -180,5 +190,6 @@ namespace TradeMaster6000.Server.Services
         void UnSubscribe(uint token);
         void Start();
         bool IsStarted();
+        bool AnyOrder(string id);
     }
 }
