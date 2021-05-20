@@ -54,19 +54,6 @@ namespace TradeMaster6000.Server.Controllers
 
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("AccessToken"), user.AccessToken);
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("PublicToken"), user.PublicToken);
-
-                    //List<Instrument> kiteInstruments = kite.GetInstruments();
-                    //List<TradeInstrument> appInstruments = instrumentService.GetInstruments();
-                    //foreach(var instrument in kiteInstruments)
-                    //{
-                    //    foreach(var appInstrument in appInstruments)
-                    //    {
-                    //        if (instrument.TradingSymbol == appInstrument.TradingSymbol)
-                    //        {
-                    //            appInstrument.Id = instrument.InstrumentToken;
-                    //        }
-                    //    }
-                    //}
                 }
                 catch (Exception e)
                 {

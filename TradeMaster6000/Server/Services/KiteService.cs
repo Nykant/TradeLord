@@ -8,7 +8,7 @@ namespace TradeMaster6000.Server.Services
 {
     public class KiteService : IKiteService
     {
-        private Kite Kite { get; set; }
+        private static Kite Kite { get; set; }
         public KiteService()
         {
 

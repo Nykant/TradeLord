@@ -18,11 +18,11 @@ namespace TradeMaster6000.Server.Services
         private IServiceProvider Services { get; set; }
         private IConfiguration Configuration { get; set; }
         private IHttpContextAccessor ContextAccessor { get; set; }
-        private Ticker Ticker { get; set; } = null;
-        private List<Order> OrderUpdates { get; set; } = new List<Order>();
-        private List<Tick> Ticks { get; set; } = new List<Tick>();
-        private List<string> TickerLogs { get; set; } = new List<string>();
-        private bool Started { get; set; } = false;
+        private static Ticker Ticker { get; set; } = null;
+        private static List<Order> OrderUpdates { get; set; } = new List<Order>();
+        private static List<Tick> Ticks { get; set; } = new List<Tick>();
+        private static List<string> TickerLogs { get; set; } = new List<string>();
+        private static bool Started { get; set; } = false;
         public TickerService(IServiceProvider services)
         {
             Services = services;

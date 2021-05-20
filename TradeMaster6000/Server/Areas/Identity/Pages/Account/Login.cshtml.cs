@@ -100,6 +100,7 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 {
                     Kite kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
                     kiteService.SetKite(kite);
+
                     //HttpContext.Session.Get<string>(Configuration.GetValue<string>("PublicTokenPassword"));
                     _logger.LogInformation("User logged in.");
                     return Redirect(kite.GetLoginURL());
