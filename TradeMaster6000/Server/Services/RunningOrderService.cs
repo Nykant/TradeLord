@@ -10,7 +10,7 @@ namespace TradeMaster6000.Server.Services
 {
     public class RunningOrderService : IRunningOrderService
     {
-        private List<TradeOrder> Orders { get; set; }
+        private static List<TradeOrder> Orders { get; set; }
         public RunningOrderService()
         {
             Orders = new List<TradeOrder>();

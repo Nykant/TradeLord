@@ -13,45 +13,20 @@ namespace TradeMaster6000.Server.Helpers
     {
         private ITradeLogHelper LogHelper { get; set; }
         private ITickerService TickService { get; set; }
+        private ITimeHelper TimeHelper { get; set; }
         private Kite Kite { get; set; }
-        public TradeHelper(ITradeLogHelper tradeLogHelper, ITickerService tickService, IKiteService kiteService)
+        public TradeHelper(ITradeLogHelper tradeLogHelper, ITickerService tickService, IKiteService kiteService, ITimeHelper timeHelper)
         {
             LogHelper = tradeLogHelper;
             TickService = tickService;
             Kite = kiteService.GetKite();
-        }
-
-        public string GetCurrentVariety()
-        {
-
-            string variety = null;
-
-            DateTime GST1 = DateTime.Now;
-            DateTime IST1 = GST1.AddHours(5).AddMinutes(30);
-            DateTime opening1 = new DateTime(IST1.Year, IST1.Month, IST1.Day, 9, 15, 0);
-            DateTime closing1 = opening1.AddHours(6).AddMinutes(15);
-
-            if (DateTime.Compare(IST1, opening1) < 0)
-            {
-                variety = "amo";
-            }
-            else if (DateTime.Compare(IST1, opening1) >= 0)
-            {
-                variety = "regular";
-            }
-            if (DateTime.Compare(IST1, closing1) >= 0)
-            {
-                variety = "amo";
-            }
-
-            return variety;
-
+            TimeHelper = timeHelper;
         }
 
         public async Task CancelEntry(string orderId_ent, int orderId)
         {
-            var variety = await Task.Run(()=>GetCurrentVariety());
             var entryTask = Task.Run(() => TickService.GetOrder(orderId_ent));
+            var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
             var entry = await entryTask;
 
             if (entry.Status != "COMPLETE" && entry.Status != "REJECTED")
@@ -70,12 +45,11 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task CancelStopLoss(string orderId_slm, bool is_pre_slm_cancelled, bool regularSLMplaced, int orderId)
         {
-            var variety = await Task.Run(()=>GetCurrentVariety());
-            var slmTask = Task.Run(() => TickService.GetOrder(orderId_slm));
-            var slm = await slmTask;
+            var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
 
             if (!is_pre_slm_cancelled)
             {
+                var slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
                 if (slm.Status != "COMPLETE" && slm.Status != "REJECTED")
                 {
                     try
@@ -91,6 +65,7 @@ namespace TradeMaster6000.Server.Helpers
             }
             else if (regularSLMplaced)
             {
+                var slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
                 if (slm.Status != "COMPLETE" && slm.Status != "REJECTED")
                 {
                     try
@@ -108,12 +83,11 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task CancelTarget(string orderId_tar, bool targetplaced, int orderId)
         {
-            var targetTask = Task.Run(() => TickService.GetOrder(orderId_tar));
-            var variety = await Task.Run(() => GetCurrentVariety());
-            var targetO = await targetTask;
-
             if (targetplaced)
             {
+                var targetTask = Task.Run(() => TickService.GetOrder(orderId_tar));
+                var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
+                var targetO = await targetTask;
                 if (targetO.Status != "COMPLETE" && targetO.Status != "REJECTED")
                 {
                     try
@@ -130,8 +104,7 @@ namespace TradeMaster6000.Server.Helpers
         }
         public async Task SquareOff(TradeOrder order, string orderId_ent, string exitTransactionType)
         {
-            var entryTask = Task.Run(() => TickService.GetOrder(orderId_ent));
-            var entry = await entryTask;
+            var entry = await Task.Run(() => TickService.GetOrder(orderId_ent));
             if (entry.FilledQuantity > 0)
             {
                 Dictionary<string, dynamic> placeOrderResponse = Kite.PlaceOrder(
@@ -152,7 +125,7 @@ namespace TradeMaster6000.Server.Helpers
             dynamic value1;
             try
             {
-                var variety = await Task.Run(() => GetCurrentVariety());
+                var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                 // place entry limit order
                 Dictionary<string, dynamic> response = Kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
@@ -192,7 +165,7 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     try
                     {
-                        var variety = await Task.Run(() => GetCurrentVariety());
+                        var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                         // place slm order
                         Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
@@ -236,7 +209,7 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     try
                     {
-                        var variety = await Task.Run(() => GetCurrentVariety());
+                        var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                         // place slm order
                         Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
@@ -283,6 +256,5 @@ namespace TradeMaster6000.Server.Helpers
         Task CancelTarget(string orderId_tar, bool targetplaced, int orderId);
         Task CancelStopLoss(string orderId_slm, bool is_pre_slm_cancelled, bool regularSLMplaced, int orderId);
         Task CancelEntry(string orderId_ent, int orderId);
-        string GetCurrentVariety();
     }
 }
