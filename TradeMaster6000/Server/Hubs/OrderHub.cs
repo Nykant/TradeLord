@@ -74,7 +74,7 @@ namespace TradeMaster6000.Server.Hubs
 
             await Task.Run(async () =>
             {
-                await orderWork.StartWork(order);
+                await orderWork.StartWork(order, order.TokenSource.Token);
                 await StopOrderWork(order.Id);
                 order.Status = Status.DONE;
                 await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);

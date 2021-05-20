@@ -25,9 +25,8 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task CancelEntry(string orderId_ent, int orderId)
         {
-            var entryTask = Task.Run(() => TickService.GetOrder(orderId_ent));
+            var entry = await Task.Run(() => TickService.GetOrder(orderId_ent));
             var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
-            var entry = await entryTask;
 
             if (entry.Status != "COMPLETE" && entry.Status != "REJECTED")
             {
@@ -122,7 +121,7 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task<string> PlaceEntry(TradeOrder order)
         {
-            dynamic value1;
+            dynamic id;
             try
             {
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
@@ -139,20 +138,18 @@ namespace TradeMaster6000.Server.Helpers
                      Variety: variety
                  );
 
-                // get order id from place order response
-                response.TryGetValue("data", out dynamic value);
-                Dictionary<string, dynamic> data = value;
-                data.TryGetValue("order_id", out value1);
+                id = response["data"]["order_id"];
 
-                await LogHelper.AddLog(order.Id, $"entry order placed...").ConfigureAwait(false);
+                await LogHelper.AddLog(order.Id, $"entry order placed...")
+                    .ConfigureAwait(false);
             }
             catch (KiteException e)
             {
-                await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...")
+                    .ConfigureAwait(false);
                 return null;
             }
-    
-            return value1;
+            return id;
         }
 
         public async Task<string> PlacePreSLM(TradeOrder order, string exitTransactionType, string orderId_ent)

@@ -13,7 +13,7 @@ namespace TradeMaster6000.Shared
         [Required]
         public decimal StopLoss { get; set; }
         [Required]
-        public decimal Entry { get; set; }
+        public Decimal Entry { get; set; }
         [Required]
         public decimal Risk { get; set; }
         [Required]

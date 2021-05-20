@@ -22,17 +22,18 @@ namespace TradeMaster6000.Server.Services
         private static List<Tick> Ticks { get; set; } = new List<Tick>();
         private static List<string> TickerLogs { get; set; } = new List<string>();
         private static bool Started { get; set; } = false;
-        public TickerService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
+        private static Kite Kite { get; set; }
+        public TickerService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor, IKiteService kiteService)
         {
             Configuration = configuration;
             ContextAccessor = httpContextAccessor;
+            Kite = kiteService.GetKite();
         }
 
         public void Start()
         {
             lock (key)
             {
-
                 // new ticker instance 
                 Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), ContextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
 
@@ -68,13 +69,20 @@ namespace TradeMaster6000.Server.Services
         public Order GetOrder(string id)
         {
             Order order = new Order();
+            bool gotit = false;
             foreach(var update in OrderUpdates)
             {
                 if(update.OrderId == id)
                 {
                     order = update;
+                    gotit = true;
                     break;
                 }
+            }
+            if (!gotit)
+            {
+                var orderH = Kite.GetOrderHistory(id);
+                order = orderH[orderH.Count - 1];
             }
             return order;
         }
@@ -87,6 +95,14 @@ namespace TradeMaster6000.Server.Services
                 {
                     any = true;
                     break;
+                }
+            }
+            if (!any)
+            {
+                var orderH = Kite.GetOrderHistory(id);
+                if(orderH.Count() > 0)
+                {
+                    any = true;
                 }
             }
             return any;

@@ -90,19 +90,23 @@ namespace TradeMaster6000.Server
                 options.Cookie.SameSite = SameSiteMode.Lax;
             });
 
+            //-------------------
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
-            services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
             services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
+            //-------------------
+            services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
+            services.TryAddSingleton<ITradeHelper, TradeHelper>();
             services.TryAddSingleton<ITickerService, TickerService>();
             services.TryAddSingleton<ITimeHelper, TimeHelper>();
-            services.TryAddSingleton<ITradeHelper, TradeHelper>();
             services.TryAddSingleton<ITargetHelper, TargetHelper>();
+            //-------------------
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
             services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
+            //-------------------
 
             services.AddSignalR();
             services.AddControllersWithViews();

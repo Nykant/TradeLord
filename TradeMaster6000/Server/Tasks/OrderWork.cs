@@ -69,6 +69,7 @@ namespace TradeMaster6000.Server.Tasks
             TargetHelper = service.GetRequiredService<ITargetHelper>();
             SLMHelper = service.GetRequiredService<ISLMHelper>();
             WatchingTargetHelper = service.GetRequiredService<IWatchingTargetHelper>();
+            TimeHelper = service.GetRequiredService<ITimeHelper>();
 
             //set values when constructor initialized
             isPreMarketOpen = false;
@@ -81,7 +82,7 @@ namespace TradeMaster6000.Server.Tasks
             isTargetHit = false;
         }
 
-        public async Task StartWork(TradeOrder order)
+        public async Task StartWork(TradeOrder order, CancellationToken token)
         {
             order = await Initialize(order, orderHub);
 
@@ -105,6 +106,10 @@ namespace TradeMaster6000.Server.Tasks
 
             while (!TickService.AnyOrder(orderId_ent))
             {
+                if (token.IsCancellationRequested)
+                {
+                    goto Stopping;
+                }
                 Thread.Sleep(500);
             }
 
@@ -112,6 +117,10 @@ namespace TradeMaster6000.Server.Tasks
             {
                 while (!TickService.AnyOrder(orderId_slm))
                 {
+                    if (token.IsCancellationRequested)
+                    {
+                        goto Stopping;
+                    }
                     Thread.Sleep(500);
                 }
             }
@@ -119,7 +128,7 @@ namespace TradeMaster6000.Server.Tasks
             // do while pre market is not open
             do
             {
-                await CheckOrderStatuses(order);
+                await Task.Run(()=>CheckOrderStatuses(order)).ConfigureAwait(false);
 
                 if (await TimeHelper.IsPreMarketOpen(orderId))
                 {
@@ -127,7 +136,7 @@ namespace TradeMaster6000.Server.Tasks
                     break;
                 }
 
-                if (order.TokenSource.IsCancellationRequested)
+                if (token.IsCancellationRequested)
                 {
                     goto Stopping;
                 }
@@ -211,7 +220,7 @@ namespace TradeMaster6000.Server.Tasks
                     }
                 }
 
-                if (order.TokenSource.IsCancellationRequested)
+                if (token.IsCancellationRequested)
                 {
                     if (!isTargetHit)
                     {
