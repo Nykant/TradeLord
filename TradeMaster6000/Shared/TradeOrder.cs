@@ -11,25 +11,35 @@ namespace TradeMaster6000.Shared
         [Key]
         public int Id { get; set; }
         [Required]
+        [Range(1, 99999), ]
         public decimal StopLoss { get; set; }
         [Required]
-        public Decimal Entry { get; set; }
+        [Range(1, 99999)]
+        public decimal Entry { get; set; }
         [Required]
+        [Range(1, 9999)]
         public decimal Risk { get; set; }
         [Required]
-        public string TradingSymbol { get; set; }
-        [Required]
+        [Range(1, 100)]
         public int RxR { get; set; }
+        [Required]
+        public string TradingSymbol { get; set; }
+
         [Required]
         public TransactionType TransactionType { get; set; }
         public Status Status { get; set; }
-        public TradeInstrument Instrument {get; set;}
-        public CancellationTokenSource TokenSource { get; set; }
-        public bool EntryHit { get; set; }
-        public bool SLMHit { get; set; }
-        public bool TargetHit { get; set; }
         public int QuantityFilled { get; set; }
         public int Quantity { get; set; }
+        public string EntryId { get; set; }
+        public string SLMId { get; set; }
+        public string TargetId { get; set; }
+        public decimal Target { get; set; }
+        public string SLMStatus { get; set; }
+        public string EntryStatus { get; set; }
+        public string TargetStatus { get; set; }
+        public bool PreSLMCancelled { get; set; } = false;
+        public TradeInstrument Instrument { get; set; }
+        public CancellationTokenSource TokenSource { get; set; }
         public List<TradeLog> TradeLogs { get; set; }
     }
     public enum TransactionType

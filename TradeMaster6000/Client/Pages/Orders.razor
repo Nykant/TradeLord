@@ -12,37 +12,41 @@
 
     if (IsConnected)
     {
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
 
-        <button @onclick="@NewOrder">New Order</button>
+        <hr />
 
-        <br />
-
-        <RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
-                        Data="@orders" TItem="TradeOrder">
-            <Columns>
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Id" Title="Id" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
-                    <Template Context="data">
-                        <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="help" Click=@(() => GoToOrder(data.Id)) Text="Details" />
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TradingSymbol" Title="Trading Symbol" />
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TransactionType" Title="Transaction Type" />
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Entry" Title="Entry" />
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Quantity" Title="Quantity" />
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Status" Title="Status" />
-                <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Title="Stop" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
-                    <Template Context="data">
-                        <RadzenButton ButtonStyle="ButtonStyle.Warning" Click=@(() => StopTicker(data.Id)) Text="Stop" />
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-
+        <div class="row">
+            <div class="col-xl-12">
+                <RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                                Data="@orders" TItem="TradeOrder">
+                    <Columns>
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Id" Title="Id" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+                            <Template Context="data">
+                                <RadzenButton ButtonStyle="ButtonStyle.Info" Click=@(() => GoToOrder(data.Id)) Text="Details" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TradingSymbol" Title="Trading Symbol" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="TransactionType" Title="Transaction Type" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Entry" Title="Entry" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="StopLoss" Title="Stop Loss" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Quantity" Title="Quantity" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="QuantityFilled" Title="Quantity Filled" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Status" Title="Status" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Title="Stop" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+                            <Template Context="data">
+                                <RadzenButton ButtonStyle="ButtonStyle.Warning" Click=@(() => StopOrder(data.Id)) Text="Stop" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </div>
+        </div>
     }
     else
     {
 
-        <h1>Connecting...</h1>
+        <h3>Connecting...</h3>
 
     }
 }
@@ -61,7 +65,7 @@
         .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
         .Build();
 
-        hubConnection.On<List<TradeOrder>>("ReceiveList", (list) =>
+        hubConnection.On<List<TradeOrder>>("ReceiveOrders", (list) =>
         {
             orders = list;
             StateHasChanged();
@@ -72,13 +76,20 @@
         await GetOrders();
     }
     private void GoToOrder(int id)
-        {
+    {
         NavigationManager.NavigateTo($"/OrderDetails/{id}");
-        }
+    }
 
     private async Task GetOrders()
     {
-        await hubConnection.SendAsync("GetOrders");
+        await Task.Run(async() =>
+        {
+            while (IsConnected)
+            {
+                await hubConnection.SendAsync("GetOrders");
+                await Task.Delay(5000);
+            }
+        }).ConfigureAwait(false);
     }
 
     private void NewOrder()
@@ -86,7 +97,7 @@
         NavigationManager.NavigateTo("/createorder");
     }
 
-    private async Task StopTicker(int id)
+    private async Task StopOrder(int id)
     {
         await hubConnection.SendAsync("StopOrderWork", id);
     }

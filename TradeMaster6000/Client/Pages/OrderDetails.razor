@@ -7,14 +7,69 @@
 @implements IAsyncDisposable
 @attribute [Authorize]
 
+@{ if (IsConnected)
+    {
+        <div class="row">
+            <div class="col-xl-6">
+                <h3>Trading Symbol</h3>
+                <RadzenTextBox Value="@TradeOrder.TradingSymbol" />
+                <h3>Transaction Type</h3>
+                <RadzenTextBox Value="@TradeOrder.TransactionType.ToString()" />
+                <h3>Entry</h3>
+                <RadzenTextBox Value="@TradeOrder.Entry.ToString()" />
+                <h3>Stop loss</h3>
+                <RadzenTextBox Value="@TradeOrder.StopLoss.ToString()" />
+                <h3>Risk</h3>
+                <RadzenTextBox Value="@TradeOrder.Risk.ToString()" />
+                <h3>R:R</h3>
+                <RadzenTextBox Value="@TradeOrder.RxR.ToString()" />
+                <h3>Status</h3>
+                <RadzenTextBox Value="@TradeOrder.Status.ToString()" />
+            </div>
+            <div class="col-xl-6">
+                <RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                                Data="@tradeLogs" TItem="TradeLog">
+                    <Columns>
+                        <RadzenDataGridColumn Width="400px" TItem="TradeLog" Property="Log" Title="Log Message" />
+                        <RadzenDataGridColumn Width="100px" TItem="TradeLog" Property="Timestamp" Title="Timestamp" />
+                    </Columns>
+                </RadzenDataGrid>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xl-6">
+                <h3>Entry order id</h3>
+                <RadzenTextBox Value="@TradeOrder.EntryId" />
+                <h3>Entry status</h3>
+                <RadzenTextBox Value="@TradeOrder.EntryStatus" />
+                <h3>SLM order id</h3>
+                <RadzenTextBox Value="@TradeOrder.SLMId" />
+                <h3>SLM status</h3>
+                <RadzenTextBox Value="@TradeOrder.SLMStatus" />
+                <h3>Target order id</h3>
+                <RadzenTextBox Value="@TradeOrder.TargetId" />
+                <h3>Target status</h3>
+                <RadzenTextBox Value="@TradeOrder.TargetStatus" />
+            </div>
+            <div class="col-xl-6">
+                <h3>Entry quantity</h3>
+                <RadzenTextBox Value="@TradeOrder.Quantity.ToString()" />
+                <h3>Entry quantity filled</h3>
+                <RadzenTextBox Value="@TradeOrder.QuantityFilled.ToString()" />
+                <h3>Target</h3>
+                <RadzenTextBox Value="@TradeOrder.Target.ToString()" />
+                <h3>Is pre slm cancelled</h3>
+                <RadzenTextBox Value="@TradeOrder.PreSLMCancelled.ToString()" />
+            </div>
+        </div>
+    }
+            else
+            {
+                <h3>Connecting...</h3>
+            }
+}
 
-<RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
-                Data="@tradeLogs" TItem="TradeLog">
-    <Columns>
-        <RadzenDataGridColumn Width="400px" TItem="TradeLog" Property="Log" Title="Log Message" />
-        <RadzenDataGridColumn Width="100px" TItem="TradeLog" Property="Timestamp" Title="Timestamp" />
-    </Columns>
-</RadzenDataGrid>
+
 
 
 @code {
@@ -22,6 +77,7 @@
     public string OrderId { get; set; }
 
     RadzenDataGrid<TradeLog> ordersGrid;
+    private TradeOrder TradeOrder { get; set; } = new TradeOrder();
     private IList<TradeLog> tradeLogs = new List<TradeLog>();
     private HubConnection hubConnection;
 
@@ -37,8 +93,15 @@
             StateHasChanged();
         });
 
+        hubConnection.On<TradeOrder>("ReceiveOrder", (order) =>
+        {
+            TradeOrder = order;
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
 
+        await GetOrder();
         await GetLogs();
     }
 
@@ -46,7 +109,19 @@
     {
         int.TryParse(OrderId, out int orderId);
         await hubConnection.SendAsync("GetLogs", orderId);
+    }
 
+    private async Task GetOrder()
+    {
+        int.TryParse(OrderId, out int orderId);
+        await Task.Run(async () =>
+        {
+            while (IsConnected)
+            {
+                await hubConnection.SendAsync("GetOrder", orderId);
+                await Task.Delay(5000);
+            }
+        }).ConfigureAwait(false);
     }
 
     public bool IsConnected =>

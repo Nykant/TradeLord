@@ -17,25 +17,29 @@ namespace TradeMaster6000.Server.Services
 
         private IConfiguration Configuration { get; set; }
         private IHttpContextAccessor ContextAccessor { get; set; }
+        private IProtectionService ProtectionService { get; set; }
         private static Ticker Ticker { get; set; }
         private static List<Order> OrderUpdates { get; set; } = new List<Order>();
         private static List<Tick> Ticks { get; set; } = new List<Tick>();
         private static List<string> TickerLogs { get; set; } = new List<string>();
         private static bool Started { get; set; } = false;
         private static Kite Kite { get; set; }
-        public TickerService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor, IKiteService kiteService)
+        public TickerService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor, IKiteService kiteService, IProtectionService protectionService)
         {
             Configuration = configuration;
             ContextAccessor = httpContextAccessor;
             Kite = kiteService.GetKite();
+            ProtectionService = protectionService;
         }
 
         public void Start()
         {
             lock (key)
             {
+                var accessToken = ProtectionService.UnprotectAccessToken(
+                    ContextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
                 // new ticker instance 
-                Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), ContextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
+                Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
 
                 // ticker event handlers
                 Ticker.OnTick += onTick;

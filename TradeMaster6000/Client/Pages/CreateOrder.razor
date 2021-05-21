@@ -9,60 +9,84 @@
 @attribute [Authorize]
 
 <style>
-    p {
-        display: inline;
+    p{
+        display:block;
+    }
+    label{
+        display:block;
     }
 </style>
 
-<h3>New Order</h3>
+@{ if (IsConnected)
+    {
+        <div class="row">
+            <div class="col-md-10 m-md-auto">
+                <EditForm Model="tradeOrder" OnValidSubmit="@FormSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="col-md-6 float-md-left">
 
-<div id="orderForm">
-    <EditForm Model="tradeOrder" OnValidSubmit="@HandleValidSubmit">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
 
-        <p>Entry: </p><InputNumber @bind-Value="tradeOrder.Entry" />
-        <br />
+                        <div class="padding-top">
+                            <label>Entry</label>
+                            <RadzenNumeric TValue="decimal" Placeholder="Entry" @bind-Value="tradeOrder.Entry" />
 
-        <p>Stoploss: </p><InputNumber @bind-Value="tradeOrder.StopLoss" />
-        <br />
+                        </div>
 
-        <p>Risk: </p><InputNumber @bind-Value="tradeOrder.Risk" />
-        <br />
+                        <div class="padding-top">
+                            <label>Stop loss</label>
+                            <RadzenNumeric TValue="decimal" Placeholder="Stop loss" @bind-Value="tradeOrder.StopLoss" />
 
-        <p>Risk:Reward : </p><InputNumber @bind-Value="tradeOrder.RxR" />
-        <br />
+                        </div>
 
-        <p>Instrument:  LTP: @LTP</p> 
-        <InputSelect @oninput="@((e) => GetTick((string)e.Value))" @bind-Value="tradeOrder.TradingSymbol">
-            @{
-                <option value="0">choose an instrument</option>
-                if (instrumentsLoaded)
-                {
-                    foreach (var instrument in instruments)
-                    {
-                        <option value="@instrument.TradingSymbol">symbol: @instrument.TradingSymbol - exchange: @instrument.Exchange</option>
-                    }
-                }
+                        <div class="padding-top">
+                            <label>Risk</label>
+                            <RadzenNumeric TValue="decimal" Placeholder="Risk" @bind-Value="tradeOrder.Risk" />
+
+                        </div>
+
+                        <div class="padding-top">
+                            <label>R:R</label>
+                            <RadzenNumeric TValue="int" Placeholder="R:R" @bind-Value="tradeOrder.RxR" />
+
+                        </div>
+
+                    </div>
+                    <div class="col-md-6 float-md-left">
+                        <div class="padding-top">
+                            <label>LTP: @LTP</label>
+                            <RadzenListBox AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                           @bind-Value="tradeOrder.TradingSymbol" Data=@instruments TextProperty="TradingSymbol"
+                                           ValueProperty="TradingSymbol" Change=@((args) => GetTick(args)) Style="height:200px" />
+                        </div>
+
+                        <div class="padding-top">
+                            <RadzenSelectBar @bind-Value=@tradeOrder.TransactionType TValue="TransactionType">
+                                <Items>
+                                    <RadzenSelectBarItem Text="BUY" Value="TransactionType.BUY" />
+                                    <RadzenSelectBarItem Text="SELL" Value="TransactionType.SELL" />
+                                </Items>
+                            </RadzenSelectBar>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 float-md-left">
+                        <RadzenButton ButtonType="ButtonType.Submit" Text="Submit" Style="margin-bottom: 20px; width: 150px; margin: auto;" />
+                    </div>
+                </EditForm>
+            </div>
+
+        </div>
+    }
+            else
+            {
+                <h3>Connecting...</h3>
             }
-        </InputSelect>
-        <br />
+}
 
-        <p>Transaction type: </p><InputSelect @bind-Value="tradeOrder.TransactionType">
-            @{
-                foreach (var type in Enum.GetValues(typeof(TransactionType)))
-                {
-                    <option value="@type">@type</option>
-                }
-            }
-        </InputSelect>
-        <br />
-
-        <button type="submit">Make Order</button>
-    </EditForm>
-</div>
 
 @code {
+    private string tradingSymbol;
     private bool instrumentsLoaded = false;
     private HubConnection hubConnection;
     private TradeOrder tradeOrder = new TradeOrder();
@@ -93,9 +117,10 @@
         await GetInstruments();
     }
 
-    private async void GetTick(string symbol)
+    private async void GetTick(object value)
     {
-        await hubConnection.SendAsync("GetTick", symbol);
+        var str = value is IEnumerable<object> ? string.Join(", ", (IEnumerable<object>)value) : value;
+        await hubConnection.SendAsync("GetTick", str);
     }
 
     private async Task GetInstruments()
@@ -103,11 +128,10 @@
         await hubConnection.SendAsync("GetInstruments");
     }
 
-    private async Task HandleValidSubmit(EditContext editContext)
+    private async Task FormSubmit(EditContext editContext)
     {
 
         await hubConnection.SendAsync("StartOrderWork", (TradeOrder)editContext.Model);
-
         NavigationManager.NavigateTo("/orders");
     }
 

@@ -21,13 +21,15 @@ namespace TradeMaster6000.Server.Controllers
         private readonly ILogger<RequestUriController> logger;
         private readonly IKiteService kiteService;
         private readonly IInstrumentService instrumentService;
+        private readonly IProtectionService protectionService;
 
-        public RequestUriController(ILogger<RequestUriController> logger, IConfiguration configuration, IKiteService _kiteService, IInstrumentService instrumentService)
+        public RequestUriController(ILogger<RequestUriController> logger, IConfiguration configuration, IKiteService _kiteService, IInstrumentService instrumentService, IProtectionService protectionService)
         {
             this.logger = logger;
             Configuration = configuration;
             kiteService = _kiteService;
             this.instrumentService = instrumentService;
+            this.protectionService = protectionService;
         }
 
         public IConfiguration Configuration { get; }
@@ -52,7 +54,8 @@ namespace TradeMaster6000.Server.Controllers
                     kite.SetAccessToken(user.AccessToken);
                     kite.SetSessionExpiryHook(() => logger.LogInformation("User need to log in again"));
 
-                    HttpContext.Session.Set<string>(Configuration.GetValue<string>("AccessToken"), user.AccessToken);
+                    var accessToken = protectionService.ProtectAccessToken(user.AccessToken);
+                    HttpContext.Session.Set<string>(Configuration.GetValue<string>("AccessToken"), accessToken);
                     HttpContext.Session.Set<string>(Configuration.GetValue<string>("PublicToken"), user.PublicToken);
                 }
                 catch (Exception e)

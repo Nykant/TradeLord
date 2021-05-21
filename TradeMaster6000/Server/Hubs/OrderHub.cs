@@ -65,10 +65,11 @@ namespace TradeMaster6000.Server.Hubs
                 tickerService.Start();
             }
 
-            order.Status = Status.STARTING;
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
+
             running.Add(order);
+            await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
 
             tickerService.Subscribe(order.Instrument.Token);
 
@@ -76,9 +77,7 @@ namespace TradeMaster6000.Server.Hubs
             {
                 await orderWork.StartWork(order, order.TokenSource.Token);
                 await StopOrderWork(order.Id);
-                order.Status = Status.DONE;
                 await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
-                await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
 
@@ -107,9 +106,17 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveInstruments", await instrumentHelper.GetTradeInstruments());
         }
 
+        public async Task GetOrder(int id)
+        {
+            await Clients.Caller.SendAsync("ReceiveOrder", await tradeOrderHelper.GetTradeOrder(id));
+        }
+
         public async Task GetOrders()
         {
-            await Clients.Caller.SendAsync("ReceiveList", running.Get());
+            await Task.Run(async() => {
+                await running.UpdateOrders();
+                await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
+            }).ConfigureAwait(false);
         }
 
         public async Task GetLogs(int orderId)
