@@ -18,29 +18,28 @@ namespace TradeMaster6000.Server.Helpers
             Kite = kiteService.GetKite();
             LogHelper = logHelper;
         }
-        public async Task<string> PlaceOrder(TradeOrder order, string exitTransactionType, int quantity, decimal target)
+        public async Task<string> PlaceOrder(TradeOrder order)
         {
+            dynamic id;
             try
             {
-                Dictionary<string, dynamic> orderReponse = Kite.PlaceOrder(
+                Dictionary<string, dynamic> response = Kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
-                     TransactionType: exitTransactionType,
-                     Quantity: quantity,
-                     Price: target,
+                     TransactionType: order.ExitTransactionType,
+                     Quantity: order.Quantity,
+                     Price: order.Target,
                      Product: Constants.PRODUCT_MIS,
                      OrderType: Constants.ORDER_TYPE_LIMIT,
                      Validity: Constants.VALIDITY_DAY,
                      Variety: Constants.VARIETY_REGULAR
                  );
 
-                orderReponse.TryGetValue("data", out dynamic value);
-                Dictionary<string, dynamic> data = value;
-                data.TryGetValue("order_id", out dynamic value1);
+                id = response["data"]["order_id"];
 
                 await LogHelper.AddLog(order.Id, $"target placed...").ConfigureAwait(false);
 
-                return value1;
+                return id;
             }
             catch (KiteException e)
             {
@@ -48,19 +47,19 @@ namespace TradeMaster6000.Server.Helpers
                 return null;
             }
         }
-        public async Task Update(string orderId_tar, Order entryO, int orderId)
+        public async Task Update(TradeOrder order, Order entryO)
         {
             Kite.ModifyOrder(
-                orderId_tar,
+                order.TargetId,
                 Quantity: entryO.FilledQuantity.ToString()
             );
 
-            await LogHelper.AddLog(orderId, $"target modified quantity = {entryO.FilledQuantity}...").ConfigureAwait(false);
+            await LogHelper.AddLog(order.Id, $"target modified quantity = {entryO.FilledQuantity}...").ConfigureAwait(false);
         }
     }
     public interface ITargetHelper
     {
-        Task<string> PlaceOrder(TradeOrder order, string exitTransactionType, int quantity, decimal target);
-        Task Update(string orderId_tar, Order entryO, int orderId);
+        Task<string> PlaceOrder(TradeOrder order);
+        Task Update(TradeOrder order, Order entryO);
     }
 }

@@ -12,10 +12,12 @@ namespace TradeMaster6000.Server.DataHelpers
     public class TradeOrderHelper : ITradeOrderHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        private ITradeLogHelper LogHelper { get; set; }
 
-        public TradeOrderHelper(IDbContextFactory<TradeDbContext> contextFactory)
+        public TradeOrderHelper(IDbContextFactory<TradeDbContext> contextFactory, ITradeLogHelper logHelper)
         {
             this.contextFactory = contextFactory;
+            LogHelper = logHelper;
         }
 
         public async Task<TradeOrder> GetTradeOrder(int id)
@@ -34,12 +36,19 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public async Task UpdateTradeOrder(TradeOrder tradeOrder)
+        public async Task UpdateTradeOrder(TradeOrder order)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                context.TradeOrders.Update(tradeOrder);
-                await context.SaveChangesAsync();
+                try
+                {
+                    context.TradeOrders.Update(order);
+                    await context.SaveChangesAsync();
+                }
+                catch(Exception e)
+                {
+                    await LogHelper.AddLog(order.Id, $"error updating order: {e.Message}").ConfigureAwait(false);
+                }
             }
         }
 

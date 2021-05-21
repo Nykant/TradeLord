@@ -91,10 +91,10 @@ namespace TradeMaster6000.Server
             });
 
             //-------------------
+            services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
             services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
-            services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
             //-------------------
             services.TryAddSingleton<IRunningOrderService, RunningOrderService>();

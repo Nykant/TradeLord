@@ -1,6 +1,7 @@
 ﻿using KiteConnect;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
@@ -23,93 +24,181 @@ namespace TradeMaster6000.Server.Helpers
             TimeHelper = timeHelper;
         }
 
-        public async Task CancelEntry(string orderId_ent, int orderId)
+        public async Task CancelEntry(TradeOrder order)
         {
-            var entry = await Task.Run(() => TickService.GetOrder(orderId_ent));
+            bool cancelled = false;
             var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
+            Order entry = new Order();
 
-            if (entry.Status != "COMPLETE" && entry.Status != "REJECTED")
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            while (!cancelled) 
             {
-                try
+                entry = await Task.Run(() => TickService.GetOrder(order.EntryId));
+                if (entry.Status == "COMPLETE" || entry.Status == "REJECTED")
                 {
-                    Kite.CancelOrder(orderId_ent, variety);
-                    await LogHelper.AddLog(orderId, $"entry order cancelled...").ConfigureAwait(false);
+                    cancelled = true;
+                    break;
                 }
-                catch (KiteException e)
-                {
-                    await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
-                }
-            }
-        }
-
-        public async Task CancelStopLoss(string orderId_slm, bool is_pre_slm_cancelled, bool regularSLMplaced, int orderId)
-        {
-            var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
-
-            if (!is_pre_slm_cancelled)
-            {
-                var slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
-                if (slm.Status != "COMPLETE" && slm.Status != "REJECTED")
+                else
                 {
                     try
                     {
-                        Kite.CancelOrder(orderId_slm, variety);
-                        await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
+                        Kite.CancelOrder(order.EntryId, variety);
+                        await LogHelper.AddLog(order.Id, $"entry order cancelled...").ConfigureAwait(false);
+                        cancelled = true;
+                        break;
                     }
                     catch (KiteException e)
                     {
-                        await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
                     }
                 }
-            }
-            else if (regularSLMplaced)
-            {
-                var slm = await Task.Run(() => TickService.GetOrder(orderId_slm));
-                if (slm.Status != "COMPLETE" && slm.Status != "REJECTED")
+
+                if (stopwatch.Elapsed.TotalMinutes < 5)
                 {
-                    try
-                    {
-                        Kite.CancelOrder(orderId_slm, variety);
-                        await LogHelper.AddLog(orderId, $"slm order cancelled...").ConfigureAwait(false);
-                    }
-                    catch (KiteException e)
-                    {
-                        await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
-                    }
+                    stopwatch.Stop();
+                    cancelled = true;
+                    break;
                 }
+                await Task.Delay(1000);
             }
         }
 
-        public async Task CancelTarget(string orderId_tar, bool targetplaced, int orderId)
+        public async Task CancelStopLoss(TradeOrder order)
         {
-            if (targetplaced)
+            if (!order.PreSLMCancelled)
             {
-                var targetTask = Task.Run(() => TickService.GetOrder(orderId_tar));
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
-                var targetO = await targetTask;
-                if (targetO.Status != "COMPLETE" && targetO.Status != "REJECTED")
+                bool cancelled = false;
+                Order slm = new Order();
+
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                while (!cancelled)
                 {
-                    try
+                    slm = await Task.Run(() => TickService.GetOrder(order.SLMId));
+                    if(slm.Status == "COMPLETE" || slm.Status == "REJECTED")
                     {
-                        Kite.CancelOrder(orderId_tar, variety);
-                        await LogHelper.AddLog(orderId, $"target order cancelled...").ConfigureAwait(false);
+                        cancelled = true;
+                        break;
                     }
-                    catch (KiteException e)
+                    else
                     {
-                        await LogHelper.AddLog(orderId, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        try
+                        {
+                            Kite.CancelOrder(order.SLMId, variety);
+                            await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
+                            cancelled = true;
+                            break;
+                        }
+                        catch (KiteException e)
+                        {
+                            await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        }
+                    }
+
+                    if (stopwatch.Elapsed.TotalMinutes < 5)
+                    {
+                        stopwatch.Stop();
+                        cancelled = true;
+                        break;
+                    }
+                    await Task.Delay(1000);
+                }
+            }
+            else if (order.RegularSlmPlaced)
+            {
+                var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
+                bool cancelled = false;
+                Order slm = new Order();
+
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                while (!cancelled)
+                {
+                    slm = await Task.Run(() => TickService.GetOrder(order.SLMId));
+                    if (slm.Status == "COMPLETE" || slm.Status == "REJECTED")
+                    {
+                        cancelled = true;
+                        break;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            Kite.CancelOrder(order.SLMId, variety);
+                            await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
+                            cancelled = true;
+                            break;
+                        }
+                        catch (KiteException e)
+                        {
+                            await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        }
+                    }
+                    if (stopwatch.Elapsed.TotalMinutes > 5)
+                    {
+                        stopwatch.Stop();
+                        cancelled = true;
+                        break;
+                    }
+                    await Task.Delay(1000);
+                }
+            }
+        }
+
+        public async Task CancelTarget(TradeOrder order)
+        {
+            if (order.TargetPlaced)
+            {
+                Order targetO = new Order();
+                var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
+                bool cancelled = false;
+
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                while (!cancelled)
+                {
+                    targetO = await Task.Run(() => TickService.GetOrder(order.TargetId));
+                    if (targetO.Status == "COMPLETE" || targetO.Status == "REJECTED")
+                    {
+                        cancelled = true;
+                        break;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            Kite.CancelOrder(order.TargetId, variety);
+                            await LogHelper.AddLog(order.Id, $"target order cancelled...").ConfigureAwait(false);
+                            cancelled = true;
+                            break;
+                        }
+                        catch (KiteException e)
+                        {
+                            await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                        }
+                    }
+                    if (stopwatch.Elapsed.TotalMinutes > 5)
+                    {
+                        stopwatch.Stop();
+                        cancelled = true;
+                        break;
                     }
                 }
             }
         }
-        public async Task SquareOff(TradeOrder order, string orderId_ent, string exitTransactionType)
+
+        public async Task SquareOff(TradeOrder order)
         {
-            var entry = await Task.Run(() => TickService.GetOrder(orderId_ent));
+            var entry = await Task.Run(() => TickService.GetOrder(order.EntryId));
             if (entry.FilledQuantity > 0)
             {
                 Dictionary<string, dynamic> placeOrderResponse = Kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
-                     TransactionType: exitTransactionType,
+                     TransactionType: order.ExitTransactionType,
                      Quantity: entry.FilledQuantity,
                      Product: Constants.PRODUCT_MIS,
                      OrderType: Constants.ORDER_TYPE_MARKET,
@@ -152,10 +241,10 @@ namespace TradeMaster6000.Server.Helpers
             return id;
         }
 
-        public async Task<string> PlacePreSLM(TradeOrder order, string exitTransactionType, string orderId_ent)
+        public async Task<string> PlacePreSLM(TradeOrder order)
         {
             var lastPrice = TickService.LastTick(order.Instrument.Token).LastPrice;
-            if (exitTransactionType == "SELL")
+            if (order.ExitTransactionType == "SELL")
             {
                 // if last price is more than stop loss then place slm
                 if (lastPrice > order.StopLoss)
@@ -167,7 +256,7 @@ namespace TradeMaster6000.Server.Helpers
                         Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
-                             TransactionType: exitTransactionType,
+                             TransactionType: order.ExitTransactionType,
                              Quantity: order.Quantity,
                              TriggerPrice: order.StopLoss,
                              Product: Constants.PRODUCT_MIS,
@@ -188,7 +277,7 @@ namespace TradeMaster6000.Server.Helpers
                     catch (KiteException e)
                     {
                         await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                        await CancelEntry(orderId_ent, order.Id);
+                        await CancelEntry(order);
                         return "cancelled";
                     }
                 }
@@ -211,7 +300,7 @@ namespace TradeMaster6000.Server.Helpers
                         Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
-                             TransactionType: exitTransactionType,
+                             TransactionType: order.ExitTransactionType,
                              Quantity: order.Quantity,
                              TriggerPrice: order.StopLoss,
                              Product: Constants.PRODUCT_MIS,
@@ -232,7 +321,7 @@ namespace TradeMaster6000.Server.Helpers
                     catch (KiteException e)
                     {
                         await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                        await CancelEntry(orderId_ent, order.Id);
+                        await CancelEntry(order);
                         return "cancelled";
                     }
                 }
@@ -247,11 +336,11 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface ITradeHelper
     {
-        Task<string> PlacePreSLM(TradeOrder order, string exitTransactionType, string orderId_ent);
+        Task<string> PlacePreSLM(TradeOrder order);
         Task<string> PlaceEntry(TradeOrder order);
-        Task SquareOff(TradeOrder order, string orderId_ent, string exitTransactionType);
-        Task CancelTarget(string orderId_tar, bool targetplaced, int orderId);
-        Task CancelStopLoss(string orderId_slm, bool is_pre_slm_cancelled, bool regularSLMplaced, int orderId);
-        Task CancelEntry(string orderId_ent, int orderId);
+        Task SquareOff(TradeOrder order);
+        Task CancelTarget(TradeOrder order);
+        Task CancelStopLoss(TradeOrder order);
+        Task CancelEntry(TradeOrder order);
     }
 }

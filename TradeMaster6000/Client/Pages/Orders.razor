@@ -73,7 +73,7 @@
 
         await hubConnection.StartAsync();
 
-        await GetOrders();
+        await Task.Run(()=>GetOrders()).ConfigureAwait(false);
     }
     private void GoToOrder(int id)
     {
@@ -82,14 +82,11 @@
 
     private async Task GetOrders()
     {
-        await Task.Run(async() =>
+        while (IsConnected)
         {
-            while (IsConnected)
-            {
-                await hubConnection.SendAsync("GetOrders");
-                await Task.Delay(5000);
-            }
-        }).ConfigureAwait(false);
+            await hubConnection.SendAsync("GetOrders");
+            await Task.Delay(5000);
+        }
     }
 
     private void NewOrder()

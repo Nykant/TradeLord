@@ -21,11 +21,11 @@ namespace TradeMaster6000.Server.Helpers
             TickService = tickerService;
         }
 
-        public decimal GetTriggerPrice(string exitTransactionType, TradeOrder order)
+        public decimal GetTriggerPrice(TradeOrder order)
         {
             var tick = TickService.LastTick(order.Instrument.Token);
             decimal triggerPrice = 0;
-            if (exitTransactionType == "BUY")
+            if (order.ExitTransactionType == "BUY")
             {
                 triggerPrice = tick.High;
                 triggerPrice = triggerPrice * (decimal)1.00015;
@@ -39,29 +39,28 @@ namespace TradeMaster6000.Server.Helpers
             }
             return triggerPrice;
         }
-        public async Task<string> PlaceOrder(TradeOrder order, string exitTransactionType, int quantity, decimal triggerPrice)
+        public async Task<string> PlaceOrder(TradeOrder order)
         {
+            dynamic id;
             try
             {
                 Dictionary<string, dynamic> response = Kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
-                     TransactionType: exitTransactionType,
-                     Quantity: quantity,
-                     TriggerPrice: triggerPrice,
+                     TransactionType: order.ExitTransactionType,
+                     Quantity: order.Quantity,
+                     TriggerPrice: order.StopLoss,
                      Product: Constants.PRODUCT_MIS,
                      OrderType: Constants.ORDER_TYPE_SLM,
                      Validity: Constants.VALIDITY_DAY,
                      Variety: Constants.VARIETY_REGULAR
                 );
 
-                response.TryGetValue("data", out dynamic value);
-                Dictionary<string, dynamic> date = value;
-                date.TryGetValue("order_id", out dynamic value1);
+                id = response["data"]["order_id"];
 
                 await LogHelper.AddLog(order.Id, $"SLM order placed...").ConfigureAwait(false);
 
-                return value1;
+                return id;
             }
             catch (KiteException e)
             {
@@ -69,20 +68,28 @@ namespace TradeMaster6000.Server.Helpers
                 return null;
             }
         }
-        public async Task SquareOff(TradeOrder order, string exitTransactionType, int quantity, string orderId_tar)
+        public async Task SquareOff(TradeOrder order)
         {
+
             Kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
-                 TransactionType: exitTransactionType,
-                 Quantity: quantity,
+                 TransactionType: order.ExitTransactionType,
+                 Quantity: order.Quantity,
                  Product: Constants.PRODUCT_MIS,
                  OrderType: Constants.ORDER_TYPE_MARKET,
                  Validity: Constants.VALIDITY_DAY,
                  Variety: Constants.VARIETY_REGULAR
              );
 
-            Kite.CancelOrder(orderId_tar);
+            if (order.TargetPlaced)
+            {
+                Kite.CancelOrder(order.TargetId);
+            }
+            else
+            {
+                await LogHelper.AddLog(order.Id, $"cant cancel target order cause it is still not placed...").ConfigureAwait(false);
+            }
 
             await LogHelper.AddLog(order.Id, $"squared off...").ConfigureAwait(false);
         }
@@ -90,8 +97,8 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface ISLMHelper
     {
-        decimal GetTriggerPrice(string exitTransactionType, TradeOrder order);
-        Task<string> PlaceOrder(TradeOrder order, string exitTransactionType, int quantity, decimal triggerPrice);
-        Task SquareOff(TradeOrder order, string exitTransactionType, int quantity, string orderId_tar);
+        decimal GetTriggerPrice(TradeOrder order);
+        Task<string> PlaceOrder(TradeOrder order);
+        Task SquareOff(TradeOrder order);
     }
 }

@@ -21,14 +21,14 @@ namespace TradeMaster6000.Server.Helpers
             TickService = tickerService;
         }
 
-        public void SquareOff(Order entry, Order targetO, TradeOrder order, string exitTransactionType)
+        public void SquareOff(Order entry, Order targetO, TradeOrder order)
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
 
             Kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
-                 TransactionType: exitTransactionType,
+                 TransactionType: order.ExitTransactionType,
                  Quantity: squareOffQuantity,
                  Product: Constants.PRODUCT_MIS,
                  OrderType: Constants.ORDER_TYPE_MARKET,
@@ -40,6 +40,6 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface IWatchingTargetHelper
     {
-        void SquareOff(Order entry, Order targetO, TradeOrder order, string exitTransactionType);
+        void SquareOff(Order entry, Order targetO, TradeOrder order);
     }
 }

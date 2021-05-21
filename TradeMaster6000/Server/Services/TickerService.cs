@@ -20,6 +20,7 @@ namespace TradeMaster6000.Server.Services
         private IProtectionService ProtectionService { get; set; }
         private static Ticker Ticker { get; set; }
         private static List<Order> OrderUpdates { get; set; } = new List<Order>();
+        private static List<Order> FirstOrderUpdates { get; set; } = new List<Order>();
         private static List<Tick> Ticks { get; set; } = new List<Tick>();
         private static List<string> TickerLogs { get; set; } = new List<string>();
         private static bool Started { get; set; } = false;
@@ -85,8 +86,22 @@ namespace TradeMaster6000.Server.Services
             }
             if (!gotit)
             {
-                var orderH = Kite.GetOrderHistory(id);
-                order = orderH[orderH.Count - 1];
+                bool gotthat = false;
+                foreach(var firstUpdate in FirstOrderUpdates)
+                {
+                    if(firstUpdate.OrderId == id)
+                    {
+                        order = firstUpdate;
+                        gotthat = true;
+                        break;
+                    }
+                }
+                if (!gotthat)
+                {
+                    var orderH = Kite.GetOrderHistory(id);
+                    order = orderH[orderH.Count - 1];
+                    FirstOrderUpdates.Add(order);
+                }
             }
             return order;
         }
@@ -162,6 +177,7 @@ namespace TradeMaster6000.Server.Services
         }
         private async void OnOrderUpdate(Order orderData)
         {
+            TickerLogs.Add($"order update for order with id: {orderData.OrderId}...");
             await Task.Run(() =>
             {
                 bool found = false;
