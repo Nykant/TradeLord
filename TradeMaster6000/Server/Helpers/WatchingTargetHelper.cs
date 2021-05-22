@@ -11,21 +11,18 @@ namespace TradeMaster6000.Server.Helpers
 {
     public class WatchingTargetHelper : IWatchingTargetHelper
     {
-        private ITradeLogHelper LogHelper { get; set; }
-        private ITickerService TickService { get; set; }
-        private Kite Kite { get; set; }
-        public WatchingTargetHelper(IKiteService kiteService, ITradeLogHelper logHelper, ITickerService tickerService)
+        private readonly IKiteService kiteService;
+        public WatchingTargetHelper(IKiteService kiteService)
         {
-            Kite = kiteService.GetKite();
-            LogHelper = logHelper;
-            TickService = tickerService;
+            this.kiteService = kiteService;
         }
 
         public void SquareOff(Order entry, Order targetO, TradeOrder order)
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
-
-            Kite.PlaceOrder(
+            var kite = kiteService.GetKite();
+            kite.SetAccessToken(kiteService.GetAccessToken());
+            kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
                  TransactionType: order.ExitTransactionType,

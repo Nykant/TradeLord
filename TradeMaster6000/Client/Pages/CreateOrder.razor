@@ -86,8 +86,6 @@
 
 
 @code {
-    private string tradingSymbol;
-    private bool instrumentsLoaded = false;
     private HubConnection hubConnection;
     private TradeOrder tradeOrder = new TradeOrder();
     private List<TradeInstrument> instruments = new List<TradeInstrument>();
@@ -102,7 +100,6 @@
         hubConnection.On<List<TradeInstrument>>("ReceiveInstruments", (instruments) =>
         {
             this.instruments = instruments;
-            instrumentsLoaded = true;
             StateHasChanged();
         });
 

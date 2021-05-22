@@ -91,8 +91,9 @@ namespace TradeMaster6000.Server
             });
 
             //-------------------
+            services.TryAddSingleton<IProtectionService, ProtectionService>();
             services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
-            services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            //services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
@@ -104,12 +105,16 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ITimeHelper, TimeHelper>();
             services.TryAddSingleton<ITargetHelper, TargetHelper>();
             //-------------------
-            services.TryAddSingleton<IProtectionService, ProtectionService>();
+
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
             services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
             //-------------------
 
-            services.AddSignalR();
+            services.AddSignalR(options =>
+            {
+                options.MaximumParallelInvocationsPerClient = 5;
+            });
+
             services.AddControllersWithViews();
             services.AddRazorPages();
 
@@ -136,7 +141,6 @@ namespace TradeMaster6000.Server
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
-                app.UseDatabaseErrorPage();
                 app.UseWebAssemblyDebugging();
             }
             else

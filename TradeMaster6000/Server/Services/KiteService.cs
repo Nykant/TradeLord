@@ -9,9 +9,19 @@ namespace TradeMaster6000.Server.Services
     public class KiteService : IKiteService
     {
         private static Kite Kite { get; set; }
-        public KiteService()
+        private static string AccessToken { get; set; }
+        private readonly IProtectionService protectionService;
+        public KiteService(IProtectionService protectionService)
         {
-
+            this.protectionService = protectionService;
+        }
+        public void SetAccessToken(string accessToken)
+        {
+            AccessToken = protectionService.ProtectAccessToken(accessToken);
+        }
+        public string GetAccessToken()
+        {
+            return protectionService.UnprotectAccessToken(AccessToken);
         }
 
         public void SetKite(Kite kite)
@@ -29,5 +39,7 @@ namespace TradeMaster6000.Server.Services
     {
         public void SetKite(Kite kite);
         public Kite GetKite();
+        void SetAccessToken(string accessToken);
+        string GetAccessToken();
     }
 }

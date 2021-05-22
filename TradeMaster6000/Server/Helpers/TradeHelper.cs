@@ -15,22 +15,22 @@ namespace TradeMaster6000.Server.Helpers
         private ITradeLogHelper LogHelper { get; set; }
         private ITickerService TickService { get; set; }
         private ITimeHelper TimeHelper { get; set; }
-        private Kite Kite { get; set; }
+        private readonly IKiteService kiteService;
         public TradeHelper(ITradeLogHelper tradeLogHelper, ITickerService tickService, IKiteService kiteService, ITimeHelper timeHelper)
         {
             LogHelper = tradeLogHelper;
             TickService = tickService;
-            Kite = kiteService.GetKite();
             TimeHelper = timeHelper;
+            this.kiteService = kiteService;
         }
 
         public async Task CancelEntry(TradeOrder order)
         {
             bool cancelled = false;
             var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
-            Order entry = new Order();
+            Order entry = new ();
 
-            Stopwatch stopwatch = new Stopwatch();
+            Stopwatch stopwatch = new ();
             stopwatch.Start();
             while (!cancelled) 
             {
@@ -44,7 +44,9 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     try
                     {
-                        Kite.CancelOrder(order.EntryId, variety);
+                        var kite = kiteService.GetKite();
+                        kite.SetAccessToken(kiteService.GetAccessToken());
+                        kite.CancelOrder(order.EntryId, variety);
                         await LogHelper.AddLog(order.Id, $"entry order cancelled...").ConfigureAwait(false);
                         cancelled = true;
                         break;
@@ -71,9 +73,9 @@ namespace TradeMaster6000.Server.Helpers
             {
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                 bool cancelled = false;
-                Order slm = new Order();
+                Order slm = new ();
 
-                Stopwatch stopwatch = new Stopwatch();
+                Stopwatch stopwatch = new ();
                 stopwatch.Start();
                 while (!cancelled)
                 {
@@ -87,7 +89,9 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         try
                         {
-                            Kite.CancelOrder(order.SLMId, variety);
+                            var kite = kiteService.GetKite();
+                            kite.SetAccessToken(kiteService.GetAccessToken());
+                            kite.CancelOrder(order.SLMId, variety);
                             await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
                             cancelled = true;
                             break;
@@ -111,9 +115,9 @@ namespace TradeMaster6000.Server.Helpers
             {
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                 bool cancelled = false;
-                Order slm = new Order();
+                Order slm = new ();
 
-                Stopwatch stopwatch = new Stopwatch();
+                Stopwatch stopwatch = new ();
                 stopwatch.Start();
                 while (!cancelled)
                 {
@@ -127,7 +131,9 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         try
                         {
-                            Kite.CancelOrder(order.SLMId, variety);
+                            var kite = kiteService.GetKite();
+                            kite.SetAccessToken(kiteService.GetAccessToken());
+                            kite.CancelOrder(order.SLMId, variety);
                             await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
                             cancelled = true;
                             break;
@@ -152,11 +158,11 @@ namespace TradeMaster6000.Server.Helpers
         {
             if (order.TargetPlaced)
             {
-                Order targetO = new Order();
+                Order targetO = new ();
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                 bool cancelled = false;
 
-                Stopwatch stopwatch = new Stopwatch();
+                Stopwatch stopwatch = new ();
                 stopwatch.Start();
                 while (!cancelled)
                 {
@@ -170,7 +176,9 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         try
                         {
-                            Kite.CancelOrder(order.TargetId, variety);
+                            var kite = kiteService.GetKite();
+                            kite.SetAccessToken(kiteService.GetAccessToken());
+                            kite.CancelOrder(order.TargetId, variety);
                             await LogHelper.AddLog(order.Id, $"target order cancelled...").ConfigureAwait(false);
                             cancelled = true;
                             break;
@@ -195,7 +203,9 @@ namespace TradeMaster6000.Server.Helpers
             var entry = await Task.Run(() => TickService.GetOrder(order.EntryId));
             if (entry.FilledQuantity > 0)
             {
-                Dictionary<string, dynamic> placeOrderResponse = Kite.PlaceOrder(
+                var kite = kiteService.GetKite();
+                kite.SetAccessToken(kiteService.GetAccessToken());
+                kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
                      TransactionType: order.ExitTransactionType,
@@ -214,8 +224,11 @@ namespace TradeMaster6000.Server.Helpers
             try
             {
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
+
+                var kite = kiteService.GetKite();
+                kite.SetAccessToken(kiteService.GetAccessToken());
                 // place entry limit order
-                Dictionary<string, dynamic> response = Kite.PlaceOrder(
+                Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
                      TransactionType: order.TransactionType.ToString(),
@@ -253,7 +266,9 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                         // place slm order
-                        Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
+                        var kite = kiteService.GetKite();
+                        kite.SetAccessToken(kiteService.GetAccessToken());
+                        Dictionary<string, dynamic> response = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
                              TransactionType: order.ExitTransactionType,
@@ -266,13 +281,11 @@ namespace TradeMaster6000.Server.Helpers
                         );
 
                         // set id
-                        responseS.TryGetValue("data", out dynamic valueS);
-                        Dictionary<string, dynamic> dateS = valueS;
-                        dateS.TryGetValue("order_id", out dynamic value1S);
+                        dynamic id = response["data"]["order_id"];
 
                         await LogHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
 
-                        return value1S;
+                        return id;
                     }
                     catch (KiteException e)
                     {
@@ -297,7 +310,9 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                         // place slm order
-                        Dictionary<string, dynamic> responseS = Kite.PlaceOrder(
+                        var kite = kiteService.GetKite();
+                        kite.SetAccessToken(kiteService.GetAccessToken());
+                        Dictionary<string, dynamic> response = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
                              TransactionType: order.ExitTransactionType,
@@ -310,13 +325,11 @@ namespace TradeMaster6000.Server.Helpers
                         );
 
                         // set id
-                        responseS.TryGetValue("data", out dynamic valueS);
-                        Dictionary<string, dynamic> dateS = valueS;
-                        dateS.TryGetValue("order_id", out dynamic value1S);
+                        dynamic id = response["data"]["order_id"];
 
                         await LogHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
 
-                        return value1S;
+                        return id;
                     }
                     catch (KiteException e)
                     {

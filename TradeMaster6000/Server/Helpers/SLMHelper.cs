@@ -13,10 +13,10 @@ namespace TradeMaster6000.Server.Helpers
     {
         private ITradeLogHelper LogHelper { get; set; }
         private ITickerService TickService { get; set; }
-        private Kite Kite { get; set; }
+        private readonly IKiteService kiteService;
         public SLMHelper(IKiteService kiteService, ITradeLogHelper logHelper, ITickerService tickerService)
         {
-            Kite = kiteService.GetKite();
+            this.kiteService = kiteService;
             LogHelper = logHelper;
             TickService = tickerService;
         }
@@ -24,17 +24,17 @@ namespace TradeMaster6000.Server.Helpers
         public decimal GetTriggerPrice(TradeOrder order)
         {
             var tick = TickService.LastTick(order.Instrument.Token);
-            decimal triggerPrice = 0;
+            decimal triggerPrice;
             if (order.ExitTransactionType == "BUY")
             {
                 triggerPrice = tick.High;
-                triggerPrice = triggerPrice * (decimal)1.00015;
+                triggerPrice *= (decimal)1.00015;
                 triggerPrice = MathHelper.RoundUp(triggerPrice, (decimal)0.05);
             }
             else
             {
                 triggerPrice = tick.Low;
-                triggerPrice = triggerPrice * (decimal)0.99985;
+                triggerPrice *= (decimal)0.99985;
                 triggerPrice = MathHelper.RoundDown(triggerPrice, (decimal)0.05);
             }
             return triggerPrice;
@@ -44,7 +44,9 @@ namespace TradeMaster6000.Server.Helpers
             dynamic id;
             try
             {
-                Dictionary<string, dynamic> response = Kite.PlaceOrder(
+                var kite = kiteService.GetKite();
+                kite.SetAccessToken(kiteService.GetAccessToken());
+                Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
                      TransactionType: order.ExitTransactionType,
@@ -70,8 +72,9 @@ namespace TradeMaster6000.Server.Helpers
         }
         public async Task SquareOff(TradeOrder order)
         {
-
-            Kite.PlaceOrder(
+            var kite = kiteService.GetKite();
+            kite.SetAccessToken(kiteService.GetAccessToken());
+            kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
                  TransactionType: order.ExitTransactionType,
@@ -84,7 +87,7 @@ namespace TradeMaster6000.Server.Helpers
 
             if (order.TargetPlaced)
             {
-                Kite.CancelOrder(order.TargetId);
+                kite.CancelOrder(order.TargetId);
             }
             else
             {

@@ -29,7 +29,6 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IServiceProvider serviceProvider;
         private readonly IRunningOrderService running;
         private IKiteService KiteService { get; set; }
-        private Kite Kite { get; set; }
 
         public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IRunningOrderService runningOrderService, IKiteService kiteService)
         {
@@ -40,7 +39,6 @@ namespace TradeMaster6000.Server.Hubs
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
-            Kite = KiteService.GetKite();
         }
 
         public async Task StartOrderWork(TradeOrder order)
@@ -91,7 +89,10 @@ namespace TradeMaster6000.Server.Hubs
                     tradeInstrument = instrument;
                 }
             }
-            var dick = Kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
+
+            var kite = KiteService.GetKite();
+            kite.SetAccessToken(KiteService.GetAccessToken());
+            var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
             dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
             await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
         }

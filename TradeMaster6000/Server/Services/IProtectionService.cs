@@ -9,7 +9,7 @@ namespace TradeMaster6000.Server.Services
 {
     public class ProtectionService : IProtectionService
     {
-        private IDataProtector accessTokeProt;
+        private readonly IDataProtector accessTokeProt;
         public ProtectionService(IDataProtectionProvider dataProtectionProvider, IConfiguration configuration)
         {
             accessTokeProt = dataProtectionProvider.CreateProtector(configuration["AccessPurpose"]);

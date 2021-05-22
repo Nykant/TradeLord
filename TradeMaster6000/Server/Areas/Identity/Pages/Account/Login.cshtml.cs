@@ -77,7 +77,7 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 ModelState.AddModelError(string.Empty, ErrorMessage);
             }
 
-            returnUrl = returnUrl ?? Url.Content("~/");
+            returnUrl ??= Url.Content("~/");
 
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
@@ -89,7 +89,7 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
 
         public async Task<IActionResult> OnPostAsync(string returnUrl = null)
         {
-            returnUrl = returnUrl ?? Url.Content("~/");
+            returnUrl ??= Url.Content("~/");
 
             if (ModelState.IsValid)
             {
@@ -98,7 +98,7 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
-                    Kite kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
+                    Kite kite = new (Configuration.GetValue<string>("APIKey"), Debug: true);
                     kiteService.SetKite(kite);
 
                     //HttpContext.Session.Get<string>(Configuration.GetValue<string>("PublicTokenPassword"));
@@ -107,7 +107,7 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 }
                 if (result.RequiresTwoFactor)
                 {
-                    return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
+                    return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, Input.RememberMe });
                 }
                 if (result.IsLockedOut)
                 {

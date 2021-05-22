@@ -13,37 +13,32 @@ namespace TradeMaster6000.Server.Services
 {
     public class TickerService : ITickerService
     {
-        private static object key = new object();
+        private readonly object key = new ();
 
         private IConfiguration Configuration { get; set; }
-        private IHttpContextAccessor ContextAccessor { get; set; }
-        private IProtectionService ProtectionService { get; set; }
+        private readonly IKiteService kiteService;
         private static Ticker Ticker { get; set; }
         private static List<Order> OrderUpdates { get; set; } = new List<Order>();
         private static List<Order> FirstOrderUpdates { get; set; } = new List<Order>();
         private static List<Tick> Ticks { get; set; } = new List<Tick>();
         private static List<string> TickerLogs { get; set; } = new List<string>();
         private static bool Started { get; set; } = false;
-        private static Kite Kite { get; set; }
-        public TickerService(IConfiguration configuration, IHttpContextAccessor httpContextAccessor, IKiteService kiteService, IProtectionService protectionService)
+        public TickerService(IConfiguration configuration, IKiteService kiteService)
         {
+            this.kiteService = kiteService;
             Configuration = configuration;
-            ContextAccessor = httpContextAccessor;
-            Kite = kiteService.GetKite();
-            ProtectionService = protectionService;
         }
 
         public void Start()
         {
             lock (key)
             {
-                var accessToken = ProtectionService.UnprotectAccessToken(
-                    ContextAccessor.HttpContext.Session.Get<string>(Configuration.GetValue<string>("AccessToken")));
+                var accessToken = kiteService.GetAccessToken();
                 // new ticker instance 
                 Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
 
                 // ticker event handlers
-                Ticker.OnTick += onTick;
+                Ticker.OnTick += OnTick;
                 Ticker.OnOrderUpdate += OnOrderUpdate;
                 Ticker.OnNoReconnect += OnNoReconnect;
                 Ticker.OnError += OnError;
@@ -60,7 +55,7 @@ namespace TradeMaster6000.Server.Services
 
         public Tick LastTick(uint token)
         {
-            Tick dick = new Tick();
+            Tick dick = new ();
             foreach(var tick in Ticks)
             {
                 if(tick.InstrumentToken == token)
@@ -73,7 +68,7 @@ namespace TradeMaster6000.Server.Services
         }
         public Order GetOrder(string id)
         {
-            Order order = new Order();
+            Order order = new ();
             bool gotit = false;
             foreach(var update in OrderUpdates)
             {
@@ -98,8 +93,10 @@ namespace TradeMaster6000.Server.Services
                 }
                 if (!gotthat)
                 {
-                    var orderH = Kite.GetOrderHistory(id);
-                    order = orderH[orderH.Count - 1];
+                    var kite = kiteService.GetKite();
+                    kite.SetAccessToken(kiteService.GetAccessToken());
+                    var orderH = kite.GetOrderHistory(id);
+                    order = orderH[^1];
                     FirstOrderUpdates.Add(order);
                 }
             }
@@ -118,8 +115,10 @@ namespace TradeMaster6000.Server.Services
             }
             if (!any)
             {
-                var orderH = Kite.GetOrderHistory(id);
-                if(orderH.Count() > 0)
+                var kite = kiteService.GetKite();
+                kite.SetAccessToken(kiteService.GetAccessToken());
+                var orderH = kite.GetOrderHistory(id);
+                if(orderH.Count > 0)
                 {
                     any = true;
                 }
@@ -155,7 +154,7 @@ namespace TradeMaster6000.Server.Services
         }
 
         // events
-        private async void onTick(Tick tickData)
+        private async void OnTick(Tick tickData)
         {
             await Task.Run(() =>
             {
