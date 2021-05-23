@@ -58,23 +58,24 @@ namespace TradeMaster6000.Server.Hubs
                 }
             });
 
-            if (!tickerService.IsStarted())
-            {
-                tickerService.Start();
-            }
+            tickerService.Start();
 
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
 
             running.Add(order);
-            await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
 
             tickerService.Subscribe(order.Instrument.Token);
 
             await Task.Run(async () =>
             {
                 await orderWork.StartWork(order, order.TokenSource.Token);
-                await StopOrderWork(order.Id);
+                tickerService.UnSubscribe(order.Instrument.Token);
+                StopOrderWork(order.Id);
+                if (running.Get().Count == 0)
+                {
+                    tickerService.Stop();
+                }
                 await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
@@ -95,6 +96,11 @@ namespace TradeMaster6000.Server.Hubs
             var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
             dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
             await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
+        }
+
+        public async Task GetTickerLogs()
+        {
+            await Clients.Caller.SendAsync("ReceiveTickerLogs", tickerService.GetTickerLogs());
         }
 
         public async Task GetOrderHistory()
@@ -125,29 +131,25 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveLogs", await tradeLogHelper.GetTradeLogs(orderId));
         }
 
-        public async Task StopOrderWork(int id)
+        public void StopOrderWork(int id)
         {
-            await Task.Run(() =>
+            var orders = running.Get();
+            var tOrder = new TradeOrder();
+            var found = false;
+            foreach (var order in orders)
             {
-                var orders = running.Get();
-                var tOrder = new TradeOrder();
-                var found = false;
-                foreach (var order in orders)
+                if (order.Id == id)
                 {
-                    if(order.Id == id)
-                    {
-                        tOrder = order;
-                        found = true;
-                        break;
-                    }
+                    tOrder = order;
+                    found = true;
+                    break;
                 }
-                if (found)
-                {
-                    tOrder.TokenSource.Cancel();
-                    running.Remove(tOrder);
-                }
-
-            }).ConfigureAwait(false);
+            }
+            if (found)
+            {
+                tOrder.TokenSource.Cancel();
+                running.Remove(tOrder);
+            }
         }
     }
 }

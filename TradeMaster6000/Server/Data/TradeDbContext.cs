@@ -16,6 +16,8 @@ namespace TradeMaster6000.Server.Data
         public DbSet<TradeOrder> TradeOrders { get; set; }
         public DbSet<TradeLog> TradeLogs { get; set; }
         public DbSet<TradeInstrument> TradeInstruments { get; set; }
+        public DbSet<Candle> Candles { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

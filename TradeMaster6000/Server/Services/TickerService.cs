@@ -4,10 +4,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Extensions;
+using TradeMaster6000.Server.Helpers;
+using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.Services
 {
@@ -17,53 +21,170 @@ namespace TradeMaster6000.Server.Services
 
         private IConfiguration Configuration { get; set; }
         private readonly IKiteService kiteService;
+        private readonly IInstrumentHelper instrumentHelper;
+        private readonly ITimeHelper timeHelper;
+        private readonly ICandleDbHelper candleHelper;
         private static Ticker Ticker { get; set; }
-        private static List<Order> OrderUpdates { get; set; } = new List<Order>();
-        private static List<Order> FirstOrderUpdates { get; set; } = new List<Order>();
-        private static List<Tick> Ticks { get; set; } = new List<Tick>();
-        private static List<string> TickerLogs { get; set; } = new List<string>();
+        private static List<Order> OrderUpdates { get; set; }
+        private static List<Order> FirstOrderUpdates { get; set; }
+        private static List<Tick> Ticks { get; set; }
+        private static List<Candle> Candles { get; set; }
+        private static List<TickerLog> TickerLogs { get; set; }
         private static bool Started { get; set; } = false;
-        public TickerService(IConfiguration configuration, IKiteService kiteService)
+        private static CancellationTokenSource TokenSource { get; set; } = null;
+        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper)
         {
             this.kiteService = kiteService;
             Configuration = configuration;
+            this.instrumentHelper = instrumentHelper;
+            this.timeHelper = timeHelper;
+            this.candleHelper = candleHelper;
+            TickerLogs = new List<TickerLog>();
+            Ticks = new List<Tick>();
+            Candles = new List<Candle>();
+            FirstOrderUpdates = new List<Order>();
+            OrderUpdates = new List<Order>();
         }
 
         public void Start()
         {
             lock (key)
             {
-                var accessToken = kiteService.GetAccessToken();
-                // new ticker instance 
-                Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
+                if (!Started)
+                {
+                    var accessToken = kiteService.GetAccessToken();
+                    // new ticker instance 
+                    Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
 
-                // ticker event handlers
-                Ticker.OnTick += OnTick;
-                Ticker.OnOrderUpdate += OnOrderUpdate;
-                Ticker.OnNoReconnect += OnNoReconnect;
-                Ticker.OnError += OnError;
-                Ticker.OnReconnect += OnReconnect;
-                Ticker.OnClose += OnClose;
-                Ticker.OnConnect += OnConnect;
+                    // ticker event handlers
+                    Ticker.OnTick += OnTick;
+                    Ticker.OnOrderUpdate += OnOrderUpdate;
+                    Ticker.OnNoReconnect += OnNoReconnect;
+                    Ticker.OnError += OnError;
+                    Ticker.OnReconnect += OnReconnect;
+                    Ticker.OnClose += OnClose;
+                    Ticker.OnConnect += OnConnect;
 
-                // set ticker settings
-                Ticker.EnableReconnect(Interval: 5, Retries: 50);
-                Ticker.Connect();
-                Started = true;
+                    // set ticker settings
+                    Ticker.EnableReconnect(Interval: 5, Retries: 50);
+                    Ticker.Connect();
+                    Started = true;
+                }
+            }
+        }
+
+        public void StartWithCandles()
+        {
+            lock (key)
+            {
+                if (!Started)
+                {
+                    var accessToken = kiteService.GetAccessToken();
+                    // new ticker instance 
+                    Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
+
+                    // ticker event handlers
+                    Ticker.OnTick += OnTick;
+                    Ticker.OnOrderUpdate += OnOrderUpdate;
+                    Ticker.OnNoReconnect += OnNoReconnect;
+                    Ticker.OnError += OnError;
+                    Ticker.OnReconnect += OnReconnect;
+                    Ticker.OnClose += OnClose;
+                    Ticker.OnConnect += OnConnect;
+
+                    // set ticker settings
+                    Ticker.EnableReconnect(Interval: 5, Retries: 50);
+                    Ticker.Connect();
+
+                    if(TokenSource == null)
+                    {
+                        TokenSource = new CancellationTokenSource();
+                        InitializeCandles(TokenSource.Token).ConfigureAwait(false);
+                    }
+
+                    Started = true;
+                }
+            }
+        }
+
+        public async Task InitializeCandles(CancellationToken token)
+        {
+            while (!await timeHelper.IsMarketOpen())
+            {
+                if (token.IsCancellationRequested)
+                {
+                    goto Ending;
+                }
+                await Task.Delay(5000);
+            }
+
+            await Task.Run(() => AnalyzeCandles(token)).ConfigureAwait(false);
+
+            Ending:;
+        }
+
+        public async Task AnalyzeCandles(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                foreach(var instrument in await instrumentHelper.GetTradeInstruments())
+                {
+                    await Task.Run(() =>
+                    {
+                        Analyze(token, instrument).ConfigureAwait(false);
+                    }).ConfigureAwait(false);
+                }
+            }
+        }
+
+        public async Task Analyze(CancellationToken token, TradeInstrument instrument)
+        {
+            Candle candle;
+            Stopwatch stopwatch;
+            decimal ltp;
+            while (!token.IsCancellationRequested)
+            {
+                candle = new Candle() { TradeInstrument = instrument, From = DateTime.Now };
+
+                stopwatch = new();
+                stopwatch.Start();
+                 
+                candle.Open = LastTick(instrument.Token).LastPrice;
+                candle.High = candle.Open;
+                candle.Low = candle.Open;
+                while (stopwatch.Elapsed.TotalMinutes < 1)
+                {
+                    ltp = LastTick(instrument.Token).LastPrice;
+                    if (candle.High < ltp)
+                    {
+                        candle.High = ltp;
+                    }
+                    if(candle.Low > ltp)
+                    {
+                        candle.Low = ltp;
+                    }
+                    await Task.Delay(500);
+                }
+                candle.Close = LastTick(instrument.Token).LastPrice;
+                candle.To = DateTime.Now;
+                stopwatch.Stop();
+
+                await candleHelper.AddCandle(candle).ConfigureAwait(false);
             }
         }
 
         public Tick LastTick(uint token)
         {
             Tick dick = new ();
-            foreach(var tick in Ticks)
+            for(int i = Ticks.Count; i > 0; i--)
             {
-                if(tick.InstrumentToken == token)
+                if(Ticks[i].InstrumentToken == token)
                 {
-                    dick = tick;
+                    dick = Ticks[i];
                     break;
                 }
             }
+
             return dick;
         }
         public Order GetOrder(string id)
@@ -126,9 +247,18 @@ namespace TradeMaster6000.Server.Services
             return any;
         }
 
+        public List<TickerLog> GetTickerLogs()
+        {
+            return TickerLogs;
+        }
+
         public void Stop()
         {
             Ticker.Close();
+            if(TokenSource != null)
+            {
+                TokenSource.Cancel();
+            }
             Started = false;
         }
 
@@ -176,7 +306,12 @@ namespace TradeMaster6000.Server.Services
         }
         private async void OnOrderUpdate(Order orderData)
         {
-            TickerLogs.Add($"order update for order with id: {orderData.OrderId}...");
+            TickerLogs.Add(new () {
+                Log = $"order update for order with id: {orderData.OrderId}...",
+                Timestamp = DateTime.Now,
+                LogType = LogType.Order
+            });
+
             await Task.Run(() =>
             {
                 bool found = false;
@@ -197,23 +332,48 @@ namespace TradeMaster6000.Server.Services
         }
         private void OnError(string message)
         {
-            TickerLogs.Add(message);
+            TickerLogs.Add(new()
+            {
+                Log = message,
+                Timestamp = DateTime.Now,
+                LogType = LogType.Error
+            });
         }
         private void OnClose()
         {
-            TickerLogs.Add("ticker connection closed...");
+            TickerLogs.Add(new()
+            {
+                Log = "ticker connection closed...",
+                Timestamp = DateTime.Now,
+                LogType = LogType.Close
+            });
         }
         private void OnReconnect()
         {
-            TickerLogs.Add("ticker connection reconnected...");
+            TickerLogs.Add(new()
+            {
+                Log = "ticker connection reconnected...",
+                Timestamp = DateTime.Now,
+                LogType = LogType.Reconnect
+            });
         }
         private void OnNoReconnect()
         {
-            TickerLogs.Add("ticker connection failed to reconnect...");
+            TickerLogs.Add(new()
+            {
+                Log = "ticker connection failed to reconnect...",
+                Timestamp = DateTime.Now,
+                LogType = LogType.NoReconnect
+            });
         }
         private void OnConnect()
         {
-            TickerLogs.Add("ticker connected...");
+            TickerLogs.Add(new()
+            {
+                Log = "ticker connected...",
+                Timestamp = DateTime.Now,
+                LogType = LogType.Connect
+            });
         }
     }
     public interface ITickerService
@@ -224,7 +384,10 @@ namespace TradeMaster6000.Server.Services
         void Subscribe(uint token);
         void UnSubscribe(uint token);
         void Start();
+        void StartWithCandles();
         bool IsStarted();
         bool AnyOrder(string id);
+        void Stop();
+        List<TickerLog> GetTickerLogs();
     }
 }

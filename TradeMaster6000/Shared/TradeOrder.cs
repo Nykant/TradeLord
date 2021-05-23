@@ -46,6 +46,7 @@ namespace TradeMaster6000.Shared
         public bool SlRejected { get; set; } = false;
         public bool TargetHit { get; set; } = false;
         public bool TargetPlaced { get; set; } = false;
+        public bool SquaredOff { get; set; } = false;
         public TradeInstrument Instrument { get; set; }
         public CancellationTokenSource TokenSource { get; set; }
         public List<TradeLog> TradeLogs { get; set; }

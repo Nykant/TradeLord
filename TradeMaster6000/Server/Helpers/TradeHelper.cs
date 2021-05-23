@@ -215,6 +215,8 @@ namespace TradeMaster6000.Server.Helpers
                      Validity: Constants.VALIDITY_DAY,
                      Variety: Constants.VARIETY_REGULAR
                 );
+
+                await LogHelper.AddLog(order.Id, $"squared off...").ConfigureAwait(false);
             }
         }
 
@@ -281,7 +283,7 @@ namespace TradeMaster6000.Server.Helpers
                         );
 
                         // set id
-                        dynamic id = response["data"]["order_id"];
+                        var id = response["data"]["order_id"];
 
                         await LogHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
 
@@ -290,7 +292,7 @@ namespace TradeMaster6000.Server.Helpers
                     catch (KiteException e)
                     {
                         await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                        await CancelEntry(order);
+                        await Task.Run(()=>CancelEntry(order)).ConfigureAwait(false);
                         return "cancelled";
                     }
                 }
@@ -300,6 +302,7 @@ namespace TradeMaster6000.Server.Helpers
                     await LogHelper.AddLog(order.Id, $"slm was cancelled...").ConfigureAwait(false);
                     return "cancelled";
                 }
+
             }
             else
             {
@@ -334,7 +337,7 @@ namespace TradeMaster6000.Server.Helpers
                     catch (KiteException e)
                     {
                         await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                        await CancelEntry(order);
+                        await Task.Run(()=>CancelEntry(order)).ConfigureAwait(false);
                         return "cancelled";
                     }
                 }

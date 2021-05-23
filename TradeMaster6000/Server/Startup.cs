@@ -93,7 +93,7 @@ namespace TradeMaster6000.Server
             //-------------------
             services.TryAddSingleton<IProtectionService, ProtectionService>();
             services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
-            //services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.TryAddSingleton<ICandleDbHelper, CandleDbHelper>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
@@ -101,11 +101,10 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
             services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.TryAddSingleton<ITradeHelper, TradeHelper>();
-            services.TryAddSingleton<ITickerService, TickerService>();
             services.TryAddSingleton<ITimeHelper, TimeHelper>();
             services.TryAddSingleton<ITargetHelper, TargetHelper>();
             //-------------------
-
+            services.TryAddSingleton<ITickerService, TickerService>();
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
             services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
             //-------------------

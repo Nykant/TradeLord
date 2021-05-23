@@ -149,11 +149,46 @@ namespace TradeMaster6000.Server.Helpers
             }
 
         }
+        public async Task<bool> IsMarketOpen()
+        {
+            if (Env.IsDevelopment())
+            {
+                DateTime GMT = DateTime.Now;
+                DateTime IST = GMT.AddHours(3).AddMinutes(30);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime closing = opening.AddHours(6).AddMinutes(15);
+                if (DateTime.Compare(IST, opening) >= 0)
+                {
+                    if (DateTime.Compare(IST, closing) < 0)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            else
+            {
+                DateTime GMT = DateTime.Now;
+                DateTime IST = GMT.AddHours(5).AddMinutes(30);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime closing = opening.AddHours(6).AddMinutes(15);
+                if (DateTime.Compare(IST, opening) >= 0)
+                {
+                    if (DateTime.Compare(IST, closing) < 0)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+        }
     }
     public interface ITimeHelper
     {
         Task<bool> IsPreMarketOpen(int orderId);
         Task<bool> IsMarketOpen(int orderId);
+        Task<bool> IsMarketOpen();
         string GetCurrentVariety();
     }
 }

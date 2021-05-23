@@ -12,12 +12,14 @@ namespace TradeMaster6000.Server.Helpers
     public class WatchingTargetHelper : IWatchingTargetHelper
     {
         private readonly IKiteService kiteService;
-        public WatchingTargetHelper(IKiteService kiteService)
+        private readonly ITradeLogHelper tradeLogHelper;
+        public WatchingTargetHelper(IKiteService kiteService, ITradeLogHelper tradeLogHelper)
         {
             this.kiteService = kiteService;
+            this.tradeLogHelper = tradeLogHelper;
         }
 
-        public void SquareOff(Order entry, Order targetO, TradeOrder order)
+        public async Task SquareOff(Order entry, Order targetO, TradeOrder order)
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
             var kite = kiteService.GetKite();
@@ -32,11 +34,13 @@ namespace TradeMaster6000.Server.Helpers
                  Validity: Constants.VALIDITY_DAY,
                  Variety: Constants.VARIETY_REGULAR
             );
+
+            await tradeLogHelper.AddLog(order.Id, $"squared off...").ConfigureAwait(false);
         }
 
     }
     public interface IWatchingTargetHelper
     {
-        void SquareOff(Order entry, Order targetO, TradeOrder order);
+        Task SquareOff(Order entry, Order targetO, TradeOrder order);
     }
 }
