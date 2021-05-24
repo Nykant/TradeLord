@@ -283,11 +283,11 @@ namespace TradeMaster6000.Server.Helpers
                         );
 
                         // set id
-                        var id = response["data"]["order_id"];
+                        dynamic id = response["data"]["order_id"];
 
                         await LogHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
 
-                        return id;
+                        return (string)id;
                     }
                     catch (KiteException e)
                     {
@@ -332,7 +332,7 @@ namespace TradeMaster6000.Server.Helpers
 
                         await LogHelper.AddLog(order.Id, $"slm order placed...").ConfigureAwait(false);
 
-                        return id;
+                        return (string)id;
                     }
                     catch (KiteException e)
                     {

@@ -5,7 +5,7 @@
 @using TradeMaster6000.Shared
 @inject NavigationManager NavigationManager
 @implements IAsyncDisposable
-@*@attribute [Authorize]*@
+@attribute [Authorize]
 
 @{ if (IsConnected)
     {
@@ -16,7 +16,7 @@
                     <Columns>
                         <RadzenDataGridColumn Width="300px" TItem="TickerLog" Property="Log" Title="Log" />
                         <RadzenDataGridColumn Width="100px" TItem="TickerLog" Property="LogType" Title="Type" />
-                        <RadzenDataGridColumn Width="100px" TItem="TickerLog" Property="Datetime" Title="Date Time" />
+                        <RadzenDataGridColumn Width="100px" TItem="TickerLog" Property="Timestamp" Title="Timestamp" />
                     </Columns>
                 </RadzenDataGrid>
             </div>

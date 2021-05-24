@@ -21,19 +21,18 @@ namespace TradeMaster6000.Server.Helpers
             TickService = tickerService;
         }
 
-        public decimal GetTriggerPrice(TradeOrder order)
+        public decimal GetTriggerPrice(TradeOrder order, Candle candle)
         {
-            var tick = TickService.LastTick(order.Instrument.Token);
             decimal triggerPrice;
             if (order.ExitTransactionType == "BUY")
             {
-                triggerPrice = tick.High;
+                triggerPrice = candle.High;
                 triggerPrice *= (decimal)1.00015;
                 triggerPrice = MathHelper.RoundUp(triggerPrice, (decimal)0.05);
             }
             else
             {
-                triggerPrice = tick.Low;
+                triggerPrice = candle.Low;
                 triggerPrice *= (decimal)0.99985;
                 triggerPrice = MathHelper.RoundDown(triggerPrice, (decimal)0.05);
             }
@@ -100,7 +99,7 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface ISLMHelper
     {
-        decimal GetTriggerPrice(TradeOrder order);
+        decimal GetTriggerPrice(TradeOrder order, Candle candle);
         Task<string> PlaceOrder(TradeOrder order);
         Task SquareOff(TradeOrder order);
     }

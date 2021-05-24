@@ -43,7 +43,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StartOrderWork(TradeOrder order)
         {
-            OrderWork orderWork = new OrderWork(this, serviceProvider);
+            OrderWork orderWork = new (serviceProvider);
             order.TokenSource = new CancellationTokenSource();
 
             await Task.Run(async() =>
@@ -82,7 +82,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetTick(string symbol)
         {
-            TradeInstrument tradeInstrument = new TradeInstrument();
+            TradeInstrument tradeInstrument = new ();
             foreach(var instrument in await instrumentHelper.GetTradeInstruments())
             {
                 if(instrument.TradingSymbol == symbol)

@@ -56,7 +56,6 @@ namespace TradeMaster6000.Server.Helpers
                 }
                 return false;
             }
-
         }
 
         public string GetCurrentVariety()
@@ -151,37 +150,39 @@ namespace TradeMaster6000.Server.Helpers
         }
         public async Task<bool> IsMarketOpen()
         {
-            if (Env.IsDevelopment())
+            return await Task.Run(() =>
             {
-                DateTime GMT = DateTime.Now;
-                DateTime IST = GMT.AddHours(3).AddMinutes(30);
-                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
-                DateTime closing = opening.AddHours(6).AddMinutes(15);
-                if (DateTime.Compare(IST, opening) >= 0)
+                if (Env.IsDevelopment())
                 {
-                    if (DateTime.Compare(IST, closing) < 0)
+                    DateTime GMT = DateTime.Now;
+                    DateTime IST = GMT.AddHours(3).AddMinutes(30);
+                    DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                    DateTime closing = opening.AddHours(6).AddMinutes(15);
+                    if (DateTime.Compare(IST, opening) >= 0)
                     {
-                        return true;
+                        if (DateTime.Compare(IST, closing) < 0)
+                        {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
-            }
-            else
-            {
-                DateTime GMT = DateTime.Now;
-                DateTime IST = GMT.AddHours(5).AddMinutes(30);
-                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
-                DateTime closing = opening.AddHours(6).AddMinutes(15);
-                if (DateTime.Compare(IST, opening) >= 0)
+                else
                 {
-                    if (DateTime.Compare(IST, closing) < 0)
+                    DateTime GMT = DateTime.Now;
+                    DateTime IST = GMT.AddHours(5).AddMinutes(30);
+                    DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                    DateTime closing = opening.AddHours(6).AddMinutes(15);
+                    if (DateTime.Compare(IST, opening) >= 0)
                     {
-                        return true;
+                        if (DateTime.Compare(IST, closing) < 0)
+                        {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
-            }
-
+            });
         }
     }
     public interface ITimeHelper

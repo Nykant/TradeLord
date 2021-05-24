@@ -24,14 +24,14 @@ namespace TradeMaster6000.Server.Services
         private readonly IInstrumentHelper instrumentHelper;
         private readonly ITimeHelper timeHelper;
         private readonly ICandleDbHelper candleHelper;
-        private static Ticker Ticker { get; set; }
-        private static List<Order> OrderUpdates { get; set; }
-        private static List<Order> FirstOrderUpdates { get; set; }
-        private static List<Tick> Ticks { get; set; }
-        private static List<Candle> Candles { get; set; }
-        private static List<TickerLog> TickerLogs { get; set; }
-        private static bool Started { get; set; } = false;
-        private static CancellationTokenSource TokenSource { get; set; } = null;
+        private Ticker Ticker { get; set; }
+        private List<Order> OrderUpdates { get; set; }
+        private List<Order> FirstOrderUpdates { get; set; }
+        private List<Tick> Ticks { get; set; }
+        private List<Candle> Candles { get; set; }
+        private List<TickerLog> TickerLogs { get; set; }
+        private bool Started { get; set; } = false;
+        private CancellationTokenSource TokenSource { get; set; } = null;
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper)
         {
             this.kiteService = kiteService;
@@ -115,10 +115,10 @@ namespace TradeMaster6000.Server.Services
                 {
                     goto Ending;
                 }
-                await Task.Delay(5000);
+                await Task.Delay(5000, token);
             }
 
-            await Task.Run(() => AnalyzeCandles(token)).ConfigureAwait(false);
+            await Task.Run(() => AnalyzeCandles(token), token).ConfigureAwait(false);
 
             Ending:;
         }
@@ -131,13 +131,13 @@ namespace TradeMaster6000.Server.Services
                 {
                     await Task.Run(() =>
                     {
-                        Analyze(token, instrument).ConfigureAwait(false);
-                    }).ConfigureAwait(false);
+                        Analyze(instrument, token).ConfigureAwait(false);
+                    }, token).ConfigureAwait(false);
                 }
             }
         }
 
-        public async Task Analyze(CancellationToken token, TradeInstrument instrument)
+        public async Task Analyze(TradeInstrument instrument, CancellationToken token)
         {
             Candle candle;
             Stopwatch stopwatch;
@@ -163,7 +163,7 @@ namespace TradeMaster6000.Server.Services
                     {
                         candle.Low = ltp;
                     }
-                    await Task.Delay(500);
+                    await Task.Delay(500, token);
                 }
                 candle.Close = LastTick(instrument.Token).LastPrice;
                 candle.To = DateTime.Now;
@@ -176,12 +176,15 @@ namespace TradeMaster6000.Server.Services
         public Tick LastTick(uint token)
         {
             Tick dick = new ();
-            for(int i = Ticks.Count - 1; i >= 0; i--)
+            if(Ticks.Count > 0)
             {
-                if(Ticks[i].InstrumentToken == token)
+                for (int i = Ticks.Count - 1; i >= 0; i--)
                 {
-                    dick = Ticks[i];
-                    break;
+                    if (Ticks[i].InstrumentToken == token)
+                    {
+                        dick = Ticks[i];
+                        break;
+                    }
                 }
             }
 
@@ -306,28 +309,33 @@ namespace TradeMaster6000.Server.Services
         }
         private async void OnOrderUpdate(Order orderData)
         {
-            TickerLogs.Add(new () {
-                Log = $"order update for order with id: {orderData.OrderId}...",
-                Timestamp = DateTime.Now,
-                LogType = LogType.Order
-            });
-
             await Task.Run(() =>
             {
-                bool found = false;
-                for (int i = 0; i < OrderUpdates.Count; i++)
+                TickerLogs.Add(new()
                 {
-                    if (OrderUpdates[i].OrderId == orderData.OrderId)
+                    Log = $"order update for order with id: {orderData.OrderId}...",
+                    Timestamp = DateTime.Now,
+                    LogType = LogType.Order
+                });
+
+                bool found = false;
+                if(OrderUpdates.Count > 0)
+                {
+                    for (int i = 0; i < OrderUpdates.Count; i++)
                     {
-                        OrderUpdates[i] = orderData;
-                        found = true;
-                        break;
+                        if (OrderUpdates[i].OrderId == orderData.OrderId)
+                        {
+                            OrderUpdates[i] = orderData;
+                            found = true;
+                            break;
+                        }
                     }
                 }
                 if (!found)
                 {
                     OrderUpdates.Add(orderData);
                 }
+
             }).ConfigureAwait(false);
         }
         private void OnError(string message)

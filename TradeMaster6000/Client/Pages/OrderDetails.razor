@@ -116,14 +116,18 @@
 
         await hubConnection.StartAsync();
 
-        await GetLogs();
-        await Task.Run(() => GetOrder()).ConfigureAwait(false);
+        await Task.Run(() => Parallel.Invoke(async () => await GetLogs(), async () => await GetOrder())).ConfigureAwait(false);
     }
 
     private async Task GetLogs()
     {
         int.TryParse(OrderId, out int orderId);
-        await hubConnection.SendAsync("GetLogs", orderId);
+
+        while (IsConnected)
+        {
+            await hubConnection.SendAsync("GetLogs", orderId);
+            await Task.Delay(1000);
+        }
     }
 
     private async Task GetOrder()
