@@ -71,7 +71,7 @@ namespace TradeMaster6000.Server.Hubs
             {
                 await orderWork.StartWork(order, order.TokenSource.Token);
                 tickerService.UnSubscribe(order.Instrument.Token);
-                StopOrderWork(order.Id);
+                running.Remove(order.Id);
                 if (running.Get().Count == 0)
                 {
                     tickerService.Stop();
@@ -148,7 +148,6 @@ namespace TradeMaster6000.Server.Hubs
             if (found)
             {
                 tOrder.TokenSource.Cancel();
-                running.Remove(tOrder);
             }
         }
     }

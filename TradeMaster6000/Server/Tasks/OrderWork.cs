@@ -113,7 +113,7 @@ namespace TradeMaster6000.Server.Tasks
             TradeOrder temp = new ();
             do
             {
-                await Task.Run(() => CheckOrderStatuses(token), token).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None).ConfigureAwait(false);
 
                 if (await TimeHelper.IsPreMarketOpen(TradeOrder.Id))
                 {
@@ -144,7 +144,7 @@ namespace TradeMaster6000.Server.Tasks
             // do while pre market is open
             do
             {
-                await Task.Run(() => CheckOrderStatuses(token), token).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None).ConfigureAwait(false);
 
                 if (await TimeHelper.IsMarketOpen(TradeOrder.Id))
                 {
@@ -188,14 +188,14 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         await PlaceStopLoss(token);
                     });
-            }, token).ConfigureAwait(false);
+            }, CancellationToken.None).ConfigureAwait(false);
 
             await LogHelper.AddLog(TradeOrder.Id, $"monitoring orders...").ConfigureAwait(false);
 
             // monitoring the orders
             while (true)
             {
-                await Task.Run(() => CheckOrderStatuses(token), token).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None).ConfigureAwait(false);
 
                 if (!TradeOrder.PreSLMCancelled)
                 {
@@ -249,7 +249,7 @@ namespace TradeMaster6000.Server.Tasks
                     goto Ending;
                 }
 
-                await Task.Delay(500, token);
+                await Task.Delay(500, CancellationToken.None);
             }
 
             // go to when trade order is stopped
@@ -292,7 +292,7 @@ namespace TradeMaster6000.Server.Tasks
                     goto End;
                 }
 
-                await Task.Delay(500, token);
+                await Task.Delay(500, CancellationToken.None);
             }
 
             decimal proximity = 0;
@@ -344,7 +344,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     goto End;
                 }
-                await Task.Delay(500, token);
+                await Task.Delay(500, CancellationToken.None);
             }
 
             End:;
@@ -388,7 +388,7 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         goto End;
                     }
-                    await Task.Delay(500, token);
+                    await Task.Delay(500, CancellationToken.None);
                 }
                 stopwatch.Stop();
                 candle.Close = tick.LastPrice;
@@ -540,7 +540,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"slm order rejected...").ConfigureAwait(false);
                     TradeOrder.PreSLMCancelled = true;
-                    await Task.Run(async () => await PlaceStopLoss(token), token).ConfigureAwait(false);
+                    await Task.Run(async () => await PlaceStopLoss(token), CancellationToken.None).ConfigureAwait(false);
                 }
             }
             else if (TradeOrder.RegularSlmPlaced)
@@ -550,7 +550,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"slm order rejected...").ConfigureAwait(false);
                     TradeOrder.RegularSlmPlaced = false;
-                    await Task.Run(async () => await PlaceStopLoss(token), token).ConfigureAwait(false);
+                    await Task.Run(async () => await PlaceStopLoss(token), CancellationToken.None).ConfigureAwait(false);
                 }
             }
 
@@ -561,7 +561,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"target order rejected...").ConfigureAwait(false);
                     TradeOrder.TargetPlaced = false;
-                    await Task.Run(async () => await PlaceTarget(token), token).ConfigureAwait(false);
+                    await Task.Run(async () => await PlaceTarget(token), CancellationToken.None).ConfigureAwait(false);
                 }
             }
 

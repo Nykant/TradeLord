@@ -24,9 +24,16 @@ namespace TradeMaster6000.Server.Services
             Orders.Add(order);
         }
 
-        public void Remove(TradeOrder order)
+        public void Remove(int id)
         {
-            Orders.Remove(order);
+            foreach(var order in Orders)
+            {
+                if(order.Id == id)
+                {
+                    Orders.Remove(order);
+                    break;
+                }
+            }
         }
 
         public async Task UpdateOrders()
@@ -56,7 +63,7 @@ namespace TradeMaster6000.Server.Services
     public interface IRunningOrderService
     {
         void Add(TradeOrder order);
-        void Remove(TradeOrder order);
+        void Remove(int id);
         List<TradeOrder> Get();
         Task UpdateOrders();
     }
