@@ -176,7 +176,7 @@ namespace TradeMaster6000.Server.Services
         public Tick LastTick(uint token)
         {
             Tick dick = new ();
-            for(int i = Ticks.Count; i > 0; i--)
+            for(int i = Ticks.Count - 1; i >= 0; i--)
             {
                 if(Ticks[i].InstrumentToken == token)
                 {
