@@ -257,6 +257,7 @@ namespace TradeMaster6000.Server.Services
 
         public void Stop()
         {
+            Ticker.DisableReconnect();
             Ticker.Close();
             if(TokenSource != null)
             {
