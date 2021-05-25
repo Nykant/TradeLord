@@ -11,7 +11,7 @@ namespace TradeMaster6000.Server.Services
 {
     public class KiteService : IKiteService
     {
-        Kite Kite { get; set; }
+        Kite Kite { get; set; } = null;
         string AccessToken { get; set; }
         string RefreshToken { get; set; }
         readonly IProtectionService protectionService;

@@ -98,12 +98,17 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
                 var result = await _signInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
                 if (result.Succeeded)
                 {
-                    Kite kite = new (Configuration.GetValue<string>("APIKey"), Debug: true);
-                    kiteService.SetKite(kite);
-
-                    //HttpContext.Session.Get<string>(Configuration.GetValue<string>("PublicTokenPassword"));
                     _logger.LogInformation("User logged in.");
-                    return Redirect(kite.GetLoginURL());
+
+                    Kite kite = kiteService.GetKite();
+                    if (kite == null)
+                    {
+                        kite = new(Configuration.GetValue<string>("APIKey"), Debug: true);
+                        kiteService.SetKite(kite);
+                        return Redirect(kite.GetLoginURL());
+                    }
+
+                    return Redirect(returnUrl);
                 }
                 if (result.RequiresTwoFactor)
                 {
