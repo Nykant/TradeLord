@@ -176,37 +176,42 @@ namespace TradeMaster6000.Server.Services
         public Tick LastTick(uint token)
         {
             Tick dick = new ();
-            if(Ticks.Count > 0)
+            var ticks = Ticks;
+            if(ticks.Count > 0)
             {
-                for (int i = Ticks.Count - 1; i >= 0; i--)
+                for (int i = ticks.Count - 1; i >= 0; i--)
                 {
-                    if (Ticks[i].InstrumentToken == token)
+                    if (ticks[i].InstrumentToken == token)
                     {
-                        dick = Ticks[i];
+                        dick = ticks[i];
                         break;
                     }
                 }
             }
-
             return dick;
         }
         public Order GetOrder(string id)
         {
             Order order = new ();
             bool gotit = false;
-            foreach(var update in OrderUpdates)
+            var updates = OrderUpdates;
+            if(updates.Count > 0)
             {
-                if(update.OrderId == id)
+                for (int i = updates.Count - 1; i >= 0; i--)
                 {
-                    order = update;
-                    gotit = true;
-                    break;
+                    if (updates[i].OrderId == id)
+                    {
+                        order = updates[i];
+                        gotit = true;
+                        break;
+                    }
                 }
             }
             if (!gotit)
             {
+                var firstUpdates = FirstOrderUpdates;
                 bool gotthat = false;
-                foreach(var firstUpdate in FirstOrderUpdates)
+                foreach(var firstUpdate in firstUpdates)
                 {
                     if(firstUpdate.OrderId == id)
                     {
@@ -288,56 +293,13 @@ namespace TradeMaster6000.Server.Services
         }
 
         // events
-        private async void OnTick(Tick tickData)
+        private void OnTick(Tick tickData)
         {
-            await Task.Run(() =>
-            {
-                bool found = false;
-                for (int i = 0; i < Ticks.Count; i++)
-                {
-                    if (Ticks[i].InstrumentToken == tickData.InstrumentToken)
-                    {
-                        Ticks[i] = tickData;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                {
-                    Ticks.Add(tickData);
-                }
-            }).ConfigureAwait(false);
+            Ticks.Add(tickData);
         }
-        private async void OnOrderUpdate(Order orderData)
+        private void OnOrderUpdate(Order orderData)
         {
-            await Task.Run(() =>
-            {
-                TickerLogs.Add(new()
-                {
-                    Log = $"order update for order with id: {orderData.OrderId}...",
-                    Timestamp = DateTime.Now,
-                    LogType = LogType.Order
-                });
-
-                bool found = false;
-                if(OrderUpdates.Count > 0)
-                {
-                    for (int i = 0; i < OrderUpdates.Count; i++)
-                    {
-                        if (OrderUpdates[i].OrderId == orderData.OrderId)
-                        {
-                            OrderUpdates[i] = orderData;
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                if (!found)
-                {
-                    OrderUpdates.Add(orderData);
-                }
-
-            }).ConfigureAwait(false);
+            OrderUpdates.Add(orderData);
         }
         private void OnError(string message)
         {

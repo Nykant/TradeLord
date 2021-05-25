@@ -403,7 +403,7 @@ namespace TradeMaster6000.Server.Tasks
                 }
                 else
                 {
-                    await LogHelper.AddLog(TradeOrder.Id, $"{TradeOrder.Instrument.TradingSymbol} candle is bullish...").ConfigureAwait(false);
+                    await LogHelper.AddLog(TradeOrder.Id, $"{TradeOrder.Instrument.TradingSymbol} candle is bearish...").ConfigureAwait(false);
                 }
 
                 if(TradeOrder.ExitTransactionType == "SELL")
@@ -489,24 +489,27 @@ namespace TradeMaster6000.Server.Tasks
         private async Task CheckOrderStatuses(CancellationToken token)
         {
             var entry = TickService.GetOrder(TradeOrder.EntryId);
+            TradeOrder.EntryStatus = entry.Status;
 
             Order slm = new ();
             if (!TradeOrder.PreSLMCancelled)
             {
                 slm = TickService.GetOrder(TradeOrder.SLMId);
+                TradeOrder.SLMStatus = slm.Status;
             }
             else if (TradeOrder.RegularSlmPlaced)
             {
                 slm = TickService.GetOrder(TradeOrder.SLMId);
+                TradeOrder.SLMStatus = slm.Status;
             }
 
             Order targetO = new ();
             if (TradeOrder.TargetPlaced)
             {
                 targetO = TickService.GetOrder(TradeOrder.TargetId);
+                TradeOrder.TargetStatus = targetO.Status;
             }
 
-            TradeOrder.EntryStatus = entry.Status;
             // check if entry status is rejected
             if (entry.Status == "REJECTED")
             {
@@ -535,7 +538,6 @@ namespace TradeMaster6000.Server.Tasks
 
             if (!TradeOrder.PreSLMCancelled)
             {
-                TradeOrder.SLMStatus = slm.Status;
                 if (slm.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"slm order rejected...").ConfigureAwait(false);
@@ -545,7 +547,6 @@ namespace TradeMaster6000.Server.Tasks
             }
             else if (TradeOrder.RegularSlmPlaced)
             {
-                TradeOrder.SLMStatus = slm.Status;
                 if (slm.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"slm order rejected...").ConfigureAwait(false);
@@ -556,7 +557,6 @@ namespace TradeMaster6000.Server.Tasks
 
             if (TradeOrder.TargetPlaced)
             {
-                TradeOrder.TargetStatus = targetO.Status;
                 if (targetO.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"target order rejected...").ConfigureAwait(false);
