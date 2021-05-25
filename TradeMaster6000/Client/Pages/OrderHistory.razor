@@ -40,7 +40,7 @@
 @code {
     RadzenDataGrid<TradeOrder> ordersGrid;
     private HubConnection hubConnection;
-    private IList<TradeOrder> orders = new List<TradeOrder>();
+    private IEnumerable<TradeOrder> orders = new List<TradeOrder>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -51,6 +51,7 @@
         hubConnection.On<List<TradeOrder>>("ReceiveOrderHistory", (list) =>
         {
             orders = list;
+            orders = orders.Reverse();
             StateHasChanged();
         });
 

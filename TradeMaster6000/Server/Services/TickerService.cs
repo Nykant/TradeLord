@@ -104,7 +104,8 @@ namespace TradeMaster6000.Server.Services
 
                     if (TokenSource == null)
                     {
-
+                        TokenSource = new CancellationTokenSource();
+                        Task.Run(() => RefreshTickerToken(TokenSource.Token)).ConfigureAwait(false);
                         InitializeCandles(TokenSource.Token).ConfigureAwait(false);
                     }
 
@@ -316,6 +317,7 @@ namespace TradeMaster6000.Server.Services
             if(TokenSource != null)
             {
                 TokenSource.Cancel();
+                TokenSource = null;
             }
             Started = false;
         }

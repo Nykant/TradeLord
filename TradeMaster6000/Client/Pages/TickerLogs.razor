@@ -31,7 +31,7 @@
 @code {
     RadzenDataGrid<TickerLog> logsGrid;
     HubConnection hubConnection;
-    IList<TickerLog> logs = new List<TickerLog>();
+    IEnumerable<TickerLog> logs = new List<TickerLog>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -42,6 +42,7 @@
         hubConnection.On<List<TickerLog>>("ReceiveTickerLogs", (list) =>
         {
             logs = list;
+            logs = logs.Reverse();
             StateHasChanged();
         });
 

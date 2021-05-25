@@ -91,7 +91,7 @@
 
     RadzenDataGrid<TradeLog> ordersGrid;
     private TradeOrder TradeOrder { get; set; } = new TradeOrder();
-    private IList<TradeLog> tradeLogs = new List<TradeLog>();
+    private IEnumerable<TradeLog> tradeLogs = new List<TradeLog>();
     private HubConnection hubConnection;
 
     protected override async Task OnInitializedAsync()
@@ -103,6 +103,7 @@
         hubConnection.On<List<TradeLog>>("ReceiveLogs", (list) =>
         {
             tradeLogs = list;
+            tradeLogs = tradeLogs.Reverse();
             StateHasChanged();
         });
 

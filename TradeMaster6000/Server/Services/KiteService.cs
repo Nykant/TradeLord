@@ -48,6 +48,7 @@ namespace TradeMaster6000.Server.Services
 
         public void Invalidate()
         {
+            Kite = null;
             source.Cancel();
             Kite.InvalidateAccessToken();
         }
