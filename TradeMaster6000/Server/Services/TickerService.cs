@@ -17,7 +17,11 @@ namespace TradeMaster6000.Server.Services
 {
     public class TickerService : ITickerService
     {
-        private readonly object key = new ();
+        private readonly object orderkey = new ();
+        private readonly object firstorderkey = new();
+        private readonly object tickkey = new();
+        private readonly object tickerlogkey = new();
+        private readonly object startkey = new();
 
         private IConfiguration Configuration { get; set; }
         private readonly IKiteService kiteService;
@@ -28,7 +32,6 @@ namespace TradeMaster6000.Server.Services
         private List<Order> OrderUpdates { get; set; }
         private List<Order> FirstOrderUpdates { get; set; }
         private List<Tick> Ticks { get; set; }
-        private List<Candle> Candles { get; set; }
         private List<TickerLog> TickerLogs { get; set; }
         private bool Started { get; set; } = false;
         private CancellationTokenSource TokenSource { get; set; } = null;
@@ -41,14 +44,13 @@ namespace TradeMaster6000.Server.Services
             this.candleHelper = candleHelper;
             TickerLogs = new List<TickerLog>();
             Ticks = new List<Tick>();
-            Candles = new List<Candle>();
             FirstOrderUpdates = new List<Order>();
             OrderUpdates = new List<Order>();
         }
 
         public void Start()
         {
-            lock (key)
+            lock (startkey)
             {
                 if (!Started)
                 {
@@ -68,14 +70,18 @@ namespace TradeMaster6000.Server.Services
                     // set ticker settings
                     Ticker.EnableReconnect(Interval: 5, Retries: 50);
                     Ticker.Connect();
+
                     Started = true;
+
+                    TokenSource = new CancellationTokenSource();
+                    Task.Run(()=>RefreshTickerToken(TokenSource.Token)).ConfigureAwait(false);
                 }
             }
         }
 
         public void StartWithCandles()
         {
-            lock (key)
+            lock (startkey)
             {
                 if (!Started)
                 {
@@ -96,9 +102,9 @@ namespace TradeMaster6000.Server.Services
                     Ticker.EnableReconnect(Interval: 5, Retries: 50);
                     Ticker.Connect();
 
-                    if(TokenSource == null)
+                    if (TokenSource == null)
                     {
-                        TokenSource = new CancellationTokenSource();
+
                         InitializeCandles(TokenSource.Token).ConfigureAwait(false);
                     }
 
@@ -173,10 +179,35 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
+        private async Task RefreshTickerToken(CancellationToken token)
+        {
+            while (true)
+            {
+                if (await timeHelper.IsRefreshTime())
+                {
+                    await Task.Delay(60000, token);
+
+                    Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), kiteService.GetAccessToken());
+
+                    await Task.Delay(72000000, token);
+                }
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+                await Task.Delay(30000, token);
+            }
+        }
+
         public Tick LastTick(uint token)
         {
             Tick dick = new ();
-            var ticks = Ticks;
+            List<Tick> ticks;
+            lock (tickkey)
+            {
+                ticks = Ticks;
+            }
+
             if(ticks.Count > 0)
             {
                 for (int i = ticks.Count - 1; i >= 0; i--)
@@ -194,7 +225,12 @@ namespace TradeMaster6000.Server.Services
         {
             Order order = new ();
             bool gotit = false;
-            var updates = OrderUpdates;
+            List<Order> updates;
+            lock (orderkey)
+            {
+                updates = OrderUpdates;
+            }
+
             if(updates.Count > 0)
             {
                 for (int i = updates.Count - 1; i >= 0; i--)
@@ -209,7 +245,12 @@ namespace TradeMaster6000.Server.Services
             }
             if (!gotit)
             {
-                var firstUpdates = FirstOrderUpdates;
+                List<Order> firstUpdates;
+                lock (firstorderkey)
+                {
+                    firstUpdates = FirstOrderUpdates;
+                }
+
                 bool gotthat = false;
                 foreach(var firstUpdate in firstUpdates)
                 {
@@ -226,7 +267,10 @@ namespace TradeMaster6000.Server.Services
                     kite.SetAccessToken(kiteService.GetAccessToken());
                     var orderH = kite.GetOrderHistory(id);
                     order = orderH[^1];
-                    FirstOrderUpdates.Add(order);
+                    lock (firstorderkey)
+                    {
+                        FirstOrderUpdates.Add(order);
+                    }
                 }
             }
             return order;
@@ -234,7 +278,12 @@ namespace TradeMaster6000.Server.Services
         public bool AnyOrder(string id)
         {
             bool any = false;
-            foreach (var update in OrderUpdates)
+            List<Order> updates;
+            lock (orderkey)
+            {
+                updates = OrderUpdates;
+            }
+            foreach (var update in updates)
             {
                 if (update.OrderId == id)
                 {
@@ -295,56 +344,127 @@ namespace TradeMaster6000.Server.Services
         // events
         private void OnTick(Tick tickData)
         {
-            Ticks.Add(tickData);
+            List<Tick> ticks;
+            lock (tickkey)
+            {
+                ticks = Ticks;
+            }
+
+            bool found = false;
+            if (ticks.Count > 0)
+            {
+                for (int i = 0; i < ticks.Count; i++)
+                {
+                    if (ticks[i].InstrumentToken == tickData.InstrumentToken)
+                    {
+                        lock (tickkey)
+                        {
+                            Ticks[i] = tickData;
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found)
+            {
+                lock (tickkey)
+                {
+                    Ticks.Add(tickData);
+                }
+            }
         }
         private void OnOrderUpdate(Order orderData)
         {
-            OrderUpdates.Add(orderData);
+            List<Order> updates;
+            lock (orderkey)
+            {
+                updates = OrderUpdates;
+            }
+
+            bool found = false;
+            if(updates.Count > 0)
+            {
+                for (int i = 0; i < updates.Count; i++)
+                {
+                    if (updates[i].OrderId == orderData.OrderId)
+                    {
+                        lock (orderkey)
+                        {
+                            OrderUpdates[i] = orderData;
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found)
+            {
+                lock (orderkey)
+                {
+                    OrderUpdates.Add(orderData);
+                }
+            }
         }
         private void OnError(string message)
         {
-            TickerLogs.Add(new()
+            lock (tickerlogkey)
             {
-                Log = message,
-                Timestamp = DateTime.Now,
-                LogType = LogType.Error
-            });
+                TickerLogs.Add(new()
+                {
+                    Log = message,
+                    Timestamp = DateTime.Now,
+                    LogType = LogType.Error
+                });
+            }
         }
         private void OnClose()
         {
-            TickerLogs.Add(new()
+            lock (tickerlogkey)
             {
-                Log = "ticker connection closed...",
-                Timestamp = DateTime.Now,
-                LogType = LogType.Close
-            });
+                TickerLogs.Add(new()
+                {
+                    Log = "ticker connection closed...",
+                    Timestamp = DateTime.Now,
+                    LogType = LogType.Close
+                });
+            }
         }
         private void OnReconnect()
         {
-            TickerLogs.Add(new()
+            lock (tickerlogkey)
             {
-                Log = "ticker connection reconnected...",
-                Timestamp = DateTime.Now,
-                LogType = LogType.Reconnect
-            });
+                TickerLogs.Add(new()
+                {
+                    Log = "ticker connection reconnected...",
+                    Timestamp = DateTime.Now,
+                    LogType = LogType.Reconnect
+                });
+            }
         }
         private void OnNoReconnect()
         {
-            TickerLogs.Add(new()
+            lock (tickerlogkey)
             {
-                Log = "ticker connection failed to reconnect...",
-                Timestamp = DateTime.Now,
-                LogType = LogType.NoReconnect
-            });
+                TickerLogs.Add(new()
+                {
+                    Log = "ticker connection failed to reconnect...",
+                    Timestamp = DateTime.Now,
+                    LogType = LogType.NoReconnect
+                });
+            }
         }
         private void OnConnect()
         {
-            TickerLogs.Add(new()
+            lock (tickerlogkey)
             {
-                Log = "ticker connected...",
-                Timestamp = DateTime.Now,
-                LogType = LogType.Connect
-            });
+                TickerLogs.Add(new()
+                {
+                    Log = "ticker connected...",
+                    Timestamp = DateTime.Now,
+                    LogType = LogType.Connect
+                });
+            }
         }
     }
     public interface ITickerService

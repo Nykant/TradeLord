@@ -58,6 +58,31 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
+        public async Task<bool> IsRefreshTime()
+        {
+            return await Task.Run(() =>
+            {
+                if (Env.IsDevelopment())
+                {
+                    DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
+                    if (IST.Hour == 5 && IST.Minute == 35)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                else
+                {
+                    DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
+                    if (IST.Hour == 5 && IST.Minute == 35)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+            });
+        }
+
         public string GetCurrentVariety()
         {
             if (Env.IsDevelopment())
@@ -191,5 +216,6 @@ namespace TradeMaster6000.Server.Helpers
         Task<bool> IsMarketOpen(int orderId);
         Task<bool> IsMarketOpen();
         string GetCurrentVariety();
+        Task<bool> IsRefreshTime();
     }
 }

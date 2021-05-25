@@ -47,6 +47,7 @@ namespace TradeMaster6000.Server.Controllers
 
                     User user = kite.GenerateSession(requestUri.Request_token, Configuration.GetValue<string>("AppSecret"));
                     kiteService.SetAccessToken(user.AccessToken);
+                    kiteService.SetRefreshToken(user.RefreshToken);
                     kite.SetSessionExpiryHook(() => logger.LogInformation("User need to log in again"));
 
                     kiteService.SetKite(kite);

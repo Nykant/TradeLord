@@ -9,7 +9,7 @@ namespace TradeMaster6000.Server.Services
 {
     public class InstrumentService : IInstrumentService
     {
-        private static List<TradeInstrument> instruments;
+        private readonly List<TradeInstrument> instruments;
         public InstrumentService()
         {
             instruments = new List<TradeInstrument>() {

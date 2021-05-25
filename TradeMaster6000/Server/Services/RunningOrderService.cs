@@ -11,7 +11,8 @@ namespace TradeMaster6000.Server.Services
 {
     public class RunningOrderService : IRunningOrderService
     {
-        private static List<TradeOrder> Orders { get; set; }
+        private readonly object runningorderkey = new();
+        private List<TradeOrder> Orders { get; set; }
         private readonly ITradeOrderHelper tradeOrderHelper;
         public RunningOrderService(ITradeOrderHelper tradeOrderHelper)
         {
@@ -21,17 +22,23 @@ namespace TradeMaster6000.Server.Services
 
         public void Add(TradeOrder order)
         {
-            Orders.Add(order);
+            lock (runningorderkey)
+            {
+                Orders.Add(order);
+            }
         }
 
         public void Remove(int id)
         {
-            foreach(var order in Orders)
+            lock (runningorderkey)
             {
-                if(order.Id == id)
+                foreach (var order in Orders)
                 {
-                    Orders.Remove(order);
-                    break;
+                    if (order.Id == id)
+                    {
+                        Orders.Remove(order);
+                        break;
+                    }
                 }
             }
         }
@@ -39,16 +46,28 @@ namespace TradeMaster6000.Server.Services
         public async Task UpdateOrders()
         {
             var orders = await tradeOrderHelper.GetTradeOrders();
-            foreach(var order in orders)
+            List<TradeOrder> running;
+            int count;
+
+            lock (runningorderkey)
+            {
+                count = Orders.Count;
+                running = Orders;
+            }
+
+            foreach (var order in orders)
             {
                 await Task.Run(() =>
                 {
-                    for (int i = 0; i < Orders.Count; i++)
+                    for (int i = 0; i < count; i++)
                     {
-                        if (order.Id == Orders[i].Id)
+                        if (order.Id == running[i].Id)
                         {
-                            Orders[i].QuantityFilled = order.QuantityFilled;
-                            Orders[i].Status = order.Status;
+                            lock (runningorderkey)
+                            {
+                                Orders[i].QuantityFilled = order.QuantityFilled;
+                                Orders[i].Status = order.Status;
+                            }
                         }
                     }
                 }).ConfigureAwait(false);
@@ -57,7 +76,10 @@ namespace TradeMaster6000.Server.Services
 
         public List<TradeOrder> Get()
         {
-            return Orders;
+            lock (runningorderkey)
+            {
+                return Orders;
+            }
         }
     }
     public interface IRunningOrderService

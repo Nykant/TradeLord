@@ -9,24 +9,24 @@ namespace TradeMaster6000.Server.Services
 {
     public class ProtectionService : IProtectionService
     {
-        private readonly IDataProtector accessTokeProt;
+        private readonly IDataProtector tokenProtector;
         public ProtectionService(IDataProtectionProvider dataProtectionProvider, IConfiguration configuration)
         {
-            accessTokeProt = dataProtectionProvider.CreateProtector(configuration["AccessPurpose"]);
+            tokenProtector = dataProtectionProvider.CreateProtector(configuration["Purpose"]);
         }
 
-        public string ProtectAccessToken(string accessToken)
+        public string ProtectToken(string token)
         {
-            return accessTokeProt.Protect(accessToken);
+            return tokenProtector.Protect(token);
         }
-        public string UnprotectAccessToken(string accessToken)
+        public string UnprotectToken(string token)
         {
-            return accessTokeProt.Unprotect(accessToken);
+            return tokenProtector.Unprotect(token);
         }
     }
     public interface IProtectionService
     {
-        string ProtectAccessToken(string accessToken);
-        string UnprotectAccessToken(string accessToken);
+        string ProtectToken(string accessToken);
+        string UnprotectToken(string accessToken);
     }
 }
