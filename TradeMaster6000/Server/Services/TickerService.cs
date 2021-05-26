@@ -34,7 +34,6 @@ namespace TradeMaster6000.Server.Services
         private List<Tick> Ticks { get; set; }
         private List<TickerLog> TickerLogs { get; set; }
         private bool Started { get; set; } = false;
-        private CancellationTokenSource TokenSource { get; set; } = null;
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper)
         {
             this.kiteService = kiteService;
@@ -72,9 +71,6 @@ namespace TradeMaster6000.Server.Services
                     Ticker.Connect();
 
                     Started = true;
-
-                    TokenSource = new CancellationTokenSource();
-                    Task.Run(()=>RefreshTickerToken(TokenSource.Token)).ConfigureAwait(false);
                 }
             }
         }
@@ -102,12 +98,12 @@ namespace TradeMaster6000.Server.Services
                     Ticker.EnableReconnect(Interval: 5, Retries: 50);
                     Ticker.Connect();
 
-                    if (TokenSource == null)
-                    {
-                        TokenSource = new CancellationTokenSource();
-                        Task.Run(() => RefreshTickerToken(TokenSource.Token)).ConfigureAwait(false);
-                        InitializeCandles(TokenSource.Token).ConfigureAwait(false);
-                    }
+                    //if (TokenSource == null)
+                    //{
+                    //    TokenSource = new CancellationTokenSource();
+                    //    Task.Run(() => RefreshTickerToken(TokenSource.Token)).ConfigureAwait(false);
+                    //    InitializeCandles(TokenSource.Token).ConfigureAwait(false);
+                    //}
 
                     Started = true;
                 }
@@ -198,6 +194,11 @@ namespace TradeMaster6000.Server.Services
                 }
                 await Task.Delay(30000, token);
             }
+        }
+
+        public void SetTicker(Ticker ticker)
+        {
+            Ticker = ticker;
         }
 
         public Tick LastTick(uint token)
@@ -314,11 +315,11 @@ namespace TradeMaster6000.Server.Services
         {
             Ticker.DisableReconnect();
             Ticker.Close();
-            if(TokenSource != null)
-            {
-                TokenSource.Cancel();
-                TokenSource = null;
-            }
+            //if (TokenSource != null)
+            //{
+            //    TokenSource.Cancel();
+            //    TokenSource = null;
+            //}
             Started = false;
         }
 
@@ -350,29 +351,28 @@ namespace TradeMaster6000.Server.Services
             lock (tickkey)
             {
                 ticks = Ticks;
-            }
 
-            bool found = false;
-            if (ticks.Count > 0)
-            {
-                for (int i = 0; i < ticks.Count; i++)
+
+                bool found = false;
+                if (ticks.Count > 0)
                 {
-                    if (ticks[i].InstrumentToken == tickData.InstrumentToken)
+                    for (int i = 0; i < ticks.Count; i++)
                     {
-                        lock (tickkey)
+                        if (ticks[i].InstrumentToken == tickData.InstrumentToken)
                         {
+
                             Ticks[i] = tickData;
+
+                            found = true;
+                            break;
                         }
-                        found = true;
-                        break;
                     }
                 }
-            }
-            if (!found)
-            {
-                lock (tickkey)
+                if (!found)
                 {
+
                     Ticks.Add(tickData);
+
                 }
             }
         }
@@ -382,27 +382,30 @@ namespace TradeMaster6000.Server.Services
             lock (orderkey)
             {
                 updates = OrderUpdates;
-            }
 
-            bool found = false;
-            if(updates.Count > 0)
-            {
-                for (int i = 0; i < updates.Count; i++)
+                bool found = false;
+                if (updates.Count > 0)
                 {
-                    if (updates[i].OrderId == orderData.OrderId)
+                    for (int i = updates.Count - 1; i > 0; i--)
                     {
-                        lock (orderkey)
+                        if (updates[i].OrderId == orderData.OrderId)
                         {
-                            OrderUpdates[i] = orderData;
+                            if (updates[i].FilledQuantity > orderData.FilledQuantity)
+                            {
+                                found = true;
+                                break;
+                            }
+                            else
+                            {
+                                OrderUpdates[i] = orderData;
+
+                                found = true;
+                                break;
+                            }
                         }
-                        found = true;
-                        break;
                     }
                 }
-            }
-            if (!found)
-            {
-                lock (orderkey)
+                if (!found)
                 {
                     OrderUpdates.Add(orderData);
                 }
@@ -482,5 +485,6 @@ namespace TradeMaster6000.Server.Services
         bool AnyOrder(string id);
         void Stop();
         List<TickerLog> GetTickerLogs();
+        void SetTicker(Ticker ticker);
     }
 }

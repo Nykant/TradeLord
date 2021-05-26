@@ -1,0 +1,57 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<AuthorizeView>
+    <Authorized>
+        @{ if (LoggedIn)
+            {
+                <h3 style="color:green;">Api logged in</h3>
+            }
+            else
+            {
+                <h3 style="color:red;">Api not logged in</h3>
+            }
+        }
+        <button class="nav-link btn btn-link" @onclick="Logout">Log out</button>
+        <button class="nav-link btn btn-link" @onclick="Login">Log In</button>
+    </Authorized>
+</AuthorizeView>
+
+@code{
+    bool LoggedIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await IsLoggedIn() == true)
+        {
+            LoggedIn = true;
+        }
+    }
+
+    private async Task Logout(MouseEventArgs args)
+    {
+        await Http.GetAsync("ApiLogin/Logout").ConfigureAwait(false);
+    }
+
+    private async Task Login(MouseEventArgs args)
+    {
+        var response = await Http.GetAsync("ApiLogin/Login");
+        Navigation.NavigateTo(await response.Content.ReadAsStringAsync());
+    }
+
+    private async Task<bool> IsLoggedIn()
+    {
+        var response = await Http.GetAsync("ApiLogin/IsLoggedOn");
+        var booly = await response.Content.ReadAsStringAsync();
+        if (booly == "true")
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+}
