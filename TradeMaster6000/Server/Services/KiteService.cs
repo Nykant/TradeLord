@@ -15,18 +15,40 @@ namespace TradeMaster6000.Server.Services
         string AccessToken { get; set; }
         string RefreshToken { get; set; }
         readonly IProtectionService protectionService;
+        readonly ITimeHelper timeHelper;
+        readonly CancellationTokenSource source;
 
-        public KiteService(IProtectionService protectionService)
+        public KiteService(IProtectionService protectionService, ITimeHelper timeHelper)
         {
             this.protectionService = protectionService;
+            this.timeHelper = timeHelper;
+            source = new CancellationTokenSource();
+            KiteManager(source.Token).ConfigureAwait(false);
         }
 
         public void Invalidate()
         {
             if(Kite != null)
             {
-                Kite.InvalidateAccessToken(GetAccessToken());
+                try
+                {
+                    Kite.InvalidateAccessToken(GetAccessToken());
+                }
+                catch { }
                 Kite = null;
+                source.Cancel();
+            }
+        }
+
+        private async Task KiteManager(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                if(await timeHelper.IsRefreshTime())
+                {
+                    Invalidate();
+                }
+                await Task.Delay(30000, token);
             }
         }
         public void SetAccessToken(string accessToken)

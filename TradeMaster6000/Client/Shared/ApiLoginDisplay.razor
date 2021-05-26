@@ -3,36 +3,39 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<AuthorizeView>
-    <Authorized>
-        @{ if (LoggedIn)
-            {
-                <h3 style="color:green;">Api logged in</h3>
-            }
-            else
-            {
-                <h3 style="color:red;">Api not logged in</h3>
-            }
-        }
-        <button class="nav-link btn btn-link" @onclick="Logout">Log out</button>
-        <button class="nav-link btn btn-link" @onclick="Login">Log In</button>
-    </Authorized>
-</AuthorizeView>
+@{
+    if (LoggedIn)
+    {
+        <div style="padding-left:30px">
+            <h3 style="color:green;">Api logged in</h3>
+            <button class="nav-link btn btn-link" @onclick="Logout">Log out</button>
+        </div>
+
+    }
+    else
+    {
+        <div style="padding-left: 30px">
+            <h3 style="color:red;">Api not logged in</h3>
+            <button class="nav-link btn btn-link" @onclick="Login">Log In</button>
+        </div>
+
+    }
+}
+
 
 @code{
-    bool LoggedIn = false;
+    bool LoggedIn { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        if (await IsLoggedIn() == true)
-        {
-            LoggedIn = true;
-        }
+        await IsLoggedIn();
     }
 
     private async Task Logout(MouseEventArgs args)
     {
-        await Http.GetAsync("ApiLogin/Logout").ConfigureAwait(false);
+        await Http.GetAsync("ApiLogin/Logout");
+        LoggedIn = false;
+        StateHasChanged();
     }
 
     private async Task Login(MouseEventArgs args)
@@ -41,17 +44,19 @@
         Navigation.NavigateTo(await response.Content.ReadAsStringAsync());
     }
 
-    private async Task<bool> IsLoggedIn()
+    private async Task IsLoggedIn()
     {
         var response = await Http.GetAsync("ApiLogin/IsLoggedOn");
         var booly = await response.Content.ReadAsStringAsync();
         if (booly == "true")
         {
-            return true;
+            LoggedIn = true;
+            StateHasChanged();
         }
         else
         {
-            return false;
+            LoggedIn = false;
+            StateHasChanged();
         }
     }
 }

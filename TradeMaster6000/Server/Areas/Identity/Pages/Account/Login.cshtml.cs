@@ -27,20 +27,13 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
-        private readonly IConfiguration Configuration;
-        private readonly IKiteService kiteService;
         public LoginModel(SignInManager<ApplicationUser> signInManager, 
             ILogger<LoginModel> logger,
-            IKiteService kiteService,
-            UserManager<ApplicationUser> userManager,
-
-            IConfiguration configuration)
+            UserManager<ApplicationUser> userManager)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
-            Configuration = configuration;
-            this.kiteService = kiteService;
         }
 
         [BindProperty]
