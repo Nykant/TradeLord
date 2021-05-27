@@ -266,7 +266,6 @@ namespace TradeMaster6000.Server.Services
                 if (!gotthat)
                 {
                     var kite = kiteService.GetKite();
-                    kite.SetAccessToken(kiteService.GetAccessToken());
                     var orderH = kite.GetOrderHistory(id);
                     order = orderH[^1];
                     lock (firstorderkey)
@@ -296,7 +295,6 @@ namespace TradeMaster6000.Server.Services
             if (!any)
             {
                 var kite = kiteService.GetKite();
-                kite.SetAccessToken(kiteService.GetAccessToken());
                 var orderH = kite.GetOrderHistory(id);
                 if(orderH.Count > 0)
                 {

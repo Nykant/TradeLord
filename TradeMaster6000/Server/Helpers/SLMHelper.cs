@@ -44,7 +44,6 @@ namespace TradeMaster6000.Server.Helpers
             try
             {
                 var kite = kiteService.GetKite();
-                kite.SetAccessToken(kiteService.GetAccessToken());
                 Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
@@ -72,7 +71,6 @@ namespace TradeMaster6000.Server.Helpers
         public async Task SquareOff(TradeOrder order)
         {
             var kite = kiteService.GetKite();
-            kite.SetAccessToken(kiteService.GetAccessToken());
             kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,

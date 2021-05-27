@@ -92,7 +92,6 @@ namespace TradeMaster6000.Server.Hubs
             }
 
             var kite = KiteService.GetKite();
-            kite.SetAccessToken(KiteService.GetAccessToken());
             var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
             dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
             await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);

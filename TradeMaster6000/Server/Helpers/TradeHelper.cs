@@ -45,7 +45,6 @@ namespace TradeMaster6000.Server.Helpers
                     try
                     {
                         var kite = kiteService.GetKite();
-                        kite.SetAccessToken(kiteService.GetAccessToken());
                         kite.CancelOrder(order.EntryId, variety);
                         await LogHelper.AddLog(order.Id, $"entry order cancelled...").ConfigureAwait(false);
                         cancelled = true;
@@ -90,7 +89,6 @@ namespace TradeMaster6000.Server.Helpers
                         try
                         {
                             var kite = kiteService.GetKite();
-                            kite.SetAccessToken(kiteService.GetAccessToken());
                             kite.CancelOrder(order.SLMId, variety);
                             await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
                             cancelled = true;
@@ -132,7 +130,6 @@ namespace TradeMaster6000.Server.Helpers
                         try
                         {
                             var kite = kiteService.GetKite();
-                            kite.SetAccessToken(kiteService.GetAccessToken());
                             kite.CancelOrder(order.SLMId, variety);
                             await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
                             cancelled = true;
@@ -177,7 +174,6 @@ namespace TradeMaster6000.Server.Helpers
                         try
                         {
                             var kite = kiteService.GetKite();
-                            kite.SetAccessToken(kiteService.GetAccessToken());
                             kite.CancelOrder(order.TargetId, variety);
                             await LogHelper.AddLog(order.Id, $"target order cancelled...").ConfigureAwait(false);
                             cancelled = true;
@@ -204,7 +200,6 @@ namespace TradeMaster6000.Server.Helpers
             if (entry.FilledQuantity > 0)
             {
                 var kite = kiteService.GetKite();
-                kite.SetAccessToken(kiteService.GetAccessToken());
                 kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
@@ -228,7 +223,6 @@ namespace TradeMaster6000.Server.Helpers
                 var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
 
                 var kite = kiteService.GetKite();
-                kite.SetAccessToken(kiteService.GetAccessToken());
                 // place entry limit order
                 Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
@@ -269,7 +263,6 @@ namespace TradeMaster6000.Server.Helpers
                         var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                         // place slm order
                         var kite = kiteService.GetKite();
-                        kite.SetAccessToken(kiteService.GetAccessToken());
                         Dictionary<string, dynamic> response = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
@@ -314,7 +307,6 @@ namespace TradeMaster6000.Server.Helpers
                         var variety = await Task.Run(() => TimeHelper.GetCurrentVariety());
                         // place slm order
                         var kite = kiteService.GetKite();
-                        kite.SetAccessToken(kiteService.GetAccessToken());
                         Dictionary<string, dynamic> response = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,

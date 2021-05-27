@@ -23,7 +23,6 @@ namespace TradeMaster6000.Server.Helpers
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
             var kite = kiteService.GetKite();
-            kite.SetAccessToken(kiteService.GetAccessToken());
             kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,

@@ -24,7 +24,6 @@ namespace TradeMaster6000.Server.Helpers
             try
             {
                 var kite = kiteService.GetKite();
-                kite.SetAccessToken(kiteService.GetAccessToken());
                 Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
@@ -52,7 +51,6 @@ namespace TradeMaster6000.Server.Helpers
         public async Task Update(TradeOrder order, Order entryO)
         {
             var kite = kiteService.GetKite();
-            kite.SetAccessToken(kiteService.GetAccessToken());
             kite.ModifyOrder(
                 order.TargetId,
                 Quantity: entryO.FilledQuantity.ToString()

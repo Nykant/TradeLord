@@ -12,20 +12,20 @@ namespace TradeMaster6000.Server.DataHelpers
 {
     public class InstrumentHelper : IInstrumentHelper
     {
-        private IDbContextFactory<TradeDbContext> contextFactory { get; }
-        private IInstrumentService instrumentService { get; set; }
-        private IServiceProvider service { get; set; }
+        private IDbContextFactory<TradeDbContext> ContextFactory { get; }
+        private IInstrumentService InstrumentService { get; set; }
+        private IServiceProvider Service { get; set; }
         public InstrumentHelper(IServiceProvider serviceProvider)
         {
-            service = serviceProvider;
-            instrumentService = service.GetRequiredService<IInstrumentService>();
-            contextFactory = service.GetRequiredService<IDbContextFactory<TradeDbContext>>();
-            LoadInstruments(instrumentService.GetInstruments());
+            Service = serviceProvider;
+            InstrumentService = Service.GetRequiredService<IInstrumentService>();
+            ContextFactory = Service.GetRequiredService<IDbContextFactory<TradeDbContext>>();
+            LoadInstruments(InstrumentService.GetInstruments());
         }
 
         public async Task<List<TradeInstrument>> GetTradeInstruments()
         {
-            using (var context = contextFactory.CreateDbContext())
+            using (var context = ContextFactory.CreateDbContext())
             {
                 return await context.TradeInstruments.ToListAsync();
             }
@@ -33,7 +33,7 @@ namespace TradeMaster6000.Server.DataHelpers
 
         private void LoadInstruments(List<TradeInstrument> list)
         {
-            using (var context = contextFactory.CreateDbContext())
+            using (var context = ContextFactory.CreateDbContext())
             {
                 foreach (var instrument in list)
                 {

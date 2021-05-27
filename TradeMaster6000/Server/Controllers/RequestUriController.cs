@@ -44,12 +44,11 @@ namespace TradeMaster6000.Server.Controllers
                 {
                     logger.LogInformation("trying to connect kite");
                     Kite kite = kiteService.GetKite();
-
                     User user = kite.GenerateSession(requestUri.Request_token, Configuration.GetValue<string>("AppSecret"));
+                    kite.SetAccessToken(user.AccessToken);
                     kiteService.SetAccessToken(user.AccessToken);
                     kiteService.SetRefreshToken(user.RefreshToken);
                     kite.SetSessionExpiryHook(() => kiteService.Invalidate());
-
                     kiteService.SetKite(kite);
                 }
                 catch (Exception e)
