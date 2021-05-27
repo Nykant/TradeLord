@@ -236,6 +236,11 @@ namespace TradeMaster6000.Server.Tasks
                     await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
                 }
 
+                if (await TimeHelper.IsMarketEnding())
+                {
+                    goto Stopping;
+                }
+
                 if (token.IsCancellationRequested)
                 {
                     if (!TradeOrder.TargetHit)
@@ -358,13 +363,10 @@ namespace TradeMaster6000.Server.Tasks
             // if entry order average price, is less than the stoploss input, then sleep for a minute for ticks to come in, so we can set the stoploss as the low. 
             if (TradeOrder.PreSLMCancelled)
             {
-                Tick tick = TickService.LastTick(TradeOrder.Instrument.Token);
-                Candle candle = new () { High = tick.High, Low = tick.Low };
-
                 await LogHelper.AddLog(TradeOrder.Id, $"average price is less than stop loss, waiting 1 min for data...").ConfigureAwait(false);
 
-                tick = TickService.LastTick(TradeOrder.Instrument.Token);
-                candle = new Candle()
+                var tick = TickService.LastTick(TradeOrder.Instrument.Token);
+                var candle = new Candle()
                 {
                     Open = tick.LastPrice,
                     High = tick.LastPrice,
@@ -373,7 +375,7 @@ namespace TradeMaster6000.Server.Tasks
 
                 Stopwatch stopwatch = new ();
                 stopwatch.Start();
-                while (stopwatch.Elapsed.TotalSeconds < 55)
+                while (stopwatch.Elapsed.TotalSeconds < 60)
                 {
                     tick = TickService.LastTick(TradeOrder.Instrument.Token);
                     if (candle.High < tick.LastPrice)
@@ -388,7 +390,7 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         goto End;
                     }
-                    await Task.Delay(500, CancellationToken.None);
+                    await Task.Delay(200, CancellationToken.None);
                 }
                 stopwatch.Stop();
                 candle.Close = tick.LastPrice;

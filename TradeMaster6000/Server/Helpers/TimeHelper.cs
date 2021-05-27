@@ -58,14 +58,14 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
-        public async Task<bool> IsRefreshTime()
+        public async Task<bool> IsMarketEnding()
         {
             return await Task.Run(() =>
             {
                 if (Env.IsDevelopment())
                 {
                     DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                    if (IST.Hour == 5 && IST.Minute == 35)
+                    if (IST.Hour == 15 && IST.Minute == 00)
                     {
                         return true;
                     }
@@ -74,7 +74,32 @@ namespace TradeMaster6000.Server.Helpers
                 else
                 {
                     DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                    if (IST.Hour == 5 && IST.Minute == 35)
+                    if (IST.Hour == 15 && IST.Minute == 00)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+            });
+        }
+
+        public async Task<bool> IsRefreshTime()
+        {
+            return await Task.Run(() =>
+            {
+                if (Env.IsDevelopment())
+                {
+                    DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
+                    if (IST.Hour == 5 && IST.Minute == 29)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                else
+                {
+                    DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
+                    if (IST.Hour == 5 && IST.Minute == 29)
                     {
                         return true;
                     }
@@ -217,5 +242,6 @@ namespace TradeMaster6000.Server.Helpers
         Task<bool> IsMarketOpen();
         string GetCurrentVariety();
         Task<bool> IsRefreshTime();
+        Task<bool> IsMarketEnding();
     }
 }
