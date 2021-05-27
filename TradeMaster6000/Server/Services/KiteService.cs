@@ -48,7 +48,12 @@ namespace TradeMaster6000.Server.Services
                 {
                     Invalidate();
                 }
-                await Task.Delay(30000, token);
+
+                try
+                {
+                    await Task.Delay(30000, token);
+                }
+                catch { }
             }
         }
         public void SetAccessToken(string accessToken)

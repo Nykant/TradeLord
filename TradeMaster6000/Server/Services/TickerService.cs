@@ -33,7 +33,6 @@ namespace TradeMaster6000.Server.Services
         private List<Order> FirstOrderUpdates { get; set; }
         private List<Tick> Ticks { get; set; }
         private List<TickerLog> TickerLogs { get; set; }
-        private bool Started { get; set; } = false;
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper)
         {
             this.kiteService = kiteService;
@@ -51,7 +50,7 @@ namespace TradeMaster6000.Server.Services
         {
             lock (startkey)
             {
-                if (!Started)
+                if(Ticker == null)
                 {
                     var accessToken = kiteService.GetAccessToken();
                     // new ticker instance 
@@ -69,8 +68,6 @@ namespace TradeMaster6000.Server.Services
                     // set ticker settings
                     Ticker.EnableReconnect(Interval: 5, Retries: 50);
                     Ticker.Connect();
-
-                    Started = true;
                 }
             }
         }
@@ -79,7 +76,7 @@ namespace TradeMaster6000.Server.Services
         {
             lock (startkey)
             {
-                if (!Started)
+                if (!Ticker.IsConnected)
                 {
                     var accessToken = kiteService.GetAccessToken();
                     // new ticker instance 
@@ -104,8 +101,6 @@ namespace TradeMaster6000.Server.Services
                     //    Task.Run(() => RefreshTickerToken(TokenSource.Token)).ConfigureAwait(false);
                     //    InitializeCandles(TokenSource.Token).ConfigureAwait(false);
                     //}
-
-                    Started = true;
                 }
             }
         }
@@ -130,7 +125,7 @@ namespace TradeMaster6000.Server.Services
         {
             while (!token.IsCancellationRequested)
             {
-                foreach(var instrument in await instrumentHelper.GetTradeInstruments())
+                foreach (var instrument in await instrumentHelper.GetTradeInstruments())
                 {
                     await Task.Run(() =>
                     {
@@ -151,7 +146,7 @@ namespace TradeMaster6000.Server.Services
 
                 stopwatch = new();
                 stopwatch.Start();
-                 
+
                 candle.Open = LastTick(instrument.Token).LastPrice;
                 candle.High = candle.Open;
                 candle.Low = candle.Open;
@@ -162,7 +157,7 @@ namespace TradeMaster6000.Server.Services
                     {
                         candle.High = ltp;
                     }
-                    if(candle.Low > ltp)
+                    if (candle.Low > ltp)
                     {
                         candle.Low = ltp;
                     }
@@ -176,26 +171,6 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        private async Task RefreshTickerToken(CancellationToken token)
-        {
-            while (true)
-            {
-                if (await timeHelper.IsRefreshTime())
-                {
-                    await Task.Delay(60000, token);
-
-                    Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), kiteService.GetAccessToken());
-
-                    await Task.Delay(72000000, token);
-                }
-                if (token.IsCancellationRequested)
-                {
-                    break;
-                }
-                await Task.Delay(30000, token);
-            }
-        }
-
         public void SetTicker(Ticker ticker)
         {
             Ticker = ticker;
@@ -204,11 +179,7 @@ namespace TradeMaster6000.Server.Services
         public Tick LastTick(uint token)
         {
             Tick dick = new ();
-            List<Tick> ticks;
-            lock (tickkey)
-            {
-                ticks = Ticks;
-            }
+            List<Tick> ticks = Ticks;
 
             if(ticks.Count > 0)
             {
@@ -227,13 +198,9 @@ namespace TradeMaster6000.Server.Services
         {
             Order order = new ();
             bool gotit = false;
-            List<Order> updates;
-            lock (orderkey)
-            {
-                updates = OrderUpdates;
-            }
+            List<Order> updates = OrderUpdates;
 
-            if(updates.Count > 0)
+            if (updates.Count > 0)
             {
                 for (int i = updates.Count - 1; i >= 0; i--)
                 {
@@ -247,16 +214,12 @@ namespace TradeMaster6000.Server.Services
             }
             if (!gotit)
             {
-                List<Order> firstUpdates;
-                lock (firstorderkey)
-                {
-                    firstUpdates = FirstOrderUpdates;
-                }
+                List<Order> firstUpdates = FirstOrderUpdates;
 
                 bool gotthat = false;
-                foreach(var firstUpdate in firstUpdates)
+                foreach (var firstUpdate in firstUpdates)
                 {
-                    if(firstUpdate.OrderId == id)
+                    if (firstUpdate.OrderId == id)
                     {
                         order = firstUpdate;
                         gotthat = true;
@@ -279,11 +242,8 @@ namespace TradeMaster6000.Server.Services
         public bool AnyOrder(string id)
         {
             bool any = false;
-            List<Order> updates;
-            lock (orderkey)
-            {
-                updates = OrderUpdates;
-            }
+            List<Order> updates = OrderUpdates;
+
             foreach (var update in updates)
             {
                 if (update.OrderId == id)
@@ -313,22 +273,7 @@ namespace TradeMaster6000.Server.Services
         {
             Ticker.DisableReconnect();
             Ticker.Close();
-            //if (TokenSource != null)
-            //{
-            //    TokenSource.Cancel();
-            //    TokenSource = null;
-            //}
-            Started = false;
-        }
-
-        public bool IsStarted()
-        {
-            return Started;
-        }
-
-        public bool IsConnected()
-        {
-            return Ticker.IsConnected;
+            Ticker = null;
         }
 
         public void Subscribe(uint token)
@@ -350,7 +295,6 @@ namespace TradeMaster6000.Server.Services
             {
                 ticks = Ticks;
 
-
                 bool found = false;
                 if (ticks.Count > 0)
                 {
@@ -368,9 +312,7 @@ namespace TradeMaster6000.Server.Services
                 }
                 if (!found)
                 {
-
                     Ticks.Add(tickData);
-
                 }
             }
         }
@@ -474,12 +416,10 @@ namespace TradeMaster6000.Server.Services
     {
         Order GetOrder(string id);
         Tick LastTick(uint token);
-        bool IsConnected();
         void Subscribe(uint token);
         void UnSubscribe(uint token);
         void Start();
         void StartWithCandles();
-        bool IsStarted();
         bool AnyOrder(string id);
         void Stop();
         List<TickerLog> GetTickerLogs();
