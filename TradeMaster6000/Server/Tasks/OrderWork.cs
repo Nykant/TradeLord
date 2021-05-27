@@ -353,6 +353,8 @@ namespace TradeMaster6000.Server.Tasks
             }
 
             End:;
+
+            await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
         }
 
         // place stop loss
@@ -390,10 +392,9 @@ namespace TradeMaster6000.Server.Tasks
                     {
                         goto End;
                     }
-                    await Task.Delay(200, CancellationToken.None);
                 }
-                stopwatch.Stop();
                 candle.Close = tick.LastPrice;
+                stopwatch.Stop();
 
                 TradeOrder.StopLoss = SLMHelper.GetTriggerPrice(TradeOrder, candle);
 

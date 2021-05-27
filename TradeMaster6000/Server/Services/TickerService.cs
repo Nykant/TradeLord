@@ -18,13 +18,9 @@ namespace TradeMaster6000.Server.Services
 {
     public class TickerService : ITickerService
     {
-        private readonly object orderkey = new ();
-        private readonly object firstorderkey = new();
-        private readonly object tickkey = new();
-        private readonly object tickerlogkey = new();
         private readonly object startkey = new();
 
-        private IConfiguration Configuration { get; set; }
+        private IConfiguration Configuration { get; }
         private readonly IKiteService kiteService;
         private readonly IInstrumentHelper instrumentHelper;
         private readonly ITimeHelper timeHelper;
@@ -187,6 +183,7 @@ namespace TradeMaster6000.Server.Services
 
             return new Tick();
         }
+
         public Order GetOrder(string id)
         {
             foreach(var update in OrderUpdates.Reverse())
@@ -207,6 +204,7 @@ namespace TradeMaster6000.Server.Services
 
             return new Order();
         }
+
         public bool AnyOrder(string id)
         {
             foreach (var update in OrderUpdates.Reverse())
@@ -256,101 +254,62 @@ namespace TradeMaster6000.Server.Services
         // events
         private void OnTick(Tick tickData)
         {
-            bool found = false;
-
-            foreach(var tick in Ticks.Reverse())
-            {
-                if(tick.Key == tickData.InstrumentToken)
-                {
-                    Ticks.TryUpdate(tick.Key, tickData, tick.Value);
-                    found = true;
-                }
-            }
-
-            if (!found)
-            {
-                Ticks.TryAdd(tickData.InstrumentToken, tickData);
-            }
+            Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => y = tickData);
         }
+
         private void OnOrderUpdate(Order orderData)
         {
-
-            bool found = false;
-
-            foreach (var update in OrderUpdates.Reverse())
-            {
-                if (update.Key == orderData.OrderId)
-                {
-                    OrderUpdates.TryUpdate(update.Key, orderData, update.Value);
-                    found = true;
-                }
-            }
-
-            if (!found)
-            {
-                OrderUpdates.TryAdd(orderData.OrderId, orderData);
-            }
-
+            OrderUpdates.AddOrUpdate(orderData.OrderId, orderData, (x, y) => y = orderData);
         }
+
         private void OnError(string message)
         {
-            lock (tickerlogkey)
-            {
                 TickerLogs.Enqueue(new()
                 {
                     Log = message,
                     Timestamp = DateTime.Now,
                     LogType = LogType.Error
                 });
-            }
         }
+
         private void OnClose()
         {
-            lock (tickerlogkey)
-            {
                 TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connection closed...",
                     Timestamp = DateTime.Now,
                     LogType = LogType.Close
                 });
-            }
         }
+
         private void OnReconnect()
         {
-            lock (tickerlogkey)
-            {
                 TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connection reconnected...",
                     Timestamp = DateTime.Now,
                     LogType = LogType.Reconnect
                 });
-            }
         }
+
         private void OnNoReconnect()
         {
-            lock (tickerlogkey)
-            {
                 TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connection failed to reconnect...",
                     Timestamp = DateTime.Now,
                     LogType = LogType.NoReconnect
                 });
-            }
         }
+
         private void OnConnect()
         {
-            lock (tickerlogkey)
-            {
                 TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connected...",
                     Timestamp = DateTime.Now,
                     LogType = LogType.Connect
                 });
-            }
         }
     }
     public interface ITickerService

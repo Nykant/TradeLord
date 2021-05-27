@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,75 +12,42 @@ namespace TradeMaster6000.Server.Services
 {
     public class RunningOrderService : IRunningOrderService
     {
-        private readonly object runningorderkey = new();
-        private List<TradeOrder> Orders { get; set; }
+        private ConcurrentDictionary<int, TradeOrder> Orders { get; set; }
         private readonly ITradeOrderHelper tradeOrderHelper;
         public RunningOrderService(ITradeOrderHelper tradeOrderHelper)
         {
-            Orders = new List<TradeOrder>();
+            Orders = new ();
             this.tradeOrderHelper = tradeOrderHelper;
         }
 
         public void Add(TradeOrder order)
         {
-            lock (runningorderkey)
-            {
-                Orders.Add(order);
-            }
+            Orders.TryAdd(order.Id, order);
         }
 
         public void Remove(int id)
         {
-            lock (runningorderkey)
-            {
-                foreach (var order in Orders)
-                {
-                    if (order.Id == id)
-                    {
-                        Orders.Remove(order);
-                        break;
-                    }
-                }
-            }
+            Orders.TryRemove(id, out TradeOrder value);
         }
 
         public async Task UpdateOrders()
         {
-            var orders = await tradeOrderHelper.GetTradeOrders();
-            List<TradeOrder> running;
-            int count;
-
-            lock (runningorderkey)
-            {
-                count = Orders.Count;
-                running = Orders;
-            }
+            var orders = await tradeOrderHelper.GetRunningTradeOrders();
 
             foreach (var order in orders)
             {
-                await Task.Run(() =>
-                {
-                    for (int i = 0; i < count; i++)
-                    {
-                        if (order.Id == running[i].Id)
-                        {
-                            lock (runningorderkey)
-                            {
-                                Orders[i].QuantityFilled = order.QuantityFilled;
-                                Orders[i].Status = order.Status;
-                            }
-                        }
-                    }
-                }).ConfigureAwait(false);
+                Orders.TryUpdate(order.Id, order, Orders[order.Id]);
             }
         }
 
         public List<TradeOrder> Get()
         {
-            lock (runningorderkey)
+            List<TradeOrder> orders = new();
+            foreach(var valuepair in Orders)
             {
-                return Orders;
+                orders.Add(valuepair.Value);
             }
+            return orders;
         }
     }
     public interface IRunningOrderService

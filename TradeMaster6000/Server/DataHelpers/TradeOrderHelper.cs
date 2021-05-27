@@ -36,6 +36,14 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
+        public async Task<List<TradeOrder>> GetRunningTradeOrders()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.TradeOrders.Where(x => x.Status == Status.RUNNING).ToListAsync();
+            }
+        }
+
         public async Task UpdateTradeOrder(TradeOrder order)
         {
             using (var context = contextFactory.CreateDbContext())
@@ -72,6 +80,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task UpdateTradeOrder(TradeOrder tradeOrder);
         Task<TradeOrder> GetTradeOrder(int id);
         Task<List<TradeOrder>> GetTradeOrders();
-
+        Task<List<TradeOrder>> GetRunningTradeOrders();
     }
 }
