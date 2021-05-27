@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -29,10 +30,9 @@ namespace TradeMaster6000.Server.Services
         private readonly ITimeHelper timeHelper;
         private readonly ICandleDbHelper candleHelper;
         private Ticker Ticker { get; set; }
-        private List<Order> OrderUpdates { get; set; }
-        private List<Order> FirstOrderUpdates { get; set; }
-        private List<Tick> Ticks { get; set; }
-        private List<TickerLog> TickerLogs { get; set; }
+        private ConcurrentDictionary<string, Order> OrderUpdates { get; set; }
+        private ConcurrentDictionary<uint, Tick> Ticks { get; set; }
+        private ConcurrentQueue<TickerLog> TickerLogs { get; set; }
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper)
         {
             this.kiteService = kiteService;
@@ -40,10 +40,9 @@ namespace TradeMaster6000.Server.Services
             this.instrumentHelper = instrumentHelper;
             this.timeHelper = timeHelper;
             this.candleHelper = candleHelper;
-            TickerLogs = new List<TickerLog>();
-            Ticks = new List<Tick>();
-            FirstOrderUpdates = new List<Order>();
-            OrderUpdates = new List<Order>();
+            TickerLogs = new ();
+            Ticks = new ();
+            OrderUpdates = new ();
         }
 
         public void Start()
@@ -178,95 +177,62 @@ namespace TradeMaster6000.Server.Services
 
         public Tick LastTick(uint token)
         {
-            Tick dick = new ();
-            List<Tick> ticks = Ticks;
-
-            if(ticks.Count > 0)
+            foreach(var tick in Ticks.Reverse())
             {
-                for (int i = ticks.Count - 1; i >= 0; i--)
+                if (tick.Key == token)
                 {
-                    if (ticks[i].InstrumentToken == token)
-                    {
-                        dick = ticks[i];
-                        break;
-                    }
+                    return tick.Value;
                 }
             }
-            return dick;
+
+            return new Tick();
         }
         public Order GetOrder(string id)
         {
-            Order order = new ();
-            bool gotit = false;
-            List<Order> updates = OrderUpdates;
-
-            if (updates.Count > 0)
+            foreach(var update in OrderUpdates.Reverse())
             {
-                for (int i = updates.Count - 1; i >= 0; i--)
+                if (update.Key == id)
                 {
-                    if (updates[i].OrderId == id)
-                    {
-                        order = updates[i];
-                        gotit = true;
-                        break;
-                    }
+                    return update.Value;
                 }
             }
-            if (!gotit)
-            {
-                List<Order> firstUpdates = FirstOrderUpdates;
 
-                bool gotthat = false;
-                foreach (var firstUpdate in firstUpdates)
-                {
-                    if (firstUpdate.OrderId == id)
-                    {
-                        order = firstUpdate;
-                        gotthat = true;
-                        break;
-                    }
-                }
-                if (!gotthat)
-                {
-                    var kite = kiteService.GetKite();
-                    var orderH = kite.GetOrderHistory(id);
-                    order = orderH[^1];
-                    lock (firstorderkey)
-                    {
-                        FirstOrderUpdates.Add(order);
-                    }
-                }
+            try
+            {
+                var order = kiteService.GetKite().GetOrderHistory(id)[^1];
+                OrderUpdates.TryAdd(order.OrderId, order);
+                return order;
             }
-            return order;
+            catch { };
+
+            return new Order();
         }
         public bool AnyOrder(string id)
         {
-            bool any = false;
-            List<Order> updates = OrderUpdates;
+            foreach (var update in OrderUpdates.Reverse())
+            {
+                if (update.Key == id)
+                {
+                    return true;
+                }
+            }
 
-            foreach (var update in updates)
+            try 
             {
-                if (update.OrderId == id)
+                var orderH = kiteService.GetKite().GetOrderHistory(id);
+                if (orderH.Count > 0)
                 {
-                    any = true;
-                    break;
+                    return true;
                 }
             }
-            if (!any)
-            {
-                var kite = kiteService.GetKite();
-                var orderH = kite.GetOrderHistory(id);
-                if(orderH.Count > 0)
-                {
-                    any = true;
-                }
-            }
-            return any;
+            catch { }
+
+            return false;
         }
 
         public List<TickerLog> GetTickerLogs()
         {
-            return TickerLogs;
+            return TickerLogs.ToList();
         }
 
         public void Stop()
@@ -290,72 +256,47 @@ namespace TradeMaster6000.Server.Services
         // events
         private void OnTick(Tick tickData)
         {
-            List<Tick> ticks;
-            lock (tickkey)
+            bool found = false;
+
+            foreach(var tick in Ticks.Reverse())
             {
-                ticks = Ticks;
-
-                bool found = false;
-                if (ticks.Count > 0)
+                if(tick.Key == tickData.InstrumentToken)
                 {
-                    for (int i = 0; i < ticks.Count; i++)
-                    {
-                        if (ticks[i].InstrumentToken == tickData.InstrumentToken)
-                        {
-
-                            Ticks[i] = tickData;
-
-                            found = true;
-                            break;
-                        }
-                    }
+                    Ticks.TryUpdate(tick.Key, tickData, tick.Value);
+                    found = true;
                 }
-                if (!found)
-                {
-                    Ticks.Add(tickData);
-                }
+            }
+
+            if (!found)
+            {
+                Ticks.TryAdd(tickData.InstrumentToken, tickData);
             }
         }
         private void OnOrderUpdate(Order orderData)
         {
-            List<Order> updates;
-            lock (orderkey)
+
+            bool found = false;
+
+            foreach (var update in OrderUpdates.Reverse())
             {
-                updates = OrderUpdates;
-
-                bool found = false;
-                if (updates.Count > 0)
+                if (update.Key == orderData.OrderId)
                 {
-                    for (int i = updates.Count - 1; i > 0; i--)
-                    {
-                        if (updates[i].OrderId == orderData.OrderId)
-                        {
-                            if (updates[i].FilledQuantity > orderData.FilledQuantity)
-                            {
-                                found = true;
-                                break;
-                            }
-                            else
-                            {
-                                OrderUpdates[i] = orderData;
-
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (!found)
-                {
-                    OrderUpdates.Add(orderData);
+                    OrderUpdates.TryUpdate(update.Key, orderData, update.Value);
+                    found = true;
                 }
             }
+
+            if (!found)
+            {
+                OrderUpdates.TryAdd(orderData.OrderId, orderData);
+            }
+
         }
         private void OnError(string message)
         {
             lock (tickerlogkey)
             {
-                TickerLogs.Add(new()
+                TickerLogs.Enqueue(new()
                 {
                     Log = message,
                     Timestamp = DateTime.Now,
@@ -367,7 +308,7 @@ namespace TradeMaster6000.Server.Services
         {
             lock (tickerlogkey)
             {
-                TickerLogs.Add(new()
+                TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connection closed...",
                     Timestamp = DateTime.Now,
@@ -379,7 +320,7 @@ namespace TradeMaster6000.Server.Services
         {
             lock (tickerlogkey)
             {
-                TickerLogs.Add(new()
+                TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connection reconnected...",
                     Timestamp = DateTime.Now,
@@ -391,7 +332,7 @@ namespace TradeMaster6000.Server.Services
         {
             lock (tickerlogkey)
             {
-                TickerLogs.Add(new()
+                TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connection failed to reconnect...",
                     Timestamp = DateTime.Now,
@@ -403,7 +344,7 @@ namespace TradeMaster6000.Server.Services
         {
             lock (tickerlogkey)
             {
-                TickerLogs.Add(new()
+                TickerLogs.Enqueue(new()
                 {
                     Log = "ticker connected...",
                     Timestamp = DateTime.Now,
