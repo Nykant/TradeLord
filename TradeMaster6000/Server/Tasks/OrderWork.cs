@@ -213,7 +213,7 @@ namespace TradeMaster6000.Server.Tasks
                 }
             }
 
-            // go to when trade order is stopped
+            // go to when trade order is stopping
             Stopping:
 
             await Task.Run(()=>TradeHelper.CancelEntry(TradeOrder), CancellationToken.None).ConfigureAwait(false);
@@ -238,7 +238,6 @@ namespace TradeMaster6000.Server.Tasks
 
 
 
-
         // place target
         private async Task PlaceTarget(CancellationToken token)
         {
@@ -252,8 +251,6 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     goto End;
                 }
-
-                await Task.Delay(500, CancellationToken.None);
             }
 
             decimal proximity = 0;
@@ -292,9 +289,9 @@ namespace TradeMaster6000.Server.Tasks
                     await LogHelper.AddLog(TradeOrder.Id, $"entry order filled...").ConfigureAwait(false);
                     TradeOrder.QuantityFilled = entryO.FilledQuantity;
                     TradeOrder.Entry = entryO.AveragePrice;
-                    break;
+                    goto End;
                 }
-                if (TickService.LastTick(TradeOrder.Instrument.Token).High >= proximity)
+                if (TickService.LastTick(TradeOrder.Instrument.Token).LastPrice >= proximity)
                 {
                     if (entryO.FilledQuantity != TradeOrder.Quantity)
                     {
@@ -305,7 +302,6 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     goto End;
                 }
-                await Task.Delay(500, CancellationToken.None);
             }
 
             End:;
@@ -428,7 +424,6 @@ namespace TradeMaster6000.Server.Tasks
             TradeOrder.StopLoss = MathHelper.RoundUp(TradeOrder.StopLoss, (decimal)0.05);
             TradeOrder.Entry = MathHelper.RoundUp(TradeOrder.Entry, (decimal)0.05);
 
-            // calculate zonewidth and quantity
             if (TradeOrder.TransactionType.ToString() == "BUY")
             {
                 TradeOrder.ZoneWidth = TradeOrder.Entry - TradeOrder.StopLoss;
@@ -447,7 +442,7 @@ namespace TradeMaster6000.Server.Tasks
 
         private async Task CheckOrderStatuses(CancellationToken token)
         {
-            var entry = TickService.GetOrder(TradeOrder.EntryId);
+            Order entry = TickService.GetOrder(TradeOrder.EntryId);
             TradeOrder.EntryStatus = entry.Status;
 
             Order slm = new ();
@@ -462,11 +457,11 @@ namespace TradeMaster6000.Server.Tasks
                 TradeOrder.SLMStatus = slm.Status;
             }
 
-            Order targetO = new ();
+            Order target = new ();
             if (TradeOrder.TargetPlaced)
             {
-                targetO = TickService.GetOrder(TradeOrder.TargetId);
-                TradeOrder.TargetStatus = targetO.Status;
+                target = TickService.GetOrder(TradeOrder.TargetId);
+                TradeOrder.TargetStatus = target.Status;
             }
 
             // check if entry status is rejected
@@ -516,7 +511,7 @@ namespace TradeMaster6000.Server.Tasks
 
             if (TradeOrder.TargetPlaced)
             {
-                if (targetO.Status == "REJECTED")
+                if (target.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"target order rejected...").ConfigureAwait(false);
                     TradeOrder.TargetPlaced = false;
@@ -531,13 +526,13 @@ namespace TradeMaster6000.Server.Tasks
         {
             Tick tick = new ();
             Order entry = new ();
-            Order targetO = new ();
+            Order target = new ();
             while (!finished)
             {
                 Parallel.Invoke(
                     () => tick = TickService.LastTick(TradeOrder.Instrument.Token), 
                     () => entry = TickService.GetOrder(TradeOrder.EntryId), 
-                    () => targetO = TickService.GetOrder(TradeOrder.TargetId)
+                    () => target = TickService.GetOrder(TradeOrder.TargetId)
                 );
 
                 if (TradeOrder.ExitTransactionType == "SELL")
@@ -553,9 +548,9 @@ namespace TradeMaster6000.Server.Tasks
                             );
                         }).ConfigureAwait(false);
 
-                        await Task.Run(() =>
+                        await Task.Run(async() =>
                         {
-                            WatchingTargetHelper.SquareOff(entry, targetO, TradeOrder).ConfigureAwait(false);
+                            await WatchingTargetHelper.SquareOff(entry, target, TradeOrder);
                             finished = true;
                         }).ConfigureAwait(false);
                     }
@@ -573,17 +568,18 @@ namespace TradeMaster6000.Server.Tasks
                             );
                         }).ConfigureAwait(false);
 
-                        await Task.Run(() =>
+                        await Task.Run(async() =>
                         {
-                            WatchingTargetHelper.SquareOff(entry, targetO, TradeOrder);
-                            LogHelper.AddLog(TradeOrder.Id, $"squared off...").ConfigureAwait(false);
+                            await WatchingTargetHelper.SquareOff(entry, target, TradeOrder);
+                            await LogHelper.AddLog(TradeOrder.Id, $"squared off...").ConfigureAwait(false);
                             finished = true;
                         }).ConfigureAwait(false);
                     }
                 }
 
-                if (entry.FilledQuantity == targetO.FilledQuantity)
+                if (entry.FilledQuantity == target.FilledQuantity)
                 {
+                    await LogHelper.AddLog(TradeOrder.Id, $"target filled...").ConfigureAwait(false);
                     finished = true;
                     break;
                 }
