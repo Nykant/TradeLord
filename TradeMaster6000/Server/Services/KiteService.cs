@@ -16,14 +16,12 @@ namespace TradeMaster6000.Server.Services
         string RefreshToken { get; set; }
         readonly IProtectionService protectionService;
         readonly ITimeHelper timeHelper;
-        readonly CancellationTokenSource source;
 
         public KiteService(IProtectionService protectionService, ITimeHelper timeHelper)
         {
             this.protectionService = protectionService;
             this.timeHelper = timeHelper;
-            source = new CancellationTokenSource();
-            KiteManager(source.Token).ConfigureAwait(false);
+            Task.Run(()=>KiteManager()).ConfigureAwait(false);
         }
 
         public void Invalidate()
@@ -36,24 +34,19 @@ namespace TradeMaster6000.Server.Services
                 }
                 catch { }
                 Kite = null;
-                source.Cancel();
             }
         }
 
-        private async Task KiteManager(CancellationToken token)
+        private async Task KiteManager()
         {
-            while (!token.IsCancellationRequested)
+            while (true)
             {
                 if(await timeHelper.IsRefreshTime())
                 {
                     Invalidate();
                 }
 
-                try
-                {
-                    await Task.Delay(30000, token);
-                }
-                catch { }
+                await Task.Delay(30000);
             }
         }
         public void SetAccessToken(string accessToken)
