@@ -35,8 +35,6 @@ namespace TradeMaster6000.Server.Tasks
         private TradeOrder TradeOrder { get; set; }
 
         // variables
-        private bool isPreMarketOpen;
-        private bool isMarketOpen;
         private bool finished;
 
         // class constructor
@@ -53,8 +51,6 @@ namespace TradeMaster6000.Server.Tasks
             TimeHelper = service.GetRequiredService<ITimeHelper>();
 
             //set values when constructor initialized
-            isPreMarketOpen = false;
-            isMarketOpen = false;
             finished = false;
         }
 
@@ -88,42 +84,16 @@ namespace TradeMaster6000.Server.Tasks
                 TradeOrder.SLMId = response;
             }
 
-            while (!TickService.AnyOrder(TradeOrder.EntryId))
-            {
-                if (token.IsCancellationRequested)
-                {
-                    goto Stopping;
-                }
-                Thread.Sleep(500);
-            }
-
-            if (!TradeOrder.PreSLMCancelled)
-            {
-                while (!TickService.AnyOrder(TradeOrder.SLMId))
-                {
-                    if (token.IsCancellationRequested)
-                    {
-                        goto Stopping;
-                    }
-                    Thread.Sleep(500);
-                }
-            }
-
+            TradeOrder temp = new();
             // do while pre market is not open
-            TradeOrder temp = new ();
             do
             {
-                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None).ConfigureAwait(false);
+                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None);
 
-                if (await TimeHelper.IsPreMarketOpen(TradeOrder.Id))
+                if (temp != TradeOrder)
                 {
-                    isPreMarketOpen = true;
-                    break;
-                }
-
-                if (token.IsCancellationRequested)
-                {
-                    goto Stopping;
+                    temp = TradeOrder;
+                    await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
                 }
 
                 if (finished)
@@ -131,71 +101,57 @@ namespace TradeMaster6000.Server.Tasks
                     goto Ending;
                 }
 
-                if (temp != TradeOrder)
+                if (token.IsCancellationRequested)
                 {
-                    temp = TradeOrder;
-                    await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
+                    goto Stopping;
                 }
 
                 Thread.Sleep(5000);
             }
-            while (!isPreMarketOpen);
+            while (!await TimeHelper.IsPreMarketOpen(TradeOrder.Id));
 
             // do while pre market is open
             do
             {
-                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None).ConfigureAwait(false);
-
-                if (await TimeHelper.IsMarketOpen(TradeOrder.Id))
-                {
-                    isMarketOpen = true;
-                    break;
-                }
-
-                if (!TradeOrder.IsOrderFilling)
-                {
-                    await Task.Run(() => CheckIfFilling(), CancellationToken.None).ConfigureAwait(false);
-                }
-
-                if (temp != TradeOrder)
-                {
-                    temp = TradeOrder;
-                    await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
-                }
+                Task t = Task.Run(() => CheckOrderStatuses(token), CancellationToken.None);
+                Task t2 = Task.Run(() => CheckIfFilling(), CancellationToken.None);
 
                 if (finished)
                 {
                     goto Ending;
                 }
 
-                Thread.Sleep(500);
+                Task.WaitAll(new Task[] { t, t2 }, CancellationToken.None);
+
+                if (temp != TradeOrder)
+                {
+                    temp = TradeOrder;
+                    await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
+                }
             }
-            while (!isMarketOpen);
+            while (!await TimeHelper.IsMarketOpen(TradeOrder.Id));
 
             if (token.IsCancellationRequested)
             {
                 goto Stopping;
             }
 
-            await Task.Run(() =>
-            {
-                Parallel.Invoke(
-                    async () =>
-                    {
-                        await PlaceTarget(token);
-                    },
-                    async () =>
-                    {
-                        await PlaceStopLoss(token);
-                    });
-            }, CancellationToken.None).ConfigureAwait(false);
+            Parallel.Invoke(
+                () =>
+                {
+                    Task.Run(() => PlaceTarget(token)).ConfigureAwait(false);
+                },
+                () =>
+                {
+                    Task.Run(() => PlaceStopLoss(token)).ConfigureAwait(false);
+                });
 
             await LogHelper.AddLog(TradeOrder.Id, $"monitoring orders...").ConfigureAwait(false);
 
             // monitoring the orders
             while (true)
             {
-                await Task.Run(() => CheckOrderStatuses(token), CancellationToken.None).ConfigureAwait(false);
+                Task t = Task.Run(() => CheckOrderStatuses(token), CancellationToken.None);
 
                 if (!TradeOrder.PreSLMCancelled)
                 {
@@ -230,15 +186,14 @@ namespace TradeMaster6000.Server.Tasks
                     }
                 }
 
-                if (temp != TradeOrder)
-                {
-                    temp = TradeOrder;
-                    await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
-                }
-
                 if (await TimeHelper.IsMarketEnding())
                 {
                     goto Stopping;
+                }
+
+                if (finished)
+                {
+                    goto Ending;
                 }
 
                 if (token.IsCancellationRequested)
@@ -249,12 +204,13 @@ namespace TradeMaster6000.Server.Tasks
                     }
                 }
 
-                if (finished)
-                {
-                    goto Ending;
-                }
+                Task.WaitAll(new Task[] { t }, CancellationToken.None);
 
-                await Task.Delay(500, CancellationToken.None);
+                if (temp != TradeOrder)
+                {
+                    temp = TradeOrder;
+                    await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
+                }
             }
 
             // go to when trade order is stopped
@@ -263,7 +219,7 @@ namespace TradeMaster6000.Server.Tasks
             await Task.Run(()=>TradeHelper.CancelEntry(TradeOrder), CancellationToken.None).ConfigureAwait(false);
             await Task.Run(() => TradeHelper.CancelStopLoss(TradeOrder), CancellationToken.None).ConfigureAwait(false);
             await Task.Run(()=>TradeHelper.CancelTarget(TradeOrder), CancellationToken.None).ConfigureAwait(false);
-            await TradeHelper.SquareOff(TradeOrder);
+            await TradeHelper.SquareOff(TradeOrder).ConfigureAwait(false);
 
             // go to when trade order is ending
             Ending:;
@@ -635,49 +591,51 @@ namespace TradeMaster6000.Server.Tasks
         }
         private async Task CheckIfFilling()
         {
-            var entry = await Task.Run(() => TickService.GetOrder(TradeOrder.EntryId));
-
-            if (entry.FilledQuantity > 0)
+            if (!TradeOrder.IsOrderFilling)
             {
-                await LogHelper.AddLog(TradeOrder.Id, $"entry order filling...").ConfigureAwait(false);
-                TradeOrder.QuantityFilled = entry.FilledQuantity;
-                TradeOrder.Entry = entry.AveragePrice;
-                if (!TradeOrder.PreSLMCancelled)
+                var entry = await Task.Run(() => TickService.GetOrder(TradeOrder.EntryId));
+                if (entry.FilledQuantity > 0)
                 {
-                    if (TradeOrder.ExitTransactionType == "SELL")
+                    await LogHelper.AddLog(TradeOrder.Id, $"entry order filling...").ConfigureAwait(false);
+                    TradeOrder.QuantityFilled = entry.FilledQuantity;
+                    TradeOrder.Entry = entry.AveragePrice;
+                    if (!TradeOrder.PreSLMCancelled)
                     {
-                        if (entry.AveragePrice < TradeOrder.StopLoss)
+                        if (TradeOrder.ExitTransactionType == "SELL")
                         {
-                            try
+                            if (entry.AveragePrice < TradeOrder.StopLoss)
                             {
-                                await Task.Run(() => TradeHelper.CancelStopLoss(TradeOrder)).ConfigureAwait(false);
-                                await LogHelper.AddLog(TradeOrder.Id, $"slm order cancelled...").ConfigureAwait(false);
-                                TradeOrder.PreSLMCancelled = true;
+                                try
+                                {
+                                    await Task.Run(() => TradeHelper.CancelStopLoss(TradeOrder)).ConfigureAwait(false);
+                                    await LogHelper.AddLog(TradeOrder.Id, $"slm order cancelled...").ConfigureAwait(false);
+                                    TradeOrder.PreSLMCancelled = true;
+                                }
+                                catch (KiteException e)
+                                {
+                                    await LogHelper.AddLog(TradeOrder.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                                }
                             }
-                            catch (KiteException e)
+                        }
+                        else
+                        {
+                            if (entry.AveragePrice > TradeOrder.StopLoss)
                             {
-                                await LogHelper.AddLog(TradeOrder.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                                try
+                                {
+                                    await Task.Run(() => TradeHelper.CancelStopLoss(TradeOrder)).ConfigureAwait(false);
+                                    await LogHelper.AddLog(TradeOrder.Id, $"slm order cancelled...").ConfigureAwait(false);
+                                    TradeOrder.PreSLMCancelled = true;
+                                }
+                                catch (KiteException e)
+                                {
+                                    await LogHelper.AddLog(TradeOrder.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
+                                }
                             }
                         }
                     }
-                    else
-                    {
-                        if (entry.AveragePrice > TradeOrder.StopLoss)
-                        {
-                            try
-                            {
-                                await Task.Run(() => TradeHelper.CancelStopLoss(TradeOrder)).ConfigureAwait(false);
-                                await LogHelper.AddLog(TradeOrder.Id, $"slm order cancelled...").ConfigureAwait(false);
-                                TradeOrder.PreSLMCancelled = true;
-                            }
-                            catch (KiteException e)
-                            {
-                                await LogHelper.AddLog(TradeOrder.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                            }
-                        }
-                    }
+                    TradeOrder.IsOrderFilling = true;
                 }
-                TradeOrder.IsOrderFilling = true;
             }
         }
     }

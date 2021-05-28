@@ -28,7 +28,7 @@ namespace TradeMaster6000.Server.Services
         private Ticker Ticker { get; set; }
         private ConcurrentDictionary<string, Order> OrderUpdates { get; set; }
         private ConcurrentDictionary<uint, Tick> Ticks { get; set; }
-        private ConcurrentQueue<TickerLog> TickerLogs { get; set; }
+        private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper)
         {
             this.kiteService = kiteService;
@@ -100,71 +100,71 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        public async Task InitializeCandles(CancellationToken token)
-        {
-            while (!await timeHelper.IsMarketOpen())
-            {
-                if (token.IsCancellationRequested)
-                {
-                    goto Ending;
-                }
-                await Task.Delay(5000, token);
-            }
+        //public async Task InitializeCandles(CancellationToken token)
+        //{
+        //    while (!await timeHelper.IsMarketOpen())
+        //    {
+        //        if (token.IsCancellationRequested)
+        //        {
+        //            goto Ending;
+        //        }
+        //        await Task.Delay(5000, token);
+        //    }
 
-            await Task.Run(() => AnalyzeCandles(token), token).ConfigureAwait(false);
+        //    await Task.Run(() => AnalyzeCandles(token), token).ConfigureAwait(false);
 
-            Ending:;
-        }
+        //    Ending:;
+        //}
 
-        public async Task AnalyzeCandles(CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                foreach (var instrument in await instrumentHelper.GetTradeInstruments())
-                {
-                    await Task.Run(() =>
-                    {
-                        Analyze(instrument, token).ConfigureAwait(false);
-                    }, token).ConfigureAwait(false);
-                }
-            }
-        }
+        //public async Task AnalyzeCandles(CancellationToken token)
+        //{
+        //    while (!token.IsCancellationRequested)
+        //    {
+        //        foreach (var instrument in await instrumentHelper.GetTradeInstruments())
+        //        {
+        //            await Task.Run(() =>
+        //            {
+        //                Analyze(instrument, token).ConfigureAwait(false);
+        //            }, token).ConfigureAwait(false);
+        //        }
+        //    }
+        //}
 
-        public async Task Analyze(TradeInstrument instrument, CancellationToken token)
-        {
-            Candle candle;
-            Stopwatch stopwatch;
-            decimal ltp;
-            while (!token.IsCancellationRequested)
-            {
-                candle = new Candle() { TradeInstrument = instrument, From = DateTime.Now };
+        //public async Task Analyze(TradeInstrument instrument, CancellationToken token)
+        //{
+        //    Candle candle;
+        //    Stopwatch stopwatch;
+        //    decimal ltp;
+        //    while (!token.IsCancellationRequested)
+        //    {
+        //        candle = new Candle() { TradeInstrument = instrument, From = DateTime.Now };
 
-                stopwatch = new();
-                stopwatch.Start();
+        //        stopwatch = new();
+        //        stopwatch.Start();
 
-                candle.Open = LastTick(instrument.Token).LastPrice;
-                candle.High = candle.Open;
-                candle.Low = candle.Open;
-                while (stopwatch.Elapsed.TotalMinutes < 1)
-                {
-                    ltp = LastTick(instrument.Token).LastPrice;
-                    if (candle.High < ltp)
-                    {
-                        candle.High = ltp;
-                    }
-                    if (candle.Low > ltp)
-                    {
-                        candle.Low = ltp;
-                    }
-                    await Task.Delay(500, token);
-                }
-                candle.Close = LastTick(instrument.Token).LastPrice;
-                candle.To = DateTime.Now;
-                stopwatch.Stop();
+        //        candle.Open = LastTick(instrument.Token).LastPrice;
+        //        candle.High = candle.Open;
+        //        candle.Low = candle.Open;
+        //        while (stopwatch.Elapsed.TotalMinutes < 1)
+        //        {
+        //            ltp = LastTick(instrument.Token).LastPrice;
+        //            if (candle.High < ltp)
+        //            {
+        //                candle.High = ltp;
+        //            }
+        //            if (candle.Low > ltp)
+        //            {
+        //                candle.Low = ltp;
+        //            }
+        //            await Task.Delay(500, token);
+        //        }
+        //        candle.Close = LastTick(instrument.Token).LastPrice;
+        //        candle.To = DateTime.Now;
+        //        stopwatch.Stop();
 
-                await candleHelper.AddCandle(candle).ConfigureAwait(false);
-            }
-        }
+        //        await candleHelper.AddCandle(candle).ConfigureAwait(false);
+        //    }
+        //}
 
         public void SetTicker(Ticker ticker)
         {
@@ -197,38 +197,24 @@ namespace TradeMaster6000.Server.Services
             try
             {
                 var order = kiteService.GetKite().GetOrderHistory(id)[^1];
-                OrderUpdates.TryAdd(order.OrderId, order);
-                return order;
+                return OrderUpdates.AddOrUpdate(id, order, (x, y) =>
+                {
+                    if (y.FilledQuantity <= order.FilledQuantity)
+                    {
+                        return order;
+                    }
+                    else
+                    {
+                        return y;
+                    }
+                });
             }
-            catch { };
+            catch (Exception e) { AddLog(e.Message, LogType.Exception); };
 
             return new Order();
         }
 
-        public bool AnyOrder(string id)
-        {
-            foreach (var update in OrderUpdates.Reverse())
-            {
-                if (update.Key == id)
-                {
-                    return true;
-                }
-            }
-
-            try 
-            {
-                var orderH = kiteService.GetKite().GetOrderHistory(id);
-                if (orderH.Count > 0)
-                {
-                    return true;
-                }
-            }
-            catch { }
-
-            return false;
-        }
-
-        public List<TickerLog> GetTickerLogs()
+        public List<SomeLog> GetSomeLogs()
         {
             return TickerLogs.ToList();
         }
@@ -251,65 +237,60 @@ namespace TradeMaster6000.Server.Services
             Ticker.UnSubscribe(Tokens: new UInt32[] { token });
         }
 
+        private void AddLog(string log, LogType logType)
+        {
+            TickerLogs.Enqueue(new()
+            {
+                Log = log,
+                Timestamp = DateTime.Now,
+                LogType = logType
+            });
+        }
+
         // events
         private void OnTick(Tick tickData)
         {
-            Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => y = tickData);
+            Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData);
         }
 
         private void OnOrderUpdate(Order orderData)
         {
-            OrderUpdates.AddOrUpdate(orderData.OrderId, orderData, (x, y) => y = orderData);
+            OrderUpdates.AddOrUpdate(orderData.OrderId, orderData, (x, y) => 
+            {
+                if(y.FilledQuantity <= orderData.FilledQuantity)
+                {
+                    return orderData;
+                }
+                else
+                {
+                    return y;
+                }
+            });
         }
 
         private void OnError(string message)
         {
-                TickerLogs.Enqueue(new()
-                {
-                    Log = message,
-                    Timestamp = DateTime.Now,
-                    LogType = LogType.Error
-                });
+            AddLog(message, LogType.Error);
         }
 
         private void OnClose()
         {
-                TickerLogs.Enqueue(new()
-                {
-                    Log = "ticker connection closed...",
-                    Timestamp = DateTime.Now,
-                    LogType = LogType.Close
-                });
+            AddLog("ticker connection closed...", LogType.Close);
         }
 
         private void OnReconnect()
         {
-                TickerLogs.Enqueue(new()
-                {
-                    Log = "ticker connection reconnected...",
-                    Timestamp = DateTime.Now,
-                    LogType = LogType.Reconnect
-                });
+            AddLog("ticker connection reconnected...", LogType.Reconnect);
         }
 
         private void OnNoReconnect()
         {
-                TickerLogs.Enqueue(new()
-                {
-                    Log = "ticker connection failed to reconnect...",
-                    Timestamp = DateTime.Now,
-                    LogType = LogType.NoReconnect
-                });
+            AddLog("ticker connection failed to reconnect...", LogType.NoReconnect);
         }
 
         private void OnConnect()
         {
-                TickerLogs.Enqueue(new()
-                {
-                    Log = "ticker connected...",
-                    Timestamp = DateTime.Now,
-                    LogType = LogType.Connect
-                });
+            AddLog("ticker connected...", LogType.Connect);
         }
     }
     public interface ITickerService
@@ -320,9 +301,8 @@ namespace TradeMaster6000.Server.Services
         void UnSubscribe(uint token);
         void Start();
         void StartWithCandles();
-        bool AnyOrder(string id);
         void Stop();
-        List<TickerLog> GetTickerLogs();
+        List<SomeLog> GetSomeLogs();
         void SetTicker(Ticker ticker);
     }
 }

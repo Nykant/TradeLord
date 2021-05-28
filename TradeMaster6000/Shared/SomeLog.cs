@@ -5,15 +5,16 @@ using System.Text;
 
 namespace TradeMaster6000.Shared
 {
-    public class TickerLog
+    public class SomeLog
     {
         public string Log { get; set; }
         public DateTime Timestamp { get; set; }
         public LogType LogType { get; set; }
-
     }
     public enum LogType
     {
+        Exception,
+        RunningOrder,
         Order,
         Error,
         Connect,

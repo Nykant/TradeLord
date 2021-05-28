@@ -99,7 +99,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetTickerLogs()
         {
-            await Clients.Caller.SendAsync("ReceiveTickerLogs", tickerService.GetTickerLogs());
+            await Clients.Caller.SendAsync("ReceiveTickerLogs", tickerService.GetSomeLogs());
         }
 
         public async Task GetOrderHistory()
@@ -119,10 +119,8 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetOrders()
         {
-            await Task.Run(async() => {
-                await running.UpdateOrders();
-                await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
-            }).ConfigureAwait(false);
+            await Task.Run(() => running.UpdateOrders());
+            await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
         }
 
         public async Task GetLogs(int orderId)

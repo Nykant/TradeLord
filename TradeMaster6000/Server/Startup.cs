@@ -105,7 +105,7 @@ namespace TradeMaster6000.Server
 
             services.AddSignalR(options =>
             {
-                options.MaximumParallelInvocationsPerClient = 5;
+                options.MaximumParallelInvocationsPerClient = 10;
             });
 
             services.AddControllersWithViews();

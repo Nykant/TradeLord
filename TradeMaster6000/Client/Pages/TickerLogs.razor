@@ -12,11 +12,11 @@
         <div class="row">
             <div class="col-lg-12">
                 <RadzenDataGrid @ref="logsGrid" AllowFiltering="false" AllowPaging="true" PageSize="20" AllowSorting="false"
-                                Data="@logs" TItem="TickerLog">
+                                Data="@logs" TItem="SomeLog">
                     <Columns>
-                        <RadzenDataGridColumn Width="300px" TItem="TickerLog" Property="Log" Title="Log" />
-                        <RadzenDataGridColumn Width="100px" TItem="TickerLog" Property="LogType" Title="Type" />
-                        <RadzenDataGridColumn Width="100px" TItem="TickerLog" Property="Timestamp" Title="Timestamp" />
+                        <RadzenDataGridColumn Width="300px" TItem="SomeLog" Property="Log" Title="Log" />
+                        <RadzenDataGridColumn Width="100px" TItem="SomeLog" Property="LogType" Title="Type" />
+                        <RadzenDataGridColumn Width="100px" TItem="SomeLog" Property="Timestamp" Title="Timestamp" />
                     </Columns>
                 </RadzenDataGrid>
             </div>
@@ -29,9 +29,9 @@
 }
 
 @code {
-    RadzenDataGrid<TickerLog> logsGrid;
+    RadzenDataGrid<SomeLog> logsGrid;
     HubConnection hubConnection;
-    IEnumerable<TickerLog> logs = new List<TickerLog>();
+    IEnumerable<SomeLog> logs = new List<SomeLog>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -39,7 +39,7 @@
         .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
         .Build();
 
-        hubConnection.On<List<TickerLog>>("ReceiveTickerLogs", (list) =>
+        hubConnection.On<List<SomeLog>>("ReceiveTickerLogs", (list) =>
         {
             logs = list;
             logs = logs.Reverse();
