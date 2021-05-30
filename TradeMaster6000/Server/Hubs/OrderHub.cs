@@ -58,26 +58,49 @@ namespace TradeMaster6000.Server.Hubs
                 }
             });
 
-            tickerService.Start();
-
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
 
             running.Add(order);
 
+            // wait untill kite is connected
+            while (!KiteService.IsKiteConnected())
+            {
+                if (order.TokenSource.Token.IsCancellationRequested)
+                {
+                    running.Remove(order.Id);
+                    goto Ending;
+                }
+                Thread.Sleep(1000);
+            }
+
+            tickerService.Start();
             tickerService.Subscribe(order.Instrument.Token);
 
             await Task.Run(async () =>
             {
-                await orderWork.StartWork(order, order.TokenSource.Token);
-                tickerService.UnSubscribe(order.Instrument.Token);
-                running.Remove(order.Id);
-                if (running.Get().Count == 0)
+                try
                 {
-                    tickerService.Stop();
+                    await orderWork.StartWork(order, order.TokenSource.Token);
+                    tickerService.UnSubscribe(order.Instrument.Token);
+                    running.Remove(order.Id);
+                    if (running.Get().Count == 0)
+                    {
+                        tickerService.Stop();
+                    }
+                    await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
                 }
-                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
+                catch(Exception e) { await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false); }
             }).ConfigureAwait(false);
+
+            Ending:;
+        }
+
+        public Task StartMagic()
+        {
+            tickerService.Start();
+            tickerService.StartCandles();
+            return Task.FromResult(0);
         }
 
         public async Task GetTick(string symbol)
@@ -92,9 +115,12 @@ namespace TradeMaster6000.Server.Hubs
             }
 
             var kite = KiteService.GetKite();
-            var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
-            dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
-            await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
+            if(kite != null)
+            {
+                var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
+                dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
+                await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
+            }
         }
 
         public async Task GetTickerLogs()
@@ -121,6 +147,11 @@ namespace TradeMaster6000.Server.Hubs
         {
             await Task.Run(() => running.UpdateOrders());
             await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
+        }
+
+        public async Task GetRunningLogs()
+        {
+            await Clients.Caller.SendAsync("ReceiveRunningLogs", running.GetLogs());
         }
 
         public async Task GetLogs(int orderId)

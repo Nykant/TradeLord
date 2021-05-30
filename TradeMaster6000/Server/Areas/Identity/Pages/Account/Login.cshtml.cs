@@ -61,8 +61,8 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
 
         public async Task OnGetAsync(string returnUrl = null)
         {
-            //var seedData = new SeedData(_userManager);
-            //seedData.EnsureSeedData();
+            var seedData = new SeedData(_userManager);
+            seedData.EnsureSeedData();
 
             if (!string.IsNullOrEmpty(ErrorMessage))
             {

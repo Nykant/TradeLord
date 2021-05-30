@@ -42,6 +42,19 @@
                 </RadzenDataGrid>
             </div>
         </div>
+        <hr />
+        <div class="row">
+            <div class="col-xl-12">
+                <RadzenDataGrid @ref="logsGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                                Data="@logs" TItem="SomeLog">
+                    <Columns>
+                        <RadzenDataGridColumn Width="300px" TItem="SomeLog" Property="Log" Title="Message" />
+                        <RadzenDataGridColumn Width="100px" TItem="SomeLog" Property="LogType" Title="Type" />
+                        <RadzenDataGridColumn Width="200px" TItem="SomeLog" Property="Timestamp" Title="Timestamp" />
+                    </Columns>
+                </RadzenDataGrid>
+            </div>
+        </div>
     }
     else
     {
@@ -51,12 +64,12 @@
     }
 }
 
-
 @code {
     RadzenDataGrid<TradeOrder> ordersGrid;
+    RadzenDataGrid<SomeLog> logsGrid;
     private HubConnection hubConnection;
     private IEnumerable<TradeOrder> orders = new List<TradeOrder>();
-    private TradeOrder tradeOrder = new TradeOrder();
+    private IEnumerable<SomeLog> logs = new List<SomeLog>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,13 +84,29 @@
             StateHasChanged();
         });
 
+        hubConnection.On<List<SomeLog>>("ReceiveRunningLogs", (list) =>
+        {
+            logs = list;
+            logs = logs.Reverse();
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
 
-        await Task.Run(()=>GetOrders()).ConfigureAwait(false);
+        Parallel.Invoke(() => Task.Run(() => GetOrders()).ConfigureAwait(false), () => Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
     }
     private void GoToOrder(int id)
     {
         NavigationManager.NavigateTo($"/OrderDetails/{id}");
+    }
+
+    private async Task GetRunningLogs()
+    {
+        while (IsConnected)
+        {
+            await hubConnection.SendAsync("GetRunningLogs");
+            await Task.Delay(1000);
+        }
     }
 
     private async Task GetOrders()

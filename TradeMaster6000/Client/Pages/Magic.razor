@@ -1,0 +1,46 @@
+﻿@page "/magic"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
+@using TradeMaster6000.Shared
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+@{
+
+    if (IsConnected)
+    {
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartMagic" Text="Start magic" />
+    }
+    else
+    {
+        <h3>Connecting...</h3>
+    }
+}
+
+@code {
+    private HubConnection hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
+        .Build();
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task StartMagic()
+    {
+        await hubConnection.SendAsync("StartMagic");
+    }
+
+    public bool IsConnected =>
+hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
+}

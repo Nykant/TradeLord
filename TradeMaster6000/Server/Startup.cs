@@ -90,6 +90,7 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ICandleDbHelper, CandleDbHelper>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
+            services.TryAddSingleton<ITickDbHelper, TickDbHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
             //-------------------
             services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
@@ -101,6 +102,8 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ITickerService, TickerService>();
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
             services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
+
+
             //-------------------
 
             services.AddSignalR(options =>

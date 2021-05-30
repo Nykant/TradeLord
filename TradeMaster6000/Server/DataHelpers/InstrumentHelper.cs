@@ -35,14 +35,14 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = ContextFactory.CreateDbContext())
             {
-                foreach (var instrument in list)
+                if (!context.TradeInstruments.Any())
                 {
-                    if(context.TradeInstruments.FirstOrDefault(x => x.TradingSymbol == instrument.TradingSymbol) == default)
+                    foreach (var instrument in list)
                     {
                         context.TradeInstruments.Add(instrument);
                     }
+                    context.SaveChanges();
                 }
-                context.SaveChanges();
             }
         }
     }

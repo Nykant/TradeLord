@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210521131336_three")]
-    partial class three
+    [Migration("20210530203204_Sex")]
+    partial class Sex
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -18,6 +18,66 @@ namespace TradeMaster6000.Server.data.migrations.trade
             modelBuilder
                 .HasAnnotation("Relational:MaxIdentifierLength", 64)
                 .HasAnnotation("ProductVersion", "5.0.6");
+
+            modelBuilder.Entity("TradeMaster6000.Shared.Candle", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Close")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("From")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("High")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("Kill")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Low")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal>("Open")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("To")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int?>("TradeInstrumentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TradeInstrumentId");
+
+                    b.ToTable("Candles");
+                });
+
+            modelBuilder.Entity("TradeMaster6000.Shared.MyTick", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndTime")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<uint>("InstrumentToken")
+                        .HasColumnType("int unsigned");
+
+                    b.Property<decimal>("LTP")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Ticks");
+                });
 
             modelBuilder.Entity("TradeMaster6000.Shared.TradeInstrument", b =>
                 {
@@ -106,7 +166,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<string>("SLMStatus")
                         .HasColumnType("longtext");
 
-                    b.Property<bool>("SlRejected")
+                    b.Property<bool>("SquaredOff")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<int>("Status")
@@ -143,6 +203,15 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.HasKey("Id");
 
                     b.ToTable("TradeOrders");
+                });
+
+            modelBuilder.Entity("TradeMaster6000.Shared.Candle", b =>
+                {
+                    b.HasOne("TradeMaster6000.Shared.TradeInstrument", "TradeInstrument")
+                        .WithMany()
+                        .HasForeignKey("TradeInstrumentId");
+
+                    b.Navigation("TradeInstrument");
                 });
 
             modelBuilder.Entity("TradeMaster6000.Shared.TradeLog", b =>

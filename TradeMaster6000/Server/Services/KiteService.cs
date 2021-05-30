@@ -12,8 +12,7 @@ namespace TradeMaster6000.Server.Services
     public class KiteService : IKiteService
     {
         Kite Kite { get; set; } = null;
-        string AccessToken { get; set; }
-        string RefreshToken { get; set; }
+        string AccessToken { get; set; } = null;
         readonly IProtectionService protectionService;
         readonly ITimeHelper timeHelper;
 
@@ -33,6 +32,7 @@ namespace TradeMaster6000.Server.Services
                     Kite.InvalidateAccessToken(GetAccessToken());
                 }
                 catch { }
+                AccessToken = null;
                 Kite = null;
             }
         }
@@ -57,14 +57,16 @@ namespace TradeMaster6000.Server.Services
         {
             return protectionService.UnprotectToken(AccessToken);
         }
-        public void SetRefreshToken(string refreshToken)
+        public bool IsKiteConnected()
         {
-            RefreshToken = protectionService.ProtectToken(refreshToken);
-        }
-        
-        public string GetRefreshToken()
-        {
-            return protectionService.UnprotectToken(RefreshToken);
+            if(AccessToken != null)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         public void SetKite(Kite kite)
@@ -75,7 +77,6 @@ namespace TradeMaster6000.Server.Services
         {
             return Kite;
         }
-
     }
 
     public interface IKiteService
@@ -84,8 +85,7 @@ namespace TradeMaster6000.Server.Services
         Kite GetKite();
         void SetAccessToken(string accessToken);
         string GetAccessToken();
-        void SetRefreshToken(string refreshToken);
-        string GetRefreshToken();
+        bool IsKiteConnected();
         void Invalidate();
     }
 }

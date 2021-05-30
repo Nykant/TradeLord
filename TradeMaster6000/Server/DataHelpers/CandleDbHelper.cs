@@ -42,11 +42,26 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
+        public Task Flush()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                foreach (var candle in context.Candles)
+                {
+                    if (DateTime.Compare(candle.Kill, DateTime.Now) < 0)
+                    {
+                        context.Remove(candle);
+                    }
+                }
+            }
+            return Task.FromResult(0);
+        }
     }
     public interface ICandleDbHelper
     {
         Task AddCandle(Candle candle);
         Task<List<Candle>> GetCandles();
         Task<List<Candle>> GetCandles(uint instrumentToken);
+        Task Flush();
     }
 }

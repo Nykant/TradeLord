@@ -13,6 +13,7 @@ namespace TradeMaster6000.Shared
     }
     public enum LogType
     {
+        Notification,
         Exception,
         RunningOrder,
         Order,

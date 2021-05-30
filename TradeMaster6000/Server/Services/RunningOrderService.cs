@@ -73,6 +73,11 @@ namespace TradeMaster6000.Server.Services
             });
         }
 
+        public List<SomeLog> GetLogs()
+        {
+            return RunningLogs.ToList();
+        }
+
         public List<TradeOrder> Get()
         {
             List<TradeOrder> orders = new();
@@ -89,5 +94,6 @@ namespace TradeMaster6000.Server.Services
         void Remove(int id);
         List<TradeOrder> Get();
         Task UpdateOrders();
+        List<SomeLog> GetLogs();
     }
 }

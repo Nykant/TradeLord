@@ -58,16 +58,6 @@ namespace TradeMaster6000.Server.Tasks
         {
             await Initialize(order);
 
-            // wait untill we get a tick
-            while (TickService.LastTick(TradeOrder.Instrument.Token).LastPrice == 0)
-            {
-                if (token.IsCancellationRequested)
-                {
-                    goto Stopping;
-                }
-                Thread.Sleep(500);
-            }
-
             TradeOrder.EntryId = await TradeHelper.PlaceEntry(TradeOrder);
             if (TradeOrder.EntryId == null)
             {

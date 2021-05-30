@@ -2,9 +2,9 @@
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 
-namespace TradeMaster6000.Server.data.migrations.app
+namespace TradeMaster6000.Server.data.migrations.identity
 {
-    public partial class init : Migration
+    public partial class Sex : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
