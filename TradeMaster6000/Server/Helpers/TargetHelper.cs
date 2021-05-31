@@ -48,15 +48,15 @@ namespace TradeMaster6000.Server.Helpers
                 return null;
             }
         }
-        public async Task Update(TradeOrder order, Order entryO)
+        public async Task Update(TradeOrder order, Order entry)
         {
             var kite = kiteService.GetKite();
             kite.ModifyOrder(
                 order.TargetId,
-                Quantity: entryO.FilledQuantity.ToString()
+                Quantity: entry.FilledQuantity.ToString()
             );
 
-            await LogHelper.AddLog(order.Id, $"target modified quantity = {entryO.FilledQuantity}...").ConfigureAwait(false);
+            await LogHelper.AddLog(order.Id, $"target modified quantity = {entry.FilledQuantity}...").ConfigureAwait(false);
         }
     }
     public interface ITargetHelper

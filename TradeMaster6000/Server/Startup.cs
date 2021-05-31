@@ -51,7 +51,7 @@ namespace TradeMaster6000.Server
             string tradeConnection = Configuration.GetConnectionString("TradeConnection");
 
             services.AddDbContext<MyKeysContext>(options =>
-                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection)));
+                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection), (x)=> { x.EnableRetryOnFailure(20); }));
 
             if (Environment.IsDevelopment())
             {

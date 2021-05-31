@@ -29,7 +29,6 @@ namespace TradeMaster6000.Server.Services
         private Ticker Ticker { get; set; }
         private ConcurrentDictionary<string, Order> OrderUpdates { get; set; }
         private ConcurrentDictionary<uint, Tick> Ticks { get; set; }
-        private ConcurrentDictionary<uint, List<Tick>> TicksDic { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private bool CandlesRunning { get; set; }
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper)
@@ -43,7 +42,6 @@ namespace TradeMaster6000.Server.Services
             TickerLogs = new ();
             Ticks = new ();
             OrderUpdates = new ();
-            TicksDic = new();
         }
 
         public void Start()
@@ -72,45 +70,46 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        public void StartCandles()
+        public async Task StartCandles()
         {
             if (!CandlesRunning)
             {
-                RunCandles().ConfigureAwait(false);
+                await Task.Run(async()=> await RunCandles()).ConfigureAwait(false);
             }
         }
 
         public async Task RunCandles()
         {
             CandlesRunning = true;
+            await candleHelper.Flush();
 
-            await Task.Run(() =>
+            while (!timeHelper.IsPreMarketOpen())
             {
-                candleHelper.Flush();
-            }).ConfigureAwait(false);
+                Thread.Sleep(10000);
+            }
 
-            //while (!await timeHelper.IsMarketOpen())
-            //{
-            //    await Task.Delay(1000);
-            //}
+            while (!timeHelper.IsMarketOpen())
+            {
+                Thread.Sleep(1000);
+            }
 
-            //while(!await tickDbHelper.Any())
-            //{
-            //    await Task.Delay(1000);
-            //}
+            while (!await tickDbHelper.Any())
+            {
+                Thread.Sleep(1000);
+            }
 
             Parallel.Invoke(
-                () => Task.Run(() => AnalyzeCandles()).ConfigureAwait(false),
-                () => Task.Run(async () =>
+                async () => await AnalyzeCandles(),
+                async () => await Task.Run(async () =>
+                {
+                    while (timeHelper.IsMarketEnded())
                     {
-                        while (!await timeHelper.IsMarketEnded())
-                        {
-                            await tickDbHelper.Flush();
-                            await Task.Delay(70000);
-                        }
-                        CandlesRunning = false;
-                    })
-                );
+                        await tickDbHelper.Flush();
+                        await Task.Delay(70000);
+                    }
+                    CandlesRunning = false;
+                }).ConfigureAwait(false)
+            );
         }
 
         public async Task AnalyzeCandles()
@@ -121,7 +120,7 @@ namespace TradeMaster6000.Server.Services
                 try
                 {
                     Subscribe(instrument.Token);
-                    await Task.Run(() => Analyze(instrument).ConfigureAwait(false)).ConfigureAwait(false);
+                    await Task.Run(async() => await Analyze(instrument)).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
@@ -139,7 +138,7 @@ namespace TradeMaster6000.Server.Services
         public async Task Analyze(TradeInstrument instrument)
         {
             AddLog($"analysing: {instrument.Token}...", LogType.Notification);
-            while (!await timeHelper.IsMarketEnded())
+            while (timeHelper.IsMarketEnded())
             {
                 var candle = new Candle() { TradeInstrument = instrument, From = DateTime.Now, Kill = DateTime.Now.AddDays(1) };
                 await Task.Delay(59500);
@@ -173,45 +172,27 @@ namespace TradeMaster6000.Server.Services
 
         public Tick LastTick(uint token)
         {
-            foreach(var tick in Ticks.Reverse())
-            {
-                if (tick.Key == token)
-                {
-                    return tick.Value;
-                }
-            }
-
-            return new Tick();
+            return Ticks.Reverse().FirstOrDefault(x => x.Key == token).Value;
         }
 
         public Order GetOrder(string id)
         {
-            foreach(var update in OrderUpdates.Reverse())
+            var update = OrderUpdates.Reverse().FirstOrDefault(x => x.Key == id).Value;
+            if(update.OrderId != default)
             {
-                if (update.Key == id)
-                {
-                    return update.Value;
-                }
+                return update;
             }
 
             try
             {
                 var order = kiteService.GetKite().GetOrderHistory(id)[^1];
-                return OrderUpdates.AddOrUpdate(id, order, (x, y) =>
-                {
-                    if (y.FilledQuantity <= order.FilledQuantity)
-                    {
-                        return order;
-                    }
-                    else
-                    {
-                        return y;
-                    }
-                });
+                return OrderUpdates.AddOrUpdate(id, order, (x, y) => order);
             }
-            catch (Exception e) { AddLog(e.Message, LogType.Exception); };
-
-            return new Order();
+            catch (Exception e) 
+            { 
+                AddLog(e.Message, LogType.Exception); 
+                return default; 
+            };
         }
 
         public List<SomeLog> GetSomeLogs()
@@ -250,14 +231,18 @@ namespace TradeMaster6000.Server.Services
         // events
         private void OnTick(Tick tickData)
         {
-            Parallel.Invoke(
-                () => Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData),
-                () => tickDbHelper.Add(
-                    new MyTick { 
-                        InstrumentToken = tickData.InstrumentToken, 
-                        LTP = tickData.LastPrice, 
-                        StartTime = DateTime.Now,
-                        EndTime = DateTime.Now.AddMinutes(1)}));
+            Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData);
+            //        Parallel.Invoke(
+            //            () => Task.Run(() =>).ConfigureAwait(false));
+
+            //        () => Task.Run(() => tickDbHelper.Add(
+            //new MyTick
+            //{
+            //    InstrumentToken = tickData.InstrumentToken,
+            //    LTP = tickData.LastPrice,
+            //    StartTime = DateTime.Now,
+            //    EndTime = DateTime.Now.AddMinutes(1)
+            //})).ConfigureAwait(false)
         }
 
         private void OnOrderUpdate(Order orderData)
@@ -307,7 +292,7 @@ namespace TradeMaster6000.Server.Services
         void Subscribe(uint token);
         void UnSubscribe(uint token);
         void Start();
-        void StartCandles();
+        Task StartCandles();
         void Stop();
         List<SomeLog> GetSomeLogs();
         void SetTicker(Ticker ticker);

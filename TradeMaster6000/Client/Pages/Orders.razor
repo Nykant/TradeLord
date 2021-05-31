@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using Microsoft.AspNetCore.SignalR.Client
 @using TradeMaster6000.Shared
+@using System.Threading;
 @inject NavigationManager NavigationManager
 @inject ILogger<Orders> Logger
 @implements IAsyncDisposable
@@ -10,7 +11,7 @@
 
 @{
 
-    if (IsConnected)
+if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
 
@@ -93,7 +94,9 @@
 
         await hubConnection.StartAsync();
 
-        Parallel.Invoke(() => Task.Run(() => GetOrders()).ConfigureAwait(false), () => Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
+        Parallel.Invoke(
+            async() => await Task.Run(() => GetOrders()).ConfigureAwait(false),
+            async() => await Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
     }
     private void GoToOrder(int id)
     {
@@ -105,7 +108,7 @@
         while (IsConnected)
         {
             await hubConnection.SendAsync("GetRunningLogs");
-            await Task.Delay(1000);
+            await Task.Delay(2000);
         }
     }
 
@@ -114,7 +117,7 @@
         while (IsConnected)
         {
             await hubConnection.SendAsync("GetOrders");
-            await Task.Delay(1000);
+            await Task.Delay(2000);
         }
     }
 

@@ -58,79 +58,86 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
-        public async Task<bool> IsMarketEnding()
+        public bool IsPreMarketOpen()
         {
-            return await Task.Run(() =>
+            if (Env.IsDevelopment())
             {
-                if (Env.IsDevelopment())
+                // check time once in a while, to figure out if it is time to wake up and go to work.
+                DateTime GST = DateTime.Now;
+                DateTime IST = GST.AddHours(3).AddMinutes(30);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 00, 00);
+                DateTime closing = opening.AddHours(6).AddMinutes(30);
+                // if clock is 9 its time to get up and start the day!
+                if (DateTime.Compare(IST, opening) >= 0)
                 {
-                    DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                    if (IST.Hour == 15 && IST.Minute == 00)
+                    if (DateTime.Compare(IST, closing) < 0)
                     {
                         return true;
                     }
-                    return false;
                 }
-                else
+                return false;
+            }
+            else
+            {
+                // check time once in a while, to figure out if it is time to wake up and go to work.
+                DateTime GST = DateTime.Now;
+                DateTime IST = GST.AddHours(5).AddMinutes(30);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 00, 00);
+                DateTime closing = opening.AddHours(6).AddMinutes(30);
+                // if clock is 9 its time to get up and start the day!
+                if (DateTime.Compare(IST, opening) >= 0)
                 {
-                    DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                    if (IST.Hour == 15 && IST.Minute == 00)
+                    if (DateTime.Compare(IST, closing) < 0)
                     {
                         return true;
                     }
-                    return false;
                 }
-            });
+                return false;
+            }
         }
 
-        public async Task<bool> IsMarketEnded()
+        public bool IsMarketEnding()
         {
-            return await Task.Run(() =>
+            if (Env.IsDevelopment())
             {
-                if (Env.IsDevelopment())
+                DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
+                if (IST.Hour == 15 && IST.Minute == 00)
                 {
-                    DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                    if (IST.Hour == 15 && IST.Minute == 35)
-                    {
-                        return true;
-                    }
-                    return false;
+                    return true;
                 }
-                else
+                return false;
+            }
+            else
+            {
+                DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
+                if (IST.Hour == 15 && IST.Minute == 00)
                 {
-                    DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                    if (IST.Hour == 15 && IST.Minute == 35)
-                    {
-                        return true;
-                    }
-                    return false;
+                    return true;
                 }
-            });
+                return false;
+            }
         }
 
-        public async Task<bool> IsRefreshTime()
+        public bool IsMarketEnded()
         {
-            return await Task.Run(() =>
+            if (Env.IsDevelopment())
             {
-                if (Env.IsDevelopment())
+                DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
+                if (IST.Hour == 15 && IST.Minute == 35)
                 {
-                    DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                    if (IST.Hour == 5 && IST.Minute == 29)
-                    {
-                        return true;
-                    }
-                    return false;
+                    return true;
                 }
-                else
+                return false;
+            }
+            else
+            {
+                DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
+                if (IST.Hour == 15 && IST.Minute == 35)
                 {
-                    DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                    if (IST.Hour == 5 && IST.Minute == 29)
-                    {
-                        return true;
-                    }
-                    return false;
+                    return true;
                 }
-            });
+                return false;
+            }
         }
 
         public string GetCurrentVariety()
@@ -223,51 +230,74 @@ namespace TradeMaster6000.Server.Helpers
             }
 
         }
-        public async Task<bool> IsMarketOpen()
+        public bool IsMarketOpen()
         {
-            return await Task.Run(() =>
+            if (Env.IsDevelopment())
             {
-                if (Env.IsDevelopment())
+                DateTime GMT = DateTime.Now;
+                DateTime IST = GMT.AddHours(3).AddMinutes(30);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime closing = opening.AddHours(6).AddMinutes(15);
+                if (DateTime.Compare(IST, opening) >= 0)
                 {
-                    DateTime GMT = DateTime.Now;
-                    DateTime IST = GMT.AddHours(3).AddMinutes(30);
-                    DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
-                    DateTime closing = opening.AddHours(6).AddMinutes(15);
-                    if (DateTime.Compare(IST, opening) >= 0)
+                    if (DateTime.Compare(IST, closing) < 0)
                     {
-                        if (DateTime.Compare(IST, closing) < 0)
-                        {
-                            return true;
-                        }
+                        return true;
                     }
-                    return false;
                 }
-                else
+                return false;
+            }
+            else
+            {
+                DateTime GMT = DateTime.Now;
+                DateTime IST = GMT.AddHours(5).AddMinutes(30);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime closing = opening.AddHours(6).AddMinutes(15);
+                if (DateTime.Compare(IST, opening) >= 0)
                 {
-                    DateTime GMT = DateTime.Now;
-                    DateTime IST = GMT.AddHours(5).AddMinutes(30);
-                    DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
-                    DateTime closing = opening.AddHours(6).AddMinutes(15);
-                    if (DateTime.Compare(IST, opening) >= 0)
+                    if (DateTime.Compare(IST, closing) < 0)
                     {
-                        if (DateTime.Compare(IST, closing) < 0)
-                        {
-                            return true;
-                        }
+                        return true;
                     }
-                    return false;
                 }
-            });
+                return false;
+            }
+        }
+
+        public bool IsRefreshTime()
+        {
+
+            if (Env.IsDevelopment())
+            {
+                DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
+                if (IST.Hour == 5 && IST.Minute == 29)
+                {
+                    return true;
+                }
+                return false;
+            }
+            else
+            {
+                DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
+                if (IST.Hour == 5 && IST.Minute == 29)
+                {
+                    return true;
+                }
+                return false;
+            }
+
         }
     }
     public interface ITimeHelper
     {
         Task<bool> IsPreMarketOpen(int orderId);
         Task<bool> IsMarketOpen(int orderId);
-        Task<bool> IsMarketOpen();
+        bool IsPreMarketOpen();
+        bool IsMarketOpen();
         string GetCurrentVariety();
-        Task<bool> IsRefreshTime();
-        Task<bool> IsMarketEnding();
-        Task<bool> IsMarketEnded();
+        bool IsMarketEnding();
+        bool IsMarketEnded();
+        bool IsRefreshTime();
+
     }
 }
