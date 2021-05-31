@@ -96,6 +96,124 @@ namespace TradeMaster6000.Server.Hubs
             Ending:;
         }
 
+        public async Task AutoOrders()
+        {
+            if (!KiteService.IsKiteConnected())
+            {
+                goto Ending;
+            }
+
+            var kite = KiteService.GetKite();
+            var orders = new List<TradeOrder>();
+            var instruments = await instrumentHelper.GetTradeInstruments();
+            Random random = new Random();
+
+            for (int i = 0; i < 5; i++)
+            {
+                TradeOrder order = new TradeOrder();
+                int rng = random.Next(0, instruments.Count - 1);
+                order.Instrument = instruments[rng];
+                var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
+                order = MakeOrder(i, order, ltp);
+                orders.Add(order);
+            }
+
+            foreach(var order in orders)
+            {
+                var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
+                order.Id = tradeorder.Id;
+                running.Add(order);
+            }
+
+            tickerService.Start();
+
+            foreach(var order in orders)
+            {
+                await Task.Run(async () =>
+                {
+                    tickerService.Subscribe(order.Instrument.Token);
+                    OrderWork orderWork = new(serviceProvider);
+
+                    try
+                    {
+                        await orderWork.StartWork(order, order.TokenSource.Token);
+                        tickerService.UnSubscribe(order.Instrument.Token);
+                        running.Remove(order.Id);
+                        if (running.Get().Count == 0)
+                        {
+                            tickerService.Stop();
+                        }
+                        await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
+                    }
+                    catch (Exception e)
+                    {
+                        await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false);
+                        try
+                        {
+                            running.Remove(order.Id);
+                        }
+                        catch { }
+                    }
+                }).ConfigureAwait(false);
+            }
+
+            Ending:;
+        }
+
+        private TradeOrder MakeOrder(int i, TradeOrder order, decimal ltp)
+        {
+            switch (i)
+            {
+                case 0:
+                    order.Entry = ltp + 1;
+                    order.StopLoss = ltp - 3;
+                    order.Risk = 4;
+                    order.RxR = 2;
+                    order.TransactionType = TransactionType.BUY;
+                    order.TradingSymbol = order.Instrument.TradingSymbol;
+                    order.TokenSource = new CancellationTokenSource();
+                    return order;
+                case 1:
+                    order.Entry = ltp - 1;
+                    order.StopLoss = ltp - 4;
+                    order.Risk = 3;
+                    order.RxR = 2;
+                    order.TransactionType = TransactionType.BUY;
+                    order.TradingSymbol = order.Instrument.TradingSymbol;
+                    order.TokenSource = new CancellationTokenSource();
+                    return order;
+                case 2:
+                    order.Entry = ltp - 6;
+                    order.StopLoss = ltp - 2;
+                    order.Risk = 4;
+                    order.RxR = 2;
+                    order.TransactionType = TransactionType.SELL;
+                    order.TradingSymbol = order.Instrument.TradingSymbol;
+                    order.TokenSource = new CancellationTokenSource();
+                    return order;
+                case 3:
+                    order.Entry = ltp + 6;
+                    order.StopLoss = ltp + 2;
+                    order.Risk = 4;
+                    order.RxR = 2;
+                    order.TransactionType = TransactionType.BUY;
+                    order.TradingSymbol = order.Instrument.TradingSymbol;
+                    order.TokenSource = new CancellationTokenSource();
+                    return order;
+                case 4:
+                    order.Entry = ltp - 1;
+                    order.StopLoss = ltp + 3;
+                    order.Risk = 4;
+                    order.RxR = 2;
+                    order.TransactionType = TransactionType.SELL;
+                    order.TradingSymbol = order.Instrument.TradingSymbol;
+                    order.TokenSource = new CancellationTokenSource();
+                    return order;
+                default:
+                    return default;
+            }
+        }
+
         public async Task StartMagic()
         {
             tickerService.Start();

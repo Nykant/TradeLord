@@ -11,9 +11,10 @@
 
 @{
 
-if (IsConnected)
+    if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => AutoOrders()) Text="5 Auto Orders" />
 
         <hr />
 
@@ -95,8 +96,8 @@ if (IsConnected)
         await hubConnection.StartAsync();
 
         Parallel.Invoke(
-            async() => await Task.Run(() => GetOrders()).ConfigureAwait(false),
-            async() => await Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
+            async () => await Task.Run(() => GetOrders()).ConfigureAwait(false),
+            async () => await Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
     }
     private void GoToOrder(int id)
     {
@@ -124,6 +125,11 @@ if (IsConnected)
     private void NewOrder()
     {
         NavigationManager.NavigateTo("/createorder");
+    }
+
+    private async Task AutoOrders()
+    {
+        await hubConnection.SendAsync("AutoOrders");
     }
 
     private async Task StopOrder(int id)
