@@ -43,7 +43,6 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StartOrderWork(TradeOrder order)
         {
-            OrderWork orderWork = new (serviceProvider);
             order.TokenSource = new CancellationTokenSource();
 
             foreach (var instrument in await instrumentHelper.GetTradeInstruments())
@@ -70,28 +69,8 @@ namespace TradeMaster6000.Server.Hubs
             }
 
             tickerService.Start();
-            tickerService.Subscribe(order.Instrument.Token);
 
-            try
-            {
-                await Task.Run(async()=> await orderWork.StartWork(order, order.TokenSource.Token));
-                tickerService.UnSubscribe(order.Instrument.Token);
-                running.Remove(order.Id);
-                if (running.Get().Count == 0)
-                {
-                    tickerService.Stop();
-                }
-                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false);
-                try
-                {
-                    running.Remove(order.Id);
-                }
-                catch { }
-            }
+            await Task.Factory.StartNew(async() => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
 
             Ending:;
         }
@@ -127,26 +106,23 @@ namespace TradeMaster6000.Server.Hubs
 
             tickerService.Start();
 
-            Parallel.Invoke(
-                () => RunOrder(orders[0]),
-                () => RunOrder(orders[1]),
-                () => RunOrder(orders[2]),
-                () => RunOrder(orders[3]),
-                () => RunOrder(orders[4])
-            );
-            
+            await Task.Factory.StartNew(async () => await RunOrder(orders[0]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[1]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[2]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[3]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[4]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
 
             Ending:;
         }
 
-        private async void RunOrder(TradeOrder order)
+        private async Task RunOrder(TradeOrder order)
         {
             tickerService.Subscribe(order.Instrument.Token);
             OrderWork orderWork = new(serviceProvider);
 
             try
             {
-                await Task.Run(()=>orderWork.StartWork(order, order.TokenSource.Token));
+                await Task.Factory.StartNew(async () => await orderWork.StartWork(order, order.TokenSource.Token), TaskCreationOptions.LongRunning);
                 tickerService.UnSubscribe(order.Instrument.Token);
                 running.Remove(order.Id);
                 if (running.Get().Count == 0)
