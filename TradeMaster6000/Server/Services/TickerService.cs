@@ -62,11 +62,11 @@ namespace TradeMaster6000.Server.Services
                 Ticker.EnableReconnect(Interval: 5, Retries: 50);
                 Ticker.Connect();
 
-                await Task.Run(()=> StartFlushing()).ConfigureAwait(false);
+                await Task.Factory.StartNew(async()=> await StartFlushing(), TaskCreationOptions.LongRunning).ConfigureAwait(false);
             }
         }
 
-        public async void StartFlushing()
+        public async Task StartFlushing()
         {
             while(Ticker != null)
             {
@@ -79,7 +79,7 @@ namespace TradeMaster6000.Server.Services
         {
             if (!CandlesRunning)
             {
-                await Task.Run(async()=> await RunCandles()).ConfigureAwait(false);
+                await Task.Factory.StartNew(async()=> await RunCandles(), TaskCreationOptions.LongRunning).ConfigureAwait(false);
             }
         }
 
@@ -103,18 +103,7 @@ namespace TradeMaster6000.Server.Services
                 Thread.Sleep(1000);
             }
 
-            Parallel.Invoke(
-                async () => await AnalyzeCandles(),
-                async () => await Task.Run(async () =>
-                {
-                    while (timeHelper.IsMarketEnded())
-                    {
-                        await tickDbHelper.Flush();
-                        await Task.Delay(70000);
-                    }
-                    CandlesRunning = false;
-                }).ConfigureAwait(false)
-            );
+            await Task.Run(async()=> await AnalyzeCandles());
         }
 
         public async Task AnalyzeCandles()
@@ -125,14 +114,14 @@ namespace TradeMaster6000.Server.Services
                 try
                 {
                     Subscribe(instrument.Token);
-                    await Task.Run(async() => await Analyze(instrument)).ConfigureAwait(false);
+                    await Task.Factory.StartNew(async() => await Analyze(instrument), TaskCreationOptions.LongRunning).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
                     AddLog($"{e.Message}...", LogType.Exception);
                 }
 
-                if (i > 50)
+                if (i > 10)
                 {
                     break;
                 }
@@ -168,6 +157,7 @@ namespace TradeMaster6000.Server.Services
 
                 await candleHelper.AddCandle(candle).ConfigureAwait(false);
             }
+            CandlesRunning = false;
         }
 
         public void SetTicker(Ticker ticker)
@@ -232,28 +222,28 @@ namespace TradeMaster6000.Server.Services
         private async void OnTick(Tick tickData)
         {
             //Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData);
-            if (!Candles.ContainsKey(tickData.InstrumentToken))
-            {
-                Candles.TryAdd(tickData.InstrumentToken,
-                    new Candle
-                    {
-                        InstrumentToken = tickData.InstrumentToken,
-                        From = DateTime.Now,
-                        Open = tickData.LastPrice,
-                        High = tickData.LastPrice,
-                        Low = tickData.LastPrice,
-                        
-                    });
-            }
-            //await tickDbHelper.Add(
-            //    new MyTick
-            //    {
-            //        InstrumentToken = tickData.InstrumentToken,
-            //        LTP = tickData.LastPrice,
-            //        StartTime = DateTime.Now,
-            //        EndTime = DateTime.Now.AddMinutes(1)
-            //    }
-            //).ConfigureAwait(false);
+            //if (!Candles.ContainsKey(tickData.InstrumentToken))
+            //{
+            //    Candles.TryAdd(tickData.InstrumentToken,
+            //        new Candle
+            //        {
+            //            InstrumentToken = tickData.InstrumentToken,
+            //            From = DateTime.Now,
+            //            Open = tickData.LastPrice,
+            //            High = tickData.LastPrice,
+            //            Low = tickData.LastPrice,
+
+            //        });
+            //}
+            await tickDbHelper.Add(
+                new MyTick
+                {
+                    InstrumentToken = tickData.InstrumentToken,
+                    LTP = tickData.LastPrice,
+                    StartTime = DateTime.Now,
+                    EndTime = DateTime.Now.AddMinutes(1)
+                }
+            ).ConfigureAwait(false);
         }
 
         private void OnOrderUpdate(Order orderData)

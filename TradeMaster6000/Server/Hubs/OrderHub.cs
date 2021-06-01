@@ -68,8 +68,7 @@ namespace TradeMaster6000.Server.Hubs
                 Thread.Sleep(2000);
             }
 
-            tickerService.Start();
-            tickerService.Subscribe(order.Instrument.Token);
+            await tickerService.Start();
 
             await Task.Factory.StartNew(async() => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
 
@@ -91,6 +90,7 @@ namespace TradeMaster6000.Server.Hubs
             for (int i = 0; i < 5; i++)
             {
                 TradeOrder order = new TradeOrder();
+                order.TokenSource = new CancellationTokenSource();
                 int rng = random.Next(0, instruments.Count - 1);
                 order.Instrument = instruments[rng];
                 var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
@@ -107,14 +107,11 @@ namespace TradeMaster6000.Server.Hubs
 
             await tickerService.Start();
 
-            Parallel.Invoke(
-                () => RunOrder(orders[0]),
-                () => RunOrder(orders[1]),
-                () => RunOrder(orders[2]),
-                () => RunOrder(orders[3]),
-                () => RunOrder(orders[4])
-            );
-            
+            await Task.Factory.StartNew(async () => await RunOrder(orders[0]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[1]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[2]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[3]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await Task.Factory.StartNew(async () => await RunOrder(orders[4]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
 
             Ending:;
         }
