@@ -15,13 +15,15 @@ namespace TradeMaster6000.Server.Helpers
         private ITradeLogHelper LogHelper { get; set; }
         private ITickerService TickService { get; set; }
         private ITimeHelper TimeHelper { get; set; }
+        private ITickDbHelper TickDbHelper { get; set; }
         private readonly IKiteService kiteService;
-        public TradeHelper(ITradeLogHelper tradeLogHelper, ITickerService tickService, IKiteService kiteService, ITimeHelper timeHelper)
+        public TradeHelper(ITradeLogHelper tradeLogHelper, ITickerService tickService, IKiteService kiteService, ITimeHelper timeHelper, ITickDbHelper tickDbHelper)
         {
             LogHelper = tradeLogHelper;
             TickService = tickService;
             TimeHelper = timeHelper;
             this.kiteService = kiteService;
+            TickDbHelper = tickDbHelper;
         }
 
         public async Task CancelEntry(TradeOrder order)
@@ -238,11 +240,11 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task<string> PlacePreSLM(TradeOrder order)
         {
-            var lastPrice = TickService.LastTick(order.Instrument.Token).LastPrice;
+            var ltp = (await TickDbHelper.GetLast(order.Instrument.Token)).LTP;
             if (order.ExitTransactionType == "SELL")
             {
                 // if last price is more than stop loss then place slm
-                if (lastPrice > order.StopLoss)
+                if (ltp > order.StopLoss)
                 {
                     try
                     {
@@ -286,7 +288,7 @@ namespace TradeMaster6000.Server.Helpers
             else
             {
                 // if last price is more than stop loss then place slm
-                if (lastPrice < order.StopLoss)
+                if (ltp < order.StopLoss)
                 {
                     try
                     {

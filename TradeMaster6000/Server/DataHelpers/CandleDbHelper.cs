@@ -29,7 +29,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.Where(x=>x.TradeInstrument.Token == instrumentToken).ToListAsync();
+                return await context.Candles.Where(x=>x.InstrumentToken == instrumentToken).ToListAsync();
             }
         }
 

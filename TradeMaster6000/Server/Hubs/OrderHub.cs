@@ -69,7 +69,7 @@ namespace TradeMaster6000.Server.Hubs
                 Thread.Sleep(2000);
             }
 
-            tickerService.Start();
+            await tickerService.Start();
             tickerService.Subscribe(order.Instrument.Token);
 
             try
@@ -125,7 +125,7 @@ namespace TradeMaster6000.Server.Hubs
                 running.Add(order);
             }
 
-            tickerService.Start();
+            await tickerService.Start();
 
             Parallel.Invoke(
                 () => RunOrder(orders[0]),
@@ -134,7 +134,6 @@ namespace TradeMaster6000.Server.Hubs
                 () => RunOrder(orders[3]),
                 () => RunOrder(orders[4])
             );
-            
 
             Ending:;
         }
@@ -222,7 +221,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StartMagic()
         {
-            tickerService.Start();
+            await tickerService.Start();
             await tickerService.StartCandles();
         }
 

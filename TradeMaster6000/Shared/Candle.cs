@@ -9,7 +9,7 @@ namespace TradeMaster6000.Shared
     {
         [Key]
         public int Id { get; set; }
-        public TradeInstrument TradeInstrument { get; set; }
+        public uint InstrumentToken { get; set; }
         public decimal Open { get; set; }
         public decimal High { get; set; }
         public decimal Low { get; set; }
