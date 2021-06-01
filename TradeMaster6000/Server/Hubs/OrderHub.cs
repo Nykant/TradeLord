@@ -69,6 +69,7 @@ namespace TradeMaster6000.Server.Hubs
             }
 
             tickerService.Start();
+            tickerService.Subscribe(order.Instrument.Token);
 
             await Task.Factory.StartNew(async() => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
 
@@ -104,13 +105,16 @@ namespace TradeMaster6000.Server.Hubs
                 running.Add(order);
             }
 
-            tickerService.Start();
+            await tickerService.Start();
 
-            await Task.Factory.StartNew(async () => await RunOrder(orders[0]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[1]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[2]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[3]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[4]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            Parallel.Invoke(
+                () => RunOrder(orders[0]),
+                () => RunOrder(orders[1]),
+                () => RunOrder(orders[2]),
+                () => RunOrder(orders[3]),
+                () => RunOrder(orders[4])
+            );
+            
 
             Ending:;
         }
@@ -198,7 +202,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StartMagic()
         {
-            tickerService.Start();
+            await tickerService.Start();
             await tickerService.StartCandles();
         }
 
