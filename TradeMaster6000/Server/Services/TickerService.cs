@@ -28,7 +28,7 @@ namespace TradeMaster6000.Server.Services
         private readonly ITickDbHelper tickDbHelper;
         private Ticker Ticker { get; set; }
         private ConcurrentDictionary<string, Order> OrderUpdates { get; set; }
-        private ConcurrentDictionary<uint, Tick> Ticks { get; set; }
+        private ConcurrentDictionary<uint, Candle> Candles { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private bool CandlesRunning { get; set; }
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper)
@@ -40,33 +40,38 @@ namespace TradeMaster6000.Server.Services
             this.candleHelper = candleHelper;
             this.tickDbHelper = tickDbHelper;
             TickerLogs = new ();
-            Ticks = new ();
+            Candles = new ();
             OrderUpdates = new ();
         }
 
-        public void Start()
+        public async Task Start()
         {
-            lock (startkey)
+            if (Ticker == null)
             {
-                if(Ticker == null)
-                {
-                    var accessToken = kiteService.GetAccessToken();
-                    // new ticker instance 
-                    Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
+                var accessToken = kiteService.GetAccessToken();
+                Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
 
-                    // ticker event handlers
-                    Ticker.OnTick += OnTick;
-                    Ticker.OnOrderUpdate += OnOrderUpdate;
-                    Ticker.OnNoReconnect += OnNoReconnect;
-                    Ticker.OnError += OnError;
-                    Ticker.OnReconnect += OnReconnect;
-                    Ticker.OnClose += OnClose;
-                    Ticker.OnConnect += OnConnect;
+                Ticker.OnTick += OnTick;
+                Ticker.OnOrderUpdate += OnOrderUpdate;
+                Ticker.OnNoReconnect += OnNoReconnect;
+                Ticker.OnError += OnError;
+                Ticker.OnReconnect += OnReconnect;
+                Ticker.OnClose += OnClose;
+                Ticker.OnConnect += OnConnect;
 
-                    // set ticker settings
-                    Ticker.EnableReconnect(Interval: 5, Retries: 50);
-                    Ticker.Connect();
-                }
+                Ticker.EnableReconnect(Interval: 5, Retries: 50);
+                Ticker.Connect();
+
+                await Task.Run(()=> StartFlushing()).ConfigureAwait(false);
+            }
+        }
+
+        public async void StartFlushing()
+        {
+            while(Ticker != null)
+            {
+                await tickDbHelper.Flush();
+                await Task.Delay(10000);
             }
         }
 
@@ -140,7 +145,7 @@ namespace TradeMaster6000.Server.Services
             AddLog($"analysing: {instrument.Token}...", LogType.Notification);
             while (timeHelper.IsMarketEnded())
             {
-                var candle = new Candle() { TradeInstrument = instrument, From = DateTime.Now, Kill = DateTime.Now.AddDays(1) };
+                var candle = new Candle() { InstrumentToken = instrument.Token, From = DateTime.Now, Kill = DateTime.Now.AddDays(1) };
                 await Task.Delay(59500);
                 var ticks = await tickDbHelper.Get(instrument.Token);
                 candle.To = DateTime.Now;
@@ -168,11 +173,6 @@ namespace TradeMaster6000.Server.Services
         public void SetTicker(Ticker ticker)
         {
             Ticker = ticker;
-        }
-
-        public Tick LastTick(uint token)
-        {
-            return Ticks.Reverse().FirstOrDefault(x => x.Key == token).Value;
         }
 
         public Order GetOrder(string id)
@@ -229,20 +229,31 @@ namespace TradeMaster6000.Server.Services
         }
 
         // events
-        private void OnTick(Tick tickData)
+        private async void OnTick(Tick tickData)
         {
-            Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData);
-            //        Parallel.Invoke(
-            //            () => Task.Run(() =>).ConfigureAwait(false));
-
-            //        () => Task.Run(() => tickDbHelper.Add(
-            //new MyTick
-            //{
-            //    InstrumentToken = tickData.InstrumentToken,
-            //    LTP = tickData.LastPrice,
-            //    StartTime = DateTime.Now,
-            //    EndTime = DateTime.Now.AddMinutes(1)
-            //})).ConfigureAwait(false)
+            //Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData);
+            if (!Candles.ContainsKey(tickData.InstrumentToken))
+            {
+                Candles.TryAdd(tickData.InstrumentToken,
+                    new Candle
+                    {
+                        InstrumentToken = tickData.InstrumentToken,
+                        From = DateTime.Now,
+                        Open = tickData.LastPrice,
+                        High = tickData.LastPrice,
+                        Low = tickData.LastPrice,
+                        
+                    });
+            }
+            //await tickDbHelper.Add(
+            //    new MyTick
+            //    {
+            //        InstrumentToken = tickData.InstrumentToken,
+            //        LTP = tickData.LastPrice,
+            //        StartTime = DateTime.Now,
+            //        EndTime = DateTime.Now.AddMinutes(1)
+            //    }
+            //).ConfigureAwait(false);
         }
 
         private void OnOrderUpdate(Order orderData)
@@ -288,10 +299,9 @@ namespace TradeMaster6000.Server.Services
     public interface ITickerService
     {
         Order GetOrder(string id);
-        Tick LastTick(uint token);
         void Subscribe(uint token);
         void UnSubscribe(uint token);
-        void Start();
+        Task Start();
         Task StartCandles();
         void Stop();
         List<SomeLog> GetSomeLogs();
