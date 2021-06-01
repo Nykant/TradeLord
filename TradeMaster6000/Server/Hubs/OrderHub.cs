@@ -127,37 +127,43 @@ namespace TradeMaster6000.Server.Hubs
 
             tickerService.Start();
 
-            foreach(var order in orders)
-            {
-                await Task.Run(async () =>
-                {
-                    tickerService.Subscribe(order.Instrument.Token);
-                    OrderWork orderWork = new(serviceProvider);
-
-                    try
-                    {
-                        await orderWork.StartWork(order, order.TokenSource.Token);
-                        tickerService.UnSubscribe(order.Instrument.Token);
-                        running.Remove(order.Id);
-                        if (running.Get().Count == 0)
-                        {
-                            tickerService.Stop();
-                        }
-                        await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
-                    }
-                    catch (Exception e)
-                    {
-                        await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false);
-                        try
-                        {
-                            running.Remove(order.Id);
-                        }
-                        catch { }
-                    }
-                }).ConfigureAwait(false);
-            }
+            Parallel.Invoke(
+                () => RunOrder(orders[0]),
+                () => RunOrder(orders[1]),
+                () => RunOrder(orders[2]),
+                () => RunOrder(orders[3]),
+                () => RunOrder(orders[4])
+            );
+            
 
             Ending:;
+        }
+
+        private async void RunOrder(TradeOrder order)
+        {
+            tickerService.Subscribe(order.Instrument.Token);
+            OrderWork orderWork = new(serviceProvider);
+
+            try
+            {
+                await Task.Run(()=>orderWork.StartWork(order, order.TokenSource.Token));
+                tickerService.UnSubscribe(order.Instrument.Token);
+                running.Remove(order.Id);
+                if (running.Get().Count == 0)
+                {
+                    tickerService.Stop();
+                }
+                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false);
+                try
+                {
+                    running.Remove(order.Id);
+                }
+                catch { }
+            }
         }
 
         private TradeOrder MakeOrder(int i, TradeOrder order, decimal ltp)
