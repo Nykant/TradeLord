@@ -19,6 +19,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Logging;
 using System;
 using System.Linq;
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using TradeMaster6000.Server.Data;
@@ -108,7 +109,12 @@ namespace TradeMaster6000.Server
 
             services.AddSignalR(options =>
             {
-                options.MaximumParallelInvocationsPerClient = 10;
+                options.MaximumParallelInvocationsPerClient = 50;
+                options.EnableDetailedErrors = true;
+                options.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
+                options.HandshakeTimeout = TimeSpan.FromMinutes(5);
+                options.MaximumReceiveMessageSize = 248;
+                options.StreamBufferCapacity = 50;
             });
 
             services.AddControllersWithViews();
@@ -123,8 +129,6 @@ namespace TradeMaster6000.Server
             services.Configure<ForwardedHeadersOptions>(options =>
             {
                 options.ForwardedHeaders = ForwardedHeaders.All;
-                options.KnownNetworks.Clear();
-                options.KnownProxies.Clear();
             });
 
             services.Configure<IdentityOptions>(options =>
@@ -187,10 +191,14 @@ namespace TradeMaster6000.Server
             {
                 app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
+                //app.UseHsts();
             }
 
+            app.UseCertificateForwarding();
             app.UseHttpsRedirection();
+            IdentityModelEventSource.ShowPII = true;
+
+            ServicePointManager.DefaultConnectionLimit = 50;
 
             app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();
