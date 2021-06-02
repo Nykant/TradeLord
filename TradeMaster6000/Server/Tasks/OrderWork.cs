@@ -56,6 +56,11 @@ namespace TradeMaster6000.Server.Tasks
         {
             await Initialize(order);
 
+            while(!await TickDbHelper.Exists(order.Instrument.Token))
+            {
+                await Task.Delay(500);
+            }
+
             TradeOrder.EntryId = await TradeHelper.PlaceEntry(TradeOrder);
             if (TradeOrder.EntryId == null)
             {

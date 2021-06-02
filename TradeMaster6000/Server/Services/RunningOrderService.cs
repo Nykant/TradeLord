@@ -53,8 +53,11 @@ namespace TradeMaster6000.Server.Services
                 try
                 {
                     Orders.TryGetValue(order.Id, out TradeOrder value);
-                    order.TokenSource = value.TokenSource;
-                    Orders.TryUpdate(order.Id, order, Orders[order.Id]);
+                    if(value != null)
+                    {
+                        order.TokenSource = value.TokenSource;
+                        Orders.TryUpdate(order.Id, order, Orders[order.Id]);
+                    }
                 }
                 catch (Exception e)
                 {

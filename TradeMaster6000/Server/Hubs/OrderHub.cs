@@ -90,7 +90,6 @@ namespace TradeMaster6000.Server.Hubs
             for (int i = 0; i < 5; i++)
             {
                 TradeOrder order = new TradeOrder();
-                order.TokenSource = new CancellationTokenSource();
                 int rng = random.Next(0, instruments.Count - 1);
                 order.Instrument = instruments[rng];
                 var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
@@ -118,12 +117,11 @@ namespace TradeMaster6000.Server.Hubs
 
         private async Task RunOrder(TradeOrder order)
         {
-            tickerService.Subscribe(order.Instrument.Token);
-            OrderWork orderWork = new(serviceProvider);
-
             try
             {
-                await Task.Factory.StartNew(async () => await orderWork.StartWork(order, order.TokenSource.Token), TaskCreationOptions.LongRunning);
+                tickerService.Subscribe(order.Instrument.Token);
+                OrderWork orderWork = new(serviceProvider);
+                await orderWork.StartWork(order, order.TokenSource.Token);
                 tickerService.UnSubscribe(order.Instrument.Token);
                 running.Remove(order.Id);
                 if (running.Get().Count == 0)

@@ -51,7 +51,7 @@ namespace TradeMaster6000.Server
             string tradeConnection = Configuration.GetConnectionString("TradeConnection");
 
             services.AddDbContext<MyKeysContext>(options =>
-                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection), (x)=> { x.EnableRetryOnFailure(20); }));
+                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection), (x)=> { x.EnableRetryOnFailure(5); }));
 
             if (Environment.IsDevelopment())
             {
@@ -69,10 +69,10 @@ namespace TradeMaster6000.Server
             }
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString), (x) => { x.EnableRetryOnFailure(5); }));
 
             services.AddDbContextFactory<TradeDbContext>(options =>
-                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection)));
+                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection), (x) => { x.EnableRetryOnFailure(5); }));
 
             services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
                 .AddEntityFrameworkStores<ApplicationDbContext>();

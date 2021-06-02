@@ -51,7 +51,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                if(await context.Ticks.FindAsync(token) != null)
+                if (await context.Ticks.FirstOrDefaultAsync(x => x.InstrumentToken == token) != default)
                 {
                     return true;
                 }
@@ -87,5 +87,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task Flush();
         Task<bool> Any();
         Task<MyTick> GetLast(uint token);
+        Task<bool> Exists(uint token);
     }
 }
