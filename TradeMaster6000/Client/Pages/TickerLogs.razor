@@ -48,16 +48,18 @@
 
         await hubConnection.StartAsync();
 
-        await Task.Run(() => GetTickerLogs()).ConfigureAwait(false);
+        await GetTickerLogs();
+        //await Task.Run(() => GetTickerLogs()).ConfigureAwait(false);
     }
 
     private async Task GetTickerLogs()
     {
-        while (IsConnected)
-        {
-            await hubConnection.SendAsync("GetTickerLogs");
-            await Task.Delay(1000);
-        }
+        await hubConnection.SendAsync("GetTickerLogs");
+        //while (IsConnected)
+        //{
+
+        //    await Task.Delay(1000);
+        //}
     }
 
     public bool IsConnected =>
