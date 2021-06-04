@@ -194,11 +194,10 @@ namespace TradeMaster6000.Server
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 //app.UseHsts();
             }
+            ServicePointManager.DefaultConnectionLimit = 50;
 
             app.UseCertificateForwarding();
             app.UseHttpsRedirection();
-
-            ServicePointManager.DefaultConnectionLimit = 50;
 
             app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();
@@ -206,7 +205,6 @@ namespace TradeMaster6000.Server
             app.UseRouting();
 
             app.UseIdentityServer();
-            IdentityModelEventSource.ShowPII = true;
             app.UseAuthentication();
             app.UseAuthorization();
 

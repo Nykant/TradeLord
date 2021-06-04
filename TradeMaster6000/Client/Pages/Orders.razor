@@ -95,9 +95,8 @@
 
         await hubConnection.StartAsync();
 
-        Parallel.Invoke(
-            async () => await Task.Run(() => GetOrders()).ConfigureAwait(false),
-            async () => await Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
+        await GetOrders();
+        await GetRunningLogs();
     }
     private void GoToOrder(int id)
     {
@@ -106,20 +105,22 @@
 
     private async Task GetRunningLogs()
     {
-        while (IsConnected)
-        {
-            await hubConnection.SendAsync("GetRunningLogs");
-            await Task.Delay(2000);
-        }
+        await hubConnection.SendAsync("GetRunningLogs");
+        //while (IsConnected)
+        //{
+
+        //    await Task.Delay(2000);
+        //}
     }
 
     private async Task GetOrders()
     {
-        while (IsConnected)
-        {
-            await hubConnection.SendAsync("GetOrders");
-            await Task.Delay(2000);
-        }
+        await hubConnection.SendAsync("GetOrders");
+        //while (IsConnected)
+        //{
+
+        //    await Task.Delay(2000);
+        //}
     }
 
     private void NewOrder()
