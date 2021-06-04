@@ -48,7 +48,7 @@ namespace TradeMaster6000.Server.Helpers
                 return null;
             }
         }
-        public async Task Update(TradeOrder order, Order entry)
+        public async Task Update(TradeOrder order, OrderUpdate entry)
         {
             var kite = kiteService.GetKite();
             kite.ModifyOrder(
@@ -62,6 +62,6 @@ namespace TradeMaster6000.Server.Helpers
     public interface ITargetHelper
     {
         Task<string> PlaceOrder(TradeOrder order);
-        Task Update(TradeOrder order, Order entryO);
+        Task Update(TradeOrder order, OrderUpdate entryO);
     }
 }

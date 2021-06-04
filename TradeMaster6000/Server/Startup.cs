@@ -91,6 +91,7 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ICandleDbHelper, CandleDbHelper>();
             services.TryAddSingleton<IInstrumentService, InstrumentService>();
             services.TryAddSingleton<ITradeOrderHelper, TradeOrderHelper>();
+            services.TryAddSingleton<IOrderUpdatesDbHelper, OrderUpdatesDbHelper>();
             services.TryAddSingleton<ITickDbHelper, TickDbHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
             //-------------------
@@ -103,7 +104,7 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ITickerService, TickerService>();
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
             services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
-
+            services.TryAddSingleton<IOrderManagerService, OrderManagerService>();
 
             //-------------------
 
@@ -113,7 +114,7 @@ namespace TradeMaster6000.Server
                 options.EnableDetailedErrors = true;
                 options.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 options.HandshakeTimeout = TimeSpan.FromMinutes(5);
-                options.MaximumReceiveMessageSize = 248;
+                options.MaximumReceiveMessageSize = null;
                 options.StreamBufferCapacity = 50;
             });
 
@@ -193,12 +194,10 @@ namespace TradeMaster6000.Server
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 //app.UseHsts();
             }
+            ServicePointManager.DefaultConnectionLimit = 50;
 
             app.UseCertificateForwarding();
             app.UseHttpsRedirection();
-            IdentityModelEventSource.ShowPII = true;
-
-            ServicePointManager.DefaultConnectionLimit = 50;
 
             app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();

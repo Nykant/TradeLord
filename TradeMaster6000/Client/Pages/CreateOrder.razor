@@ -127,7 +127,7 @@
 
     private async Task FormSubmit(EditContext editContext)
     {
-        await hubConnection.SendAsync("StartOrderWork", (TradeOrder)editContext.Model);
+        await hubConnection.SendAsync("NewOrder", (TradeOrder)editContext.Model);
         NavigationManager.NavigateTo("/orders");
     }
 

@@ -29,13 +29,13 @@ namespace TradeMaster6000.Server.Helpers
         public async Task CancelEntry(TradeOrder order)
         {
             var variety = TimeHelper.GetCurrentVariety();
-            Order entry;
+            OrderUpdate entry;
 
             Stopwatch stopwatch = new ();
             stopwatch.Start();
             while (true) 
             {
-                entry = TickService.GetOrder(order.EntryId);
+                entry = await TickService.GetOrder(order.EntryId);
                 if (entry.Status == "COMPLETE" || entry.Status == "REJECTED")
                 {
                     break;
@@ -69,13 +69,13 @@ namespace TradeMaster6000.Server.Helpers
             if (!order.PreSLMCancelled)
             {
                 var variety = TimeHelper.GetCurrentVariety();
-                Order slm;
+                OrderUpdate slm;
 
                 Stopwatch stopwatch = new ();
                 stopwatch.Start();
                 while (true)
                 {
-                    slm = TickService.GetOrder(order.SLMId);
+                    slm = await TickService.GetOrder(order.SLMId);
                     if(slm.Status == "COMPLETE" || slm.Status == "REJECTED")
                     {
                         break;
@@ -106,13 +106,13 @@ namespace TradeMaster6000.Server.Helpers
             else if (order.RegularSlmPlaced)
             {
                 var variety = TimeHelper.GetCurrentVariety();
-                Order slm;
+                OrderUpdate slm;
 
                 Stopwatch stopwatch = new ();
                 stopwatch.Start();
                 while (true)
                 {
-                    slm = TickService.GetOrder(order.SLMId);
+                    slm = await TickService.GetOrder(order.SLMId);
                     if (slm.Status == "COMPLETE" || slm.Status == "REJECTED")
                     {
                         break;
@@ -145,14 +145,14 @@ namespace TradeMaster6000.Server.Helpers
         {
             if (order.TargetPlaced)
             {
-                Order targetO;
+                OrderUpdate targetO;
                 var variety = TimeHelper.GetCurrentVariety();
 
                 Stopwatch stopwatch = new ();
                 stopwatch.Start();
                 while (true)
                 {
-                    targetO = TickService.GetOrder(order.TargetId);
+                    targetO = await TickService .GetOrder(order.TargetId);
                     if (targetO.Status == "COMPLETE" || targetO.Status == "REJECTED")
                     {
                         break;
@@ -184,7 +184,7 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task SquareOff(TradeOrder order)
         {
-            var entry = TickService.GetOrder(order.EntryId);
+            var entry = await TickService.GetOrder(order.EntryId);
             if (entry.FilledQuantity > 0)
             {
                 var kite = kiteService.GetKite();

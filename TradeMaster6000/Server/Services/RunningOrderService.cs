@@ -90,6 +90,19 @@ namespace TradeMaster6000.Server.Services
             }
             return orders;
         }
+
+
+        public void StopOrder(int id)
+        {
+            var orders = Get();
+            foreach (var order in orders)
+            {
+                if (order.Id == id)
+                {
+                    order.TokenSource.Cancel();
+                }
+            }
+        }
     }
     public interface IRunningOrderService
     {
@@ -98,5 +111,6 @@ namespace TradeMaster6000.Server.Services
         List<TradeOrder> Get();
         Task UpdateOrders();
         List<SomeLog> GetLogs();
+        void StopOrder(int id);
     }
 }
