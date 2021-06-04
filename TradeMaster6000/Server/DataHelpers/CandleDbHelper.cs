@@ -53,6 +53,7 @@ namespace TradeMaster6000.Server.DataHelpers
                         context.Remove(candle);
                     }
                 }
+                context.SaveChanges();
             }
             return Task.FromResult(0);
         }
