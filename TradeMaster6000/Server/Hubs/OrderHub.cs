@@ -26,14 +26,14 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IInstrumentHelper instrumentHelper;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly ITickerService tickerService;
-        private readonly IServiceProvider serviceProvider;
         private readonly IRunningOrderService running;
+        private readonly IOrderManagerService orderManagerService;
         private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IRunningOrderService runningOrderService, IKiteService kiteService)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IRunningOrderService runningOrderService, IKiteService kiteService, IOrderManagerService orderManagerService)
         {
             this.tickerService = tickerService;
-            this.serviceProvider = serviceProvider;
+            this.orderManagerService = orderManagerService;
             running = runningOrderService;
             KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
@@ -41,158 +41,14 @@ namespace TradeMaster6000.Server.Hubs
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
         }
 
-        public async Task StartOrderWork(TradeOrder order)
+        public async Task NewOrder(TradeOrder order)
         {
-            order.TokenSource = new CancellationTokenSource();
-
-            foreach (var instrument in await instrumentHelper.GetTradeInstruments())
-            {
-                if (instrument.TradingSymbol == order.TradingSymbol)
-                {
-                    order.Instrument = instrument;
-                    break;
-                }
-            }
-
-            var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
-            order.Id = tradeorder.Id;
-            running.Add(order);
-
-            while (!KiteService.IsKiteConnected())
-            {
-                if (order.TokenSource.Token.IsCancellationRequested)
-                {
-                    running.Remove(order.Id);
-                    goto Ending;
-                }
-                Thread.Sleep(2000);
-            }
-
-            await tickerService.Start();
-
-            await Task.Factory.StartNew(async() => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-
-            Ending:;
+            await orderManagerService.StartOrder(order).ConfigureAwait(false);
         }
 
         public async Task AutoOrders()
         {
-            if (!KiteService.IsKiteConnected())
-            {
-                goto Ending;
-            }
-
-            var kite = KiteService.GetKite();
-            var orders = new List<TradeOrder>();
-            var instruments = await instrumentHelper.GetTradeInstruments();
-            Random random = new Random();
-
-            for (int i = 0; i < 5; i++)
-            {
-                TradeOrder order = new TradeOrder();
-                int rng = random.Next(0, instruments.Count - 1);
-                order.Instrument = instruments[rng];
-                var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
-                order = MakeOrder(i, order, ltp);
-                orders.Add(order);
-            }
-
-            foreach(var order in orders)
-            {
-                var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
-                order.Id = tradeorder.Id;
-                running.Add(order);
-            }
-
-            await tickerService.Start();
-
-            await Task.Factory.StartNew(async () => await RunOrder(orders[0]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[1]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[2]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[3]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[4]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-
-            Ending:;
-        }
-
-        private async Task RunOrder(TradeOrder order)
-        {
-            try
-            {
-                tickerService.Subscribe(order.Instrument.Token);
-                OrderWork orderWork = new(serviceProvider);
-                await orderWork.StartWork(order, order.TokenSource.Token);
-                tickerService.UnSubscribe(order.Instrument.Token);
-                running.Remove(order.Id);
-                if (running.Get().Count == 0)
-                {
-                    tickerService.Stop();
-                }
-                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false);
-                try
-                {
-                    running.Remove(order.Id);
-                }
-                catch { }
-            }
-        }
-
-        private TradeOrder MakeOrder(int i, TradeOrder order, decimal ltp)
-        {
-            switch (i)
-            {
-                case 0:
-                    order.Entry = ltp + 1;
-                    order.StopLoss = ltp - 3;
-                    order.Risk = 4;
-                    order.RxR = 2;
-                    order.TransactionType = TransactionType.BUY;
-                    order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
-                    return order;
-                case 1:
-                    order.Entry = ltp - 1;
-                    order.StopLoss = ltp - 4;
-                    order.Risk = 3;
-                    order.RxR = 2;
-                    order.TransactionType = TransactionType.BUY;
-                    order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
-                    return order;
-                case 2:
-                    order.Entry = ltp - 6;
-                    order.StopLoss = ltp - 2;
-                    order.Risk = 4;
-                    order.RxR = 2;
-                    order.TransactionType = TransactionType.SELL;
-                    order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
-                    return order;
-                case 3:
-                    order.Entry = ltp + 6;
-                    order.StopLoss = ltp + 2;
-                    order.Risk = 4;
-                    order.RxR = 2;
-                    order.TransactionType = TransactionType.BUY;
-                    order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
-                    return order;
-                case 4:
-                    order.Entry = ltp - 1;
-                    order.StopLoss = ltp + 3;
-                    order.Risk = 4;
-                    order.RxR = 2;
-                    order.TransactionType = TransactionType.SELL;
-                    order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
-                    return order;
-                default:
-                    return default;
-            }
+            await orderManagerService.AutoOrders().ConfigureAwait(false);
         }
 
         public async Task StartMagic()
@@ -203,18 +59,23 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetTick(string symbol)
         {
-            TradeInstrument tradeInstrument = new ();
-            foreach(var instrument in await instrumentHelper.GetTradeInstruments())
-            {
-                if(instrument.TradingSymbol == symbol)
-                {
-                    tradeInstrument = instrument;
-                }
-            }
-
             var kite = KiteService.GetKite();
             if(kite != null)
             {
+                TradeInstrument tradeInstrument = new();
+                var instruments = await instrumentHelper.GetTradeInstruments();
+                await Task.Run(() =>
+                {
+                    foreach (var instrument in instruments)
+                    {
+                        if (instrument.TradingSymbol == symbol)
+                        {
+                            tradeInstrument = instrument;
+                            break;
+                        }
+                    }
+                });
+
                 var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
                 dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
                 await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
@@ -243,7 +104,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetOrders()
         {
-            await running.UpdateOrders();
+            await Task.Run(async()=> await running.UpdateOrders());
             await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
         }
 
@@ -257,24 +118,9 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveLogs", await tradeLogHelper.GetTradeLogs(orderId));
         }
 
-        public void StopOrderWork(int id)
+        public async Task StopOrderWork(int id)
         {
-            var orders = running.Get();
-            var tOrder = new TradeOrder();
-            var found = false;
-            foreach (var order in orders)
-            {
-                if (order.Id == id)
-                {
-                    tOrder = order;
-                    found = true;
-                    break;
-                }
-            }
-            if (found)
-            {
-                tOrder.TokenSource.Cancel();
-            }
+            await Task.Run(()=>running.StopOrder(id)).ConfigureAwait(false);
         }
     }
 }

@@ -21,7 +21,7 @@ using System.Diagnostics;
 
 namespace TradeMaster6000.Server.Tasks
 {
-    public class OrderWork
+    public class OrderInstance
     {
         // private class properties
         private ITradeOrderHelper OrderHelper { get; set; }
@@ -37,7 +37,7 @@ namespace TradeMaster6000.Server.Tasks
 
         private bool finished;
 
-        public OrderWork(IServiceProvider service)
+        public OrderInstance(IServiceProvider service)
         {
             OrderHelper = service.GetRequiredService<ITradeOrderHelper>();
             LogHelper = service.GetRequiredService<ITradeLogHelper>();
@@ -136,7 +136,7 @@ namespace TradeMaster6000.Server.Tasks
 
                 if (!TradeOrder.PreSLMCancelled)
                 {
-                    if (TickService.GetOrder(TradeOrder.SLMId).FilledQuantity > 0)
+                    if ((await TickService.GetOrder(TradeOrder.SLMId)).FilledQuantity > 0)
                     {
                         await LogHelper.AddLog(TradeOrder.Id, $"slm hit...").ConfigureAwait(false);
                         await Task.Run(async () => await TradeHelper.CancelTarget(TradeOrder)).ConfigureAwait(false);
@@ -145,7 +145,7 @@ namespace TradeMaster6000.Server.Tasks
                 }
                 else if (TradeOrder.RegularSlmPlaced)
                 {
-                    if (TickService.GetOrder(TradeOrder.SLMId).FilledQuantity > 0)
+                    if ((await TickService.GetOrder(TradeOrder.SLMId)).FilledQuantity > 0)
                     {
                         await LogHelper.AddLog(TradeOrder.Id, $"slm hit...").ConfigureAwait(false);
                         await Task.Run(async () => await TradeHelper.CancelTarget(TradeOrder)).ConfigureAwait(false);
@@ -157,7 +157,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     if (!TradeOrder.TargetHit)
                     {
-                        if (TickService.GetOrder(TradeOrder.TargetId).FilledQuantity > 0)
+                        if ((await TickService.GetOrder(TradeOrder.TargetId)).FilledQuantity > 0)
                         {
                             TradeOrder.TargetHit = true;
                             await LogHelper.AddLog(TradeOrder.Id, $"target hit...").ConfigureAwait(false);
@@ -238,7 +238,7 @@ namespace TradeMaster6000.Server.Tasks
             }
 
             decimal proximity;
-            var entry = TickService.GetOrder(TradeOrder.EntryId);
+            var entry = await TickService.GetOrder(TradeOrder.EntryId);
             if (TradeOrder.ExitTransactionType == "SELL")
             {
                 TradeOrder.Target = (TradeOrder.RxR * TradeOrder.ZoneWidth) + entry.AveragePrice;
@@ -267,7 +267,7 @@ namespace TradeMaster6000.Server.Tasks
 
             while (true)
             {
-                var entryO = TickService.GetOrder(TradeOrder.EntryId);
+                var entryO = await TickService.GetOrder(TradeOrder.EntryId);
                 if (entryO.FilledQuantity == TradeOrder.Quantity)
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"entry order filled...").ConfigureAwait(false);
@@ -424,31 +424,31 @@ namespace TradeMaster6000.Server.Tasks
 
         private async Task CheckOrderStatuses(CancellationToken token)
         {
-            Order entry = new();
-            Order slm = new();
-            Order target = new();
+            OrderUpdate entry = new();
+            OrderUpdate slm = new();
+            OrderUpdate target = new();
 
             Parallel.Invoke(
-            () => {
-                entry = TickService.GetOrder(TradeOrder.EntryId);
+            async() => {
+                entry = await TickService.GetOrder(TradeOrder.EntryId);
                 TradeOrder.EntryStatus = entry.Status;
             },
-            () => {
+            async() => {
                 if (!TradeOrder.PreSLMCancelled)
                 {
-                    slm = TickService.GetOrder(TradeOrder.SLMId);
+                    slm = await TickService.GetOrder(TradeOrder.SLMId);
                     TradeOrder.SLMStatus = slm.Status;
                 }
                 else if (TradeOrder.RegularSlmPlaced)
                 {
-                    slm = TickService.GetOrder(TradeOrder.SLMId);
+                    slm = await TickService.GetOrder(TradeOrder.SLMId);
                     TradeOrder.SLMStatus = slm.Status;
                 }
             },
-            () => {
+            async() => {
                 if (TradeOrder.TargetPlaced)
                 {
-                    target = TickService.GetOrder(TradeOrder.TargetId);
+                    target = await TickService.GetOrder(TradeOrder.TargetId);
                     TradeOrder.TargetStatus = target.Status;
                 }
             });
@@ -516,14 +516,14 @@ namespace TradeMaster6000.Server.Tasks
         private async Task WatchingTarget()
         {
             MyTick tick = new ();
-            Order entry = new ();
-            Order target = new ();
+            OrderUpdate entry = new ();
+            OrderUpdate target = new ();
             while (!finished)
             {
                 Parallel.Invoke(
                     async() => tick = await TickDbHelper.GetLast(TradeOrder.Instrument.Token),
-                    () => entry = TickService.GetOrder(TradeOrder.EntryId),
-                    () => target = TickService.GetOrder(TradeOrder.TargetId)
+                    async() => entry = await TickService.GetOrder(TradeOrder.EntryId),
+                    async() => target = await TickService.GetOrder(TradeOrder.TargetId)
                 );
 
                 if (TradeOrder.ExitTransactionType == "SELL")
@@ -569,7 +569,7 @@ namespace TradeMaster6000.Server.Tasks
         {
             if (!TradeOrder.IsOrderFilling)
             {
-                var entry = TickService.GetOrder(TradeOrder.EntryId);
+                var entry = await TickService .GetOrder(TradeOrder.EntryId);
                 if (entry.FilledQuantity > 0)
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"entry order filling...").ConfigureAwait(false);

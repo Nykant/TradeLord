@@ -19,7 +19,7 @@ namespace TradeMaster6000.Server.Helpers
             this.tradeLogHelper = tradeLogHelper;
         }
 
-        public async Task SquareOff(Order entry, Order targetO, TradeOrder order)
+        public async Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order)
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
             var kite = kiteService.GetKite();
@@ -40,6 +40,6 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface IWatchingTargetHelper
     {
-        Task SquareOff(Order entry, Order targetO, TradeOrder order);
+        Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order);
     }
 }

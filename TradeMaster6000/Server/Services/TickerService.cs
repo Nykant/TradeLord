@@ -26,12 +26,12 @@ namespace TradeMaster6000.Server.Services
         private readonly ITimeHelper timeHelper;
         private readonly ICandleDbHelper candleHelper;
         private readonly ITickDbHelper tickDbHelper;
+        private readonly IOrderUpdatesDbHelper updatesHelper;
+
         private Ticker Ticker { get; set; }
-        private ConcurrentDictionary<string, Order> OrderUpdates { get; set; }
-        private ConcurrentDictionary<uint, Candle> Candles { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private bool CandlesRunning { get; set; }
-        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper)
+        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper)
         {
             this.kiteService = kiteService;
             Configuration = configuration;
@@ -39,9 +39,8 @@ namespace TradeMaster6000.Server.Services
             this.timeHelper = timeHelper;
             this.candleHelper = candleHelper;
             this.tickDbHelper = tickDbHelper;
+            this.updatesHelper = orderUpdatesDbHelper;
             TickerLogs = new ();
-            Candles = new ();
-            OrderUpdates = new ();
         }
 
         public async Task Start()
@@ -160,15 +159,10 @@ namespace TradeMaster6000.Server.Services
             CandlesRunning = false;
         }
 
-        public void SetTicker(Ticker ticker)
+        public async Task<OrderUpdate> GetOrder(string id)
         {
-            Ticker = ticker;
-        }
-
-        public Order GetOrder(string id)
-        {
-            var update = OrderUpdates.Reverse().FirstOrDefault(x => x.Key == id).Value;
-            if(update.OrderId != default)
+            var update = await updatesHelper.Get(id);
+            if (update != null)
             {
                 return update;
             }
@@ -176,13 +170,31 @@ namespace TradeMaster6000.Server.Services
             try
             {
                 var order = kiteService.GetKite().GetOrderHistory(id)[^1];
-                return OrderUpdates.AddOrUpdate(id, order, (x, y) => order);
+                var newOrderUpdate = new OrderUpdate
+                {
+                    AveragePrice = order.AveragePrice,
+                    FilledQuantity = order.FilledQuantity,
+                    InstrumentToken = order.InstrumentToken,
+                    OrderId = order.OrderId,
+                    Price = order.Price,
+                    Quantity = order.Quantity,
+                    Status = order.Status,
+                    Timestamp = DateTime.Now,
+                    TriggerPrice = order.TriggerPrice
+                };
+                await updatesHelper.AddOrUpdate(newOrderUpdate);
+                return newOrderUpdate;
             }
-            catch (Exception e) 
-            { 
-                AddLog(e.Message, LogType.Exception); 
-                return default; 
+            catch (KiteException e)
+            {
+                AddLog(e.Message, LogType.Exception);
+                return default;
             };
+        }
+
+        public void SetTicker(Ticker ticker)
+        {
+            Ticker = ticker;
         }
 
         public List<SomeLog> GetSomeLogs()
@@ -221,43 +233,28 @@ namespace TradeMaster6000.Server.Services
         // events
         private async void OnTick(Tick tickData)
         {
-            //Ticks.AddOrUpdate(tickData.InstrumentToken, tickData, (x, y) => tickData);
-            //if (!Candles.ContainsKey(tickData.InstrumentToken))
-            //{
-            //    Candles.TryAdd(tickData.InstrumentToken,
-            //        new Candle
-            //        {
-            //            InstrumentToken = tickData.InstrumentToken,
-            //            From = DateTime.Now,
-            //            Open = tickData.LastPrice,
-            //            High = tickData.LastPrice,
-            //            Low = tickData.LastPrice,
-
-            //        });
-            //}
-            await tickDbHelper.Add(
-                new MyTick
-                {
-                    InstrumentToken = tickData.InstrumentToken,
-                    LTP = tickData.LastPrice,
-                    StartTime = DateTime.Now,
-                    EndTime = DateTime.Now.AddMinutes(1)
-                }
-            ).ConfigureAwait(false);
+            await tickDbHelper.Add(new MyTick
+            {
+                InstrumentToken = tickData.InstrumentToken,
+                LTP = tickData.LastPrice,
+                StartTime = DateTime.Now,
+                EndTime = DateTime.Now.AddMinutes(1)
+            });
         }
 
-        private void OnOrderUpdate(Order orderData)
+        private async void OnOrderUpdate(Order orderData)
         {
-            OrderUpdates.AddOrUpdate(orderData.OrderId, orderData, (x, y) => 
+            await updatesHelper.AddOrUpdate(new OrderUpdate
             {
-                if(y.FilledQuantity <= orderData.FilledQuantity)
-                {
-                    return orderData;
-                }
-                else
-                {
-                    return y;
-                }
+                AveragePrice = orderData.AveragePrice,
+                FilledQuantity = orderData.FilledQuantity,
+                InstrumentToken = orderData.InstrumentToken,
+                OrderId = orderData.OrderId,
+                Price = orderData.Price,
+                Quantity = orderData.Quantity,
+                Status = orderData.Status,
+                Timestamp = DateTime.Now,
+                TriggerPrice = orderData.TriggerPrice
             });
         }
 
@@ -288,7 +285,7 @@ namespace TradeMaster6000.Server.Services
     }
     public interface ITickerService
     {
-        Order GetOrder(string id);
+        Task<OrderUpdate> GetOrder(string id);
         void Subscribe(uint token);
         void UnSubscribe(uint token);
         Task Start();
