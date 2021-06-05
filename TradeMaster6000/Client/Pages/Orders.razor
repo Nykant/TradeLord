@@ -95,8 +95,9 @@
 
         await hubConnection.StartAsync();
 
-        await GetOrders();
-        await GetRunningLogs();
+        Parallel.Invoke(
+            async () => await Task.Run(() => GetOrders()).ConfigureAwait(false),
+            async () => await Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
     }
     private void GoToOrder(int id)
     {
