@@ -48,22 +48,27 @@ namespace TradeMaster6000.Server.Services
 
         public async Task UpdateOrders()
         {
-            foreach (var order in await tradeOrderHelper.GetRunningTradeOrders())
+            var orders = await tradeOrderHelper.GetRunningTradeOrders();
+
+            await Task.Run(() =>
             {
-                try
+                foreach (var order in orders)
                 {
-                    Orders.TryGetValue(order.Id, out TradeOrder value);
-                    if(value != null)
+                    try
                     {
-                        order.TokenSource = value.TokenSource;
-                        Orders.TryUpdate(order.Id, order, Orders[order.Id]);
+                        Orders.TryGetValue(order.Id, out TradeOrder value);
+                        if (value != null)
+                        {
+                            order.TokenSource = value.TokenSource;
+                            Orders.TryUpdate(order.Id, order, Orders[order.Id]);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        AddLog($"{order.Id} -> {e.Message}", LogType.Exception);
                     }
                 }
-                catch (Exception e)
-                {
-                    AddLog($"{order.Id} -> {e.Message}", LogType.Exception);
-                }
-            }
+            }).ConfigureAwait(false);
         }
 
         private void AddLog(string log, LogType type)

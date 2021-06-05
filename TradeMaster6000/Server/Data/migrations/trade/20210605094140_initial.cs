@@ -4,11 +4,56 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TradeMaster6000.Server.data.migrations.trade
 {
-    public partial class Sex : Migration
+    public partial class initial : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterDatabase()
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Candles",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    InstrumentToken = table.Column<uint>(type: "int unsigned", nullable: false),
+                    Open = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    High = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    Low = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    Close = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    From = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    To = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Kill = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Candles", x => x.Id);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "OrderUpdates",
+                columns: table => new
+                {
+                    OrderId = table.Column<string>(type: "varchar(255)", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    InstrumentToken = table.Column<uint>(type: "int unsigned", nullable: false),
+                    AveragePrice = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    FilledQuantity = table.Column<int>(type: "int", nullable: false),
+                    TriggerPrice = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Price = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    RowVersion = table.Column<DateTime>(type: "timestamp(6)", rowVersion: true, nullable: true)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.ComputedColumn)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrderUpdates", x => x.OrderId);
+                })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
@@ -92,33 +137,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Candles",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    TradeInstrumentId = table.Column<int>(type: "int", nullable: true),
-                    Open = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    High = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    Low = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    Close = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    From = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    To = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    Kill = table.Column<DateTime>(type: "datetime(6)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Candles", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Candles_TradeInstruments_TradeInstrumentId",
-                        column: x => x.TradeInstrumentId,
-                        principalTable: "TradeInstruments",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                })
-                .Annotation("MySql:CharSet", "utf8mb4");
-
-            migrationBuilder.CreateTable(
                 name: "TradeLogs",
                 columns: table => new
                 {
@@ -142,11 +160,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Candles_TradeInstrumentId",
-                table: "Candles",
-                column: "TradeInstrumentId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_TradeLogs_TradeOrderId",
                 table: "TradeLogs",
                 column: "TradeOrderId");
@@ -158,13 +171,16 @@ namespace TradeMaster6000.Server.data.migrations.trade
                 name: "Candles");
 
             migrationBuilder.DropTable(
+                name: "OrderUpdates");
+
+            migrationBuilder.DropTable(
                 name: "Ticks");
 
             migrationBuilder.DropTable(
-                name: "TradeLogs");
+                name: "TradeInstruments");
 
             migrationBuilder.DropTable(
-                name: "TradeInstruments");
+                name: "TradeLogs");
 
             migrationBuilder.DropTable(
                 name: "TradeOrders");

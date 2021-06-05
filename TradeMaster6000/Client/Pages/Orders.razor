@@ -14,8 +14,8 @@
     if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => AutoOrders()) Text="5 Auto Orders" />
-
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoOrders()) Text="@AutoText" />
+        <RadzenButton Style="float: right" ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />        
         <hr />
 
         <div class="row">
@@ -72,6 +72,9 @@
     private HubConnection hubConnection;
     private IEnumerable<TradeOrder> orders = new List<TradeOrder>();
     private IEnumerable<SomeLog> logs = new List<SomeLog>();
+    private bool IsAutoLocked = false;
+    private bool IsUpdateLocked = false;
+    private string AutoText = "5 random orders";
 
     protected override async Task OnInitializedAsync()
     {
@@ -95,33 +98,11 @@
 
         await hubConnection.StartAsync();
 
-        Parallel.Invoke(
-            async () => await Task.Run(() => GetOrders()).ConfigureAwait(false),
-            async () => await Task.Run(() => GetRunningLogs()).ConfigureAwait(false));
+        await Update();
     }
     private void GoToOrder(int id)
     {
         NavigationManager.NavigateTo($"/OrderDetails/{id}");
-    }
-
-    private async Task GetRunningLogs()
-    {
-        await hubConnection.SendAsync("GetRunningLogs");
-        //while (IsConnected)
-        //{
-
-        //    await Task.Delay(2000);
-        //}
-    }
-
-    private async Task GetOrders()
-    {
-        await hubConnection.SendAsync("GetOrders");
-        //while (IsConnected)
-        //{
-
-        //    await Task.Delay(2000);
-        //}
     }
 
     private void NewOrder()
@@ -129,9 +110,30 @@
         NavigationManager.NavigateTo("/createorder");
     }
 
+    private async Task Update()
+    {
+        IsUpdateLocked = true;
+        StateHasChanged();
+        await hubConnection.SendAsync("Update");
+        await Task.Delay(2000);
+        IsUpdateLocked = false;
+        StateHasChanged();
+    }
+
     private async Task AutoOrders()
     {
+        IsAutoLocked = true;
+        StateHasChanged();
         await hubConnection.SendAsync("AutoOrders");
+        for(int i = 10; i >= 0; i--)
+        {
+            AutoText = i.ToString();
+            StateHasChanged();
+            await Task.Delay(1000);
+        }
+        IsAutoLocked = false;
+        AutoText = "5 random orders";
+        StateHasChanged();
     }
 
     private async Task StopOrder(int id)

@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210530203204_Sex")]
-    partial class Sex
+    [Migration("20210605094140_initial")]
+    partial class initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -34,6 +34,9 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<decimal>("High")
                         .HasColumnType("decimal(65,30)");
 
+                    b.Property<uint>("InstrumentToken")
+                        .HasColumnType("int unsigned");
+
                     b.Property<DateTime>("Kill")
                         .HasColumnType("datetime(6)");
 
@@ -46,12 +49,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<DateTime>("To")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<int?>("TradeInstrumentId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("TradeInstrumentId");
 
                     b.ToTable("Candles");
                 });
@@ -77,6 +75,45 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.HasKey("Id");
 
                     b.ToTable("Ticks");
+                });
+
+            modelBuilder.Entity("TradeMaster6000.Shared.OrderUpdate", b =>
+                {
+                    b.Property<string>("OrderId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<decimal>("AveragePrice")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("FilledQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<uint>("InstrumentToken")
+                        .HasColumnType("int unsigned");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp(6)");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("longtext");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("TriggerPrice")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.HasKey("OrderId");
+
+                    b.ToTable("OrderUpdates");
                 });
 
             modelBuilder.Entity("TradeMaster6000.Shared.TradeInstrument", b =>
@@ -203,15 +240,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.HasKey("Id");
 
                     b.ToTable("TradeOrders");
-                });
-
-            modelBuilder.Entity("TradeMaster6000.Shared.Candle", b =>
-                {
-                    b.HasOne("TradeMaster6000.Shared.TradeInstrument", "TradeInstrument")
-                        .WithMany()
-                        .HasForeignKey("TradeInstrumentId");
-
-                    b.Navigation("TradeInstrument");
                 });
 
             modelBuilder.Entity("TradeMaster6000.Shared.TradeLog", b =>

@@ -73,7 +73,13 @@ namespace TradeMaster6000.Server
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString), (x) => { x.EnableRetryOnFailure(5); }));
 
             services.AddDbContextFactory<TradeDbContext>(options =>
-                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection), (x) => { x.EnableRetryOnFailure(5); }));
+            {
+                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection), (x) => { x.EnableRetryOnFailure(5); });
+                options.EnableSensitiveDataLogging(true);
+                options.EnableDetailedErrors(true);
+                options.ConfigureWarnings(options => options.Default(WarningBehavior.Log));
+            });
+
 
             services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
                 .AddEntityFrameworkStores<ApplicationDbContext>();

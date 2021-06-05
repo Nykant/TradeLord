@@ -102,14 +102,10 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveOrder", await tradeOrderHelper.GetTradeOrder(id));
         }
 
-        public async Task GetOrders()
+        public async Task Update()
         {
-            await Task.Run(async()=> await running.UpdateOrders());
+            await running.UpdateOrders();
             await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
-        }
-
-        public async Task GetRunningLogs()
-        {
             await Clients.Caller.SendAsync("ReceiveRunningLogs", running.GetLogs());
         }
 

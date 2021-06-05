@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.AspNet.SignalR;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -79,7 +80,7 @@ namespace TradeMaster6000.Server.Services
             var instruments = await instrumentHelper.GetTradeInstruments();
             Random random = new ();
 
-            await Task.Run(() =>
+            await Task.Run(async() =>
             {
                 for (int i = 0; i < 5; i++)
                 {
@@ -89,6 +90,7 @@ namespace TradeMaster6000.Server.Services
                     var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
                     order = MakeOrder(i, order, ltp);
                     orders.Add(order);
+                    await Task.Delay(500);
                 }
             });
 
@@ -104,11 +106,11 @@ namespace TradeMaster6000.Server.Services
 
             await tickerService.Start();
 
-            await Task.Factory.StartNew(async () => await RunOrder(orders[0]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[1]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[2]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[3]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            await Task.Factory.StartNew(async () => await RunOrder(orders[4]), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            foreach (var order in orders)
+            {
+                await Task.Factory.StartNew(async () => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+                await Task.Delay(500);
+            }
 
             Ending:;
         }

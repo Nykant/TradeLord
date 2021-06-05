@@ -80,7 +80,7 @@ namespace TradeMaster6000.Server.Tasks
             TradeOrder temp = new();
             do
             {
-                await CheckOrderStatuses(token);
+                //await CheckOrderStatuses(token);
 
                 if (temp != TradeOrder)
                 {
@@ -198,12 +198,10 @@ namespace TradeMaster6000.Server.Tasks
 
             Stopping:
 
-            Parallel.Invoke(
-                async () => await Task.Run(async () => await TradeHelper.CancelEntry(TradeOrder)),
-                async () => await Task.Run(async () => await TradeHelper.CancelStopLoss(TradeOrder)),
-                async () => await Task.Run(async () => await TradeHelper.CancelTarget(TradeOrder)),
-                async () => await Task.Run(async () => await TradeHelper.SquareOff(TradeOrder))
-                );
+            await TradeHelper.CancelEntry(TradeOrder);
+            await TradeHelper.CancelStopLoss(TradeOrder);
+            await TradeHelper.CancelTarget(TradeOrder);
+            await TradeHelper.SquareOff(TradeOrder);
 
             Ending:;
 
@@ -424,34 +422,24 @@ namespace TradeMaster6000.Server.Tasks
 
         private async Task CheckOrderStatuses(CancellationToken token)
         {
-            OrderUpdate entry = new();
+            OrderUpdate entry = await TickService.GetOrder(TradeOrder.EntryId);
             OrderUpdate slm = new();
+            if (!TradeOrder.PreSLMCancelled)
+            {
+                slm = await TickService.GetOrder(TradeOrder.SLMId);
+                TradeOrder.SLMStatus = slm.Status;
+            }
+            else if (TradeOrder.RegularSlmPlaced)
+            {
+                slm = await TickService.GetOrder(TradeOrder.SLMId);
+                TradeOrder.SLMStatus = slm.Status;
+            }
             OrderUpdate target = new();
-
-            Parallel.Invoke(
-            async() => {
-                entry = await TickService.GetOrder(TradeOrder.EntryId);
-                TradeOrder.EntryStatus = entry.Status;
-            },
-            async() => {
-                if (!TradeOrder.PreSLMCancelled)
-                {
-                    slm = await TickService.GetOrder(TradeOrder.SLMId);
-                    TradeOrder.SLMStatus = slm.Status;
-                }
-                else if (TradeOrder.RegularSlmPlaced)
-                {
-                    slm = await TickService.GetOrder(TradeOrder.SLMId);
-                    TradeOrder.SLMStatus = slm.Status;
-                }
-            },
-            async() => {
-                if (TradeOrder.TargetPlaced)
-                {
-                    target = await TickService.GetOrder(TradeOrder.TargetId);
-                    TradeOrder.TargetStatus = target.Status;
-                }
-            });
+            if (TradeOrder.TargetPlaced)
+            {
+                target = await TickService.GetOrder(TradeOrder.TargetId);
+                TradeOrder.TargetStatus = target.Status;
+            }
 
             // check if entry status is rejected
             if (entry.Status == "REJECTED")
