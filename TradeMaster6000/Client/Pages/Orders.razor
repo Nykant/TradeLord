@@ -14,6 +14,7 @@
     if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoUltraOrders()) Text="@AutoUltraText" />
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoOrders()) Text="@AutoText" />
         <RadzenButton Style="float: right" ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />        
         <hr />
@@ -75,6 +76,7 @@
     private bool IsAutoLocked = false;
     private bool IsUpdateLocked = false;
     private string AutoText = "5 random orders";
+    private string AutoUltraText = "20 random orders";
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,10 +130,30 @@
         for(int i = 10; i >= 0; i--)
         {
             AutoText = i.ToString();
+            AutoUltraText = i.ToString();
             StateHasChanged();
             await Task.Delay(1000);
         }
         IsAutoLocked = false;
+        AutoText = "5 random orders";
+        AutoUltraText = "20 random orders";
+        StateHasChanged();
+    }
+
+    private async Task AutoUltraOrders()
+    {
+        IsAutoLocked = true;
+        StateHasChanged();
+        await hubConnection.SendAsync("AutoUltraOrders");
+        for (int i = 40; i >= 0; i--)
+        {
+            AutoUltraText = i.ToString();
+            AutoText = i.ToString();
+            StateHasChanged();
+            await Task.Delay(1000);
+        }
+        IsAutoLocked = true;
+        AutoUltraText = "20 random orders";
         AutoText = "5 random orders";
         StateHasChanged();
     }

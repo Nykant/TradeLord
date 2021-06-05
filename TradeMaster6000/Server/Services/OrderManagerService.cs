@@ -68,7 +68,7 @@ namespace TradeMaster6000.Server.Services
             Ending:;
         }
 
-        public async Task AutoOrders()
+        public async Task AutoOrders(int k)
         {
             if (!kiteService.IsKiteConnected())
             {
@@ -82,7 +82,7 @@ namespace TradeMaster6000.Server.Services
 
             await Task.Run(async() =>
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < k; i++)
                 {
                     TradeOrder order = new ();
                     int rng = random.Next(0, instruments.Count - 1);
@@ -196,7 +196,7 @@ namespace TradeMaster6000.Server.Services
     }
     public interface IOrderManagerService
     {
-        Task AutoOrders();
+        Task AutoOrders(int k);
         Task StartOrder(TradeOrder order);
     }
 }

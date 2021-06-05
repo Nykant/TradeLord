@@ -48,7 +48,12 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task AutoOrders()
         {
-            await orderManagerService.AutoOrders().ConfigureAwait(false);
+            await orderManagerService.AutoOrders(5).ConfigureAwait(false);
+        }
+
+        public async Task AutoUltraOrders()
+        {
+            await orderManagerService.AutoOrders(20).ConfigureAwait(false);
         }
 
         public async Task StartMagic()

@@ -68,7 +68,7 @@ namespace TradeMaster6000.Server.Services
                         AddLog($"{order.Id} -> {e.Message}", LogType.Exception);
                     }
                 }
-            }).ConfigureAwait(false);
+            });
         }
 
         private void AddLog(string log, LogType type)
@@ -95,7 +95,6 @@ namespace TradeMaster6000.Server.Services
             }
             return orders;
         }
-
 
         public void StopOrder(int id)
         {

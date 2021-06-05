@@ -20,7 +20,7 @@ namespace TradeMaster6000.Server.Services
         {
             this.protectionService = protectionService;
             this.timeHelper = timeHelper;
-            Task.Run(async()=> await KiteManager()).ConfigureAwait(false);
+            Task.Factory.StartNew(async () => await KiteManager()).ConfigureAwait(false);
         }
 
         public void Invalidate()
