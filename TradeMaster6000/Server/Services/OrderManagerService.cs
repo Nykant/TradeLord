@@ -35,17 +35,14 @@ namespace TradeMaster6000.Server.Services
             order.TokenSource = new CancellationTokenSource();
             var instruments = await instrumentHelper.GetTradeInstruments();
 
-            await Task.Run(() =>
+            foreach (var instrument in instruments)
             {
-                foreach (var instrument in instruments)
+                if (instrument.TradingSymbol == order.TradingSymbol)
                 {
-                    if (instrument.TradingSymbol == order.TradingSymbol)
-                    {
-                        order.Instrument = instrument;
-                        break;
-                    }
+                    order.Instrument = instrument;
+                    break;
                 }
-            });
+            }
 
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
@@ -63,7 +60,7 @@ namespace TradeMaster6000.Server.Services
 
             await tickerService.Start();
 
-            await Task.Factory.StartNew(async () => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+            await RunOrder(order).ConfigureAwait(false);
 
             Ending:;
         }
@@ -80,35 +77,44 @@ namespace TradeMaster6000.Server.Services
             var instruments = await instrumentHelper.GetTradeInstruments();
             Random random = new ();
 
-            await Task.Run(async() =>
+            int z = 0;
+            int y = 0;
+            for (int i = 0; i < k; i++)
             {
-                for (int i = 0; i < k; i++)
-                {
-                    TradeOrder order = new ();
-                    int rng = random.Next(0, instruments.Count - 1);
-                    order.Instrument = instruments[rng];
-                    var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
-                    order = MakeOrder(i, order, ltp);
-                    orders.Add(order);
-                    await Task.Delay(500);
-                }
-            });
+                TradeOrder order = new();
+                int rng = random.Next(0, instruments.Count - 1);
+                order.Instrument = instruments[rng];
+                var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
+                order = MakeOrder(y, order, ltp);
+                orders.Add(order);
+                await Task.Delay(500);
 
-            await Task.Run(async() =>
-            {
-                foreach (var order in orders)
+                y++;
+
+                if (y == 5)
                 {
-                    var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
-                    order.Id = tradeorder.Id;
-                    running.Add(order);
+                    y = 0;
+                    z++;
                 }
-            });
+
+                if (z == 4)
+                {
+                    break;
+                }
+            }
+
+            foreach (var order in orders)
+            {
+                var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
+                order.Id = tradeorder.Id;
+                running.Add(order);
+            }
 
             await tickerService.Start();
 
             foreach (var order in orders)
             {
-                await Task.Factory.StartNew(async () => await RunOrder(order), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+                await RunOrder(order).ConfigureAwait(false);
                 await Task.Delay(500);
             }
 

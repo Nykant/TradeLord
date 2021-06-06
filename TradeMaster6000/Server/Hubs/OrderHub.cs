@@ -43,7 +43,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task NewOrder(TradeOrder order)
         {
-            await orderManagerService.StartOrder(order).ConfigureAwait(false);
+            await orderManagerService.StartOrder(order);
         }
 
         public async Task AutoOrders()
