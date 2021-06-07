@@ -20,7 +20,6 @@ namespace TradeMaster6000.Server.Services
         {
             this.protectionService = protectionService;
             this.timeHelper = timeHelper;
-            Task.Factory.StartNew(async () => await KiteManager()).ConfigureAwait(false);
         }
 
         public void Invalidate()
@@ -37,9 +36,9 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        private async Task KiteManager()
+        public async Task KiteManager(CancellationToken token)
         {
-            while (true)
+            while (!token.IsCancellationRequested)
             {
                 if(timeHelper.IsRefreshTime())
                 {
@@ -87,5 +86,6 @@ namespace TradeMaster6000.Server.Services
         string GetAccessToken();
         bool IsKiteConnected();
         void Invalidate();
+        Task KiteManager(CancellationToken token);
     }
 }

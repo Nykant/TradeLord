@@ -1,4 +1,5 @@
-﻿using KiteConnect;
+﻿using Hangfire;
+using KiteConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,11 +28,12 @@ namespace TradeMaster6000.Server.Services
         private readonly ICandleDbHelper candleHelper;
         private readonly ITickDbHelper tickDbHelper;
         private readonly IOrderUpdatesDbHelper updatesHelper;
+        private readonly IBackgroundJobClient backgroundJob;
 
         private Ticker Ticker { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private bool CandlesRunning { get; set; }
-        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper)
+        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob)
         {
             this.kiteService = kiteService;
             Configuration = configuration;
@@ -40,10 +42,11 @@ namespace TradeMaster6000.Server.Services
             this.candleHelper = candleHelper;
             this.tickDbHelper = tickDbHelper;
             this.updatesHelper = orderUpdatesDbHelper;
+            this.backgroundJob = backgroundJob;
             TickerLogs = new ();
         }
 
-        public async Task Start()
+        public void Start()
         {
             if (Ticker == null)
             {
@@ -60,52 +63,42 @@ namespace TradeMaster6000.Server.Services
 
                 Ticker.EnableReconnect(Interval: 5, Retries: 50);
                 Ticker.Connect();
-
-                await Task.Factory.StartNew(async()=> await StartFlushing(), TaskCreationOptions.LongRunning).ConfigureAwait(false);
             }
         }
 
-        public async Task StartFlushing()
+        public async Task StartFlushing(CancellationToken token)
         {
-            while(Ticker != null)
+            while(!token.IsCancellationRequested)
             {
                 await tickDbHelper.Flush();
                 await Task.Delay(10000);
             }
         }
 
-        public async Task StartCandles()
-        {
-            if (!CandlesRunning)
-            {
-                await Task.Factory.StartNew(async()=> await RunCandles(), TaskCreationOptions.LongRunning).ConfigureAwait(false);
-            }
-        }
-
-        public async Task RunCandles()
+        public async Task RunCandles(CancellationToken token)
         {
             CandlesRunning = true;
             await candleHelper.Flush();
 
-            while (!timeHelper.IsPreMarketOpen())
+            while (!timeHelper.IsPreMarketOpen() && !token.IsCancellationRequested)
             {
-                Thread.Sleep(10000);
+                await Task.Delay(10000);
             }
 
-            while (!timeHelper.IsMarketOpen())
+            while (!timeHelper.IsMarketOpen() && !token.IsCancellationRequested)
             {
-                Thread.Sleep(1000);
+                await Task.Delay(1000);
             }
 
-            while (!await tickDbHelper.Any())
+            while (!await tickDbHelper.Any() && !token.IsCancellationRequested)
             {
-                Thread.Sleep(1000);
+                await Task.Delay(1000);
             }
 
-            await Task.Run(async()=> await AnalyzeCandles());
+            await AnalyzeCandles(token);
         }
 
-        public async Task AnalyzeCandles()
+        private async Task AnalyzeCandles(CancellationToken token)
         {
             int i = 0;
             foreach (var instrument in await instrumentHelper.GetTradeInstruments())
@@ -113,7 +106,7 @@ namespace TradeMaster6000.Server.Services
                 try
                 {
                     Subscribe(instrument.Token);
-                    await Task.Factory.StartNew(async() => await Analyze(instrument), TaskCreationOptions.LongRunning).ConfigureAwait(false);
+                    backgroundJob.Enqueue(() =>  Analyze(instrument, token));
                 }
                 catch (Exception e)
                 {
@@ -128,13 +121,13 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        public async Task Analyze(TradeInstrument instrument)
+        private async Task Analyze(TradeInstrument instrument, CancellationToken token)
         {
             AddLog($"analysing: {instrument.Token}...", LogType.Notification);
-            while (timeHelper.IsMarketEnded())
+            while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
             {
                 var candle = new Candle() { InstrumentToken = instrument.Token, From = DateTime.Now, Kill = DateTime.Now.AddDays(1) };
-                await Task.Delay(59500);
+                await Task.Delay(59500, token);
                 var ticks = await tickDbHelper.Get(instrument.Token);
                 candle.To = DateTime.Now;
                 await Task.Run(() =>
@@ -190,6 +183,11 @@ namespace TradeMaster6000.Server.Services
                 AddLog(e.Message, LogType.Exception);
                 return default;
             };
+        }
+
+        public bool IsCandlesRunning()
+        {
+            return CandlesRunning;
         }
 
         public void SetTicker(Ticker ticker)
@@ -288,10 +286,12 @@ namespace TradeMaster6000.Server.Services
         Task<OrderUpdate> GetOrder(string id);
         void Subscribe(uint token);
         void UnSubscribe(uint token);
-        Task Start();
-        Task StartCandles();
+        void Start();
         void Stop();
         List<SomeLog> GetSomeLogs();
         void SetTicker(Ticker ticker);
+        Task StartFlushing(CancellationToken token);
+        Task RunCandles(CancellationToken token);
+        bool IsCandlesRunning();
     }
 }

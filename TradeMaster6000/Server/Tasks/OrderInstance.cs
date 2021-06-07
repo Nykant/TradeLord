@@ -33,11 +33,12 @@ namespace TradeMaster6000.Server.Tasks
         private ISLMHelper SLMHelper { get; set; }
         private IWatchingTargetHelper WatchingTargetHelper { get; set; }
         private ITickDbHelper TickDbHelper { get; set; }
+        private readonly IOrderManagerService orderManager;
         private TradeOrder TradeOrder { get; set; }
 
         private bool finished;
 
-        private SemaphoreSlim 
+        private readonly SemaphoreSlim semaphore;
 
         public OrderInstance(IServiceProvider service)
         {
@@ -50,7 +51,9 @@ namespace TradeMaster6000.Server.Tasks
             WatchingTargetHelper = service.GetRequiredService<IWatchingTargetHelper>();
             TimeHelper = service.GetRequiredService<ITimeHelper>();
             TickDbHelper = service.GetRequiredService<ITickDbHelper>();
+            orderManager = service.GetRequiredService<IOrderManagerService>();
 
+            semaphore = new SemaphoreSlim(1);
             finished = false;
         }
 
@@ -60,10 +63,12 @@ namespace TradeMaster6000.Server.Tasks
 
             while(!await TickDbHelper.Exists(order.Instrument.Token))
             {
-                await Task.Delay(500);
+                await Task.Delay(500, token);
             }
 
+            await semaphore.WaitAsync(token);
             TradeOrder.EntryId = await TradeHelper.PlaceEntry(TradeOrder);
+            semaphore.Release();
             if (TradeOrder.EntryId == null)
             {
                 goto Ending;
@@ -72,11 +77,15 @@ namespace TradeMaster6000.Server.Tasks
             var response = await TradeHelper.PlacePreSLM(TradeOrder);
             if (response == "cancelled")
             {
+                await semaphore.WaitAsync(token);
                 TradeOrder.PreSLMCancelled = true;
+                semaphore.Release();
             }
             else
             {
+                await semaphore.WaitAsync(token);
                 TradeOrder.SLMId = response;
+                semaphore.Release();
             }
 
             TradeOrder temp = new();
@@ -100,7 +109,7 @@ namespace TradeMaster6000.Server.Tasks
                     goto Stopping;
                 }
 
-                Thread.Sleep(5000);
+                await Task.Delay(5000, token);
             }
             while (!await TimeHelper.IsPreMarketOpen(TradeOrder.Id));
 
@@ -119,7 +128,7 @@ namespace TradeMaster6000.Server.Tasks
                     await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
                 }
 
-                Thread.Sleep(1000);
+                await Task.Delay(1000);
             }
             while (!await TimeHelper.IsMarketOpen(TradeOrder.Id));
             
@@ -195,7 +204,7 @@ namespace TradeMaster6000.Server.Tasks
                     await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
                 }
 
-                Thread.Sleep(500);
+                await Task.Delay(500);
             }
 
             Stopping:
@@ -209,6 +218,8 @@ namespace TradeMaster6000.Server.Tasks
 
             TradeOrder.Status = Status.DONE;
             await OrderHelper.UpdateTradeOrder(TradeOrder);
+
+            await orderManager.StopOrder(TradeOrder);
         }
 
 
@@ -239,6 +250,7 @@ namespace TradeMaster6000.Server.Tasks
 
             decimal proximity;
             var entry = await TickService.GetOrder(TradeOrder.EntryId);
+            await semaphore.WaitAsync();
             if (TradeOrder.ExitTransactionType == "SELL")
             {
                 TradeOrder.Target = (TradeOrder.RxR * TradeOrder.ZoneWidth) + entry.AveragePrice;
@@ -251,17 +263,20 @@ namespace TradeMaster6000.Server.Tasks
                 proximity = entry.AveragePrice 
                     - ((entry.AveragePrice - TradeOrder.Target) * (decimal)0.8);
             }
+            semaphore.Release();
 
             if (finished)
             {
                 goto End;
             }
 
+            await semaphore.WaitAsync();
             TradeOrder.TargetId = await TargetHelper.PlaceOrder(TradeOrder);
             if(TradeOrder.TargetId != null)
             {
                 TradeOrder.TargetPlaced = true;
             }
+            semaphore.Release();
 
             await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
 
@@ -271,8 +286,10 @@ namespace TradeMaster6000.Server.Tasks
                 if (entryO.FilledQuantity == TradeOrder.Quantity)
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"entry order filled...").ConfigureAwait(false);
+                    await semaphore.WaitAsync();
                     TradeOrder.QuantityFilled = entryO.FilledQuantity;
                     TradeOrder.Entry = entryO.AveragePrice;
+                    semaphore.Release();
                     goto End;
                 }
                 if ((await TickDbHelper.GetLast(TradeOrder.Instrument.Token)).LTP >= proximity)
@@ -330,9 +347,9 @@ namespace TradeMaster6000.Server.Tasks
                 }
                 candle.Close = tick.LTP;
                 stopwatch.Stop();
-
+                await semaphore.WaitAsync();
                 TradeOrder.StopLoss = SLMHelper.GetTriggerPrice(TradeOrder, candle);
-
+                semaphore.Release();
                 bool isBullish = false;
                 if (candle.Open < candle.Close)
                 {
@@ -344,7 +361,8 @@ namespace TradeMaster6000.Server.Tasks
                     await LogHelper.AddLog(TradeOrder.Id, $"{TradeOrder.Instrument.TradingSymbol} candle is bearish...").ConfigureAwait(false);
                 }
 
-                if(TradeOrder.ExitTransactionType == "SELL")
+                await semaphore.WaitAsync();
+                if (TradeOrder.ExitTransactionType == "SELL")
                 {
                     if (isBullish)
                     {
@@ -380,6 +398,7 @@ namespace TradeMaster6000.Server.Tasks
                         goto End;
                     }
                 }
+                semaphore.Release();
 
                 End:;
 
@@ -391,6 +410,7 @@ namespace TradeMaster6000.Server.Tasks
         {
             await LogHelper.AddLog(order.Id, $"order starting...").ConfigureAwait(false);
 
+            await semaphore.WaitAsync();
             TradeOrder = order;
 
             if (TradeOrder.TransactionType.ToString() == "BUY")
@@ -418,6 +438,7 @@ namespace TradeMaster6000.Server.Tasks
                 decimal decQuantity = TradeOrder.Risk / TradeOrder.ZoneWidth;
                 TradeOrder.Quantity = (int)decQuantity;
             }
+            semaphore.Release();
 
             await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
         }
@@ -426,6 +447,9 @@ namespace TradeMaster6000.Server.Tasks
         {
             OrderUpdate entry = await TickService.GetOrder(TradeOrder.EntryId);
             OrderUpdate slm = new();
+            OrderUpdate target = new();
+            await semaphore.WaitAsync();
+            TradeOrder.EntryStatus = entry.Status;
             if (!TradeOrder.PreSLMCancelled)
             {
                 slm = await TickService.GetOrder(TradeOrder.SLMId);
@@ -436,12 +460,12 @@ namespace TradeMaster6000.Server.Tasks
                 slm = await TickService.GetOrder(TradeOrder.SLMId);
                 TradeOrder.SLMStatus = slm.Status;
             }
-            OrderUpdate target = new();
             if (TradeOrder.TargetPlaced)
             {
                 target = await TickService.GetOrder(TradeOrder.TargetId);
                 TradeOrder.TargetStatus = target.Status;
             }
+            semaphore.Release();
 
             // check if entry status is rejected
             if (entry.Status == "REJECTED")
@@ -476,7 +500,9 @@ namespace TradeMaster6000.Server.Tasks
                 if (slm.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"slm order rejected...").ConfigureAwait(false);
+                    await semaphore.WaitAsync();
                     TradeOrder.PreSLMCancelled = true;
+                    semaphore.Release();
                     await PlaceStopLoss().ConfigureAwait(false);
                 }
             }
@@ -485,7 +511,9 @@ namespace TradeMaster6000.Server.Tasks
                 if (slm.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"slm order rejected...").ConfigureAwait(false);
+                    await semaphore.WaitAsync();
                     TradeOrder.RegularSlmPlaced = false;
+                    semaphore.Release();
                     await PlaceStopLoss().ConfigureAwait(false);
                 }
             }
@@ -495,7 +523,9 @@ namespace TradeMaster6000.Server.Tasks
                 if (target.Status == "REJECTED")
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"target order rejected...").ConfigureAwait(false);
+                    await semaphore.WaitAsync();
                     TradeOrder.TargetPlaced = false;
+                    semaphore.Release();
                     await PlaceTarget(token).ConfigureAwait(false);
                 }
             }
@@ -561,6 +591,7 @@ namespace TradeMaster6000.Server.Tasks
                 if (entry.FilledQuantity > 0)
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"entry order filling...").ConfigureAwait(false);
+                    await semaphore.WaitAsync();
                     TradeOrder.QuantityFilled = entry.FilledQuantity;
                     TradeOrder.Entry = entry.AveragePrice;
                     if (!TradeOrder.PreSLMCancelled)
@@ -599,6 +630,7 @@ namespace TradeMaster6000.Server.Tasks
                         }
                     }
                     TradeOrder.IsOrderFilling = true;
+                    semaphore.Release();
                 }
             }
         }

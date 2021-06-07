@@ -15,27 +15,33 @@ namespace TradeMaster6000.Server.Services
     {
         private readonly IInstrumentHelper instrumentHelper;
         private readonly IKiteService kiteService;
-        private readonly IRunningOrderService running;
+        //private readonly IRunningOrderService running;
         private readonly ITradeOrderHelper tradeOrderHelper;
         private readonly ITickerService tickerService;
         private readonly IServiceProvider serviceProvider;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly IBackgroundJobClient backgroundJobs;
-        public OrderManagerService(IRunningOrderService runningOrderService, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
+        private readonly CancellationTokenSource source;
+        public OrderManagerService(/*IRunningOrderService runningOrderService, */IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
         {
             this.instrumentHelper = instrumentHelper;
             this.kiteService = kiteService;
-            this.running = runningOrderService;
+            //this.running = runningOrderService;
             this.tradeOrderHelper = tradeOrderHelper;
             this.tickerService = tickerService;
             this.serviceProvider = serviceProvider;
             this.tradeLogHelper = tradeLogHelper;
             this.backgroundJobs = backgroundJobs;
+            source = new CancellationTokenSource();
         }
 
         public async Task StartOrder(TradeOrder order)
         {
-            order.TokenSource = new CancellationTokenSource();
+            if (!kiteService.IsKiteConnected())
+            {
+                goto Ending;
+            }
+
             var instruments = await instrumentHelper.GetTradeInstruments();
 
             foreach (var instrument in instruments)
@@ -49,19 +55,9 @@ namespace TradeMaster6000.Server.Services
 
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
-            running.Add(order);
+            //running.Add(order);
 
-            while (!kiteService.IsKiteConnected())
-            {
-                if (order.TokenSource.Token.IsCancellationRequested)
-                {
-                    running.Remove(order.Id);
-                    goto Ending;
-                }
-                Thread.Sleep(2000);
-            }
-
-            await tickerService.Start();
+            tickerService.Start();
 
             RunOrder(order);
 
@@ -106,36 +102,34 @@ namespace TradeMaster6000.Server.Services
                 }
             }
 
-            foreach (var order in orders)
+            for (int i = 0; i < orders.Count; i++)
             {
-                var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
-                order.Id = tradeorder.Id;
-                running.Add(order);
+                var tradeorder = await tradeOrderHelper.AddTradeOrder(orders[i]);
+                orders[i].Id = tradeorder.Id;
             }
 
-            await tickerService.Start();
+            tickerService.Start();
 
-            foreach (var order in orders)
+            for (int i = 0; i < orders.Count; i++)
             {
-                RunOrder(order);
-                await Task.Delay(500);
+                orders[i].JobId = RunOrder(orders[i]);
+                await tradeOrderHelper.UpdateTradeOrder(orders[i]).ConfigureAwait(false);
             }
 
             Ending:;
         }
 
-        private void RunOrder(TradeOrder order)
+        private string RunOrder(TradeOrder order)
         {
             tickerService.Subscribe(order.Instrument.Token);
             OrderInstance orderWork = new(serviceProvider);
-            backgroundJobs.Enqueue(() => orderWork.StartWork(order, order.TokenSource.Token));
+            return backgroundJobs.Enqueue(() => orderWork.StartWork(order, source.Token));
         }
 
-        private async Task StopOrder(TradeOrder order)
+        public async Task StopOrder(TradeOrder order)
         {
             tickerService.UnSubscribe(order.Instrument.Token);
-            running.Remove(order.Id);
-            if (running.Get().Count == 0)
+            if (!tradeOrderHelper.AnyRunning())
             {
                 tickerService.Stop();
             }
@@ -152,7 +146,6 @@ namespace TradeMaster6000.Server.Services
                     order.RxR = 2;
                     order.TransactionType = TransactionType.BUY;
                     order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
                     return order;
                 case 1:
                     order.Entry = ltp - 1;
@@ -161,7 +154,6 @@ namespace TradeMaster6000.Server.Services
                     order.RxR = 2;
                     order.TransactionType = TransactionType.BUY;
                     order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
                     return order;
                 case 2:
                     order.Entry = ltp - 6;
@@ -170,7 +162,6 @@ namespace TradeMaster6000.Server.Services
                     order.RxR = 2;
                     order.TransactionType = TransactionType.SELL;
                     order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
                     return order;
                 case 3:
                     order.Entry = ltp + 6;
@@ -179,7 +170,6 @@ namespace TradeMaster6000.Server.Services
                     order.RxR = 2;
                     order.TransactionType = TransactionType.BUY;
                     order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
                     return order;
                 case 4:
                     order.Entry = ltp - 1;
@@ -188,7 +178,6 @@ namespace TradeMaster6000.Server.Services
                     order.RxR = 2;
                     order.TransactionType = TransactionType.SELL;
                     order.TradingSymbol = order.Instrument.TradingSymbol;
-                    order.TokenSource = new CancellationTokenSource();
                     return order;
                 default:
                     return default;
@@ -199,5 +188,6 @@ namespace TradeMaster6000.Server.Services
     {
         Task AutoOrders(int k);
         Task StartOrder(TradeOrder order);
+        Task StopOrder(TradeOrder order);
     }
 }

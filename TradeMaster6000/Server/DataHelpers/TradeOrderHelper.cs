@@ -12,12 +12,10 @@ namespace TradeMaster6000.Server.DataHelpers
     public class TradeOrderHelper : ITradeOrderHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
-        private ITradeLogHelper LogHelper { get; set; }
 
-        public TradeOrderHelper(IDbContextFactory<TradeDbContext> contextFactory, ITradeLogHelper logHelper)
+        public TradeOrderHelper(IDbContextFactory<TradeDbContext> contextFactory)
         {
             this.contextFactory = contextFactory;
-            LogHelper = logHelper;
         }
 
         public async Task<TradeOrder> GetTradeOrder(int id)
@@ -63,6 +61,13 @@ namespace TradeMaster6000.Server.DataHelpers
 
             return order;
         }
+        public bool AnyRunning()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return context.TradeOrders.Where(x => x.Status == Status.RUNNING).Any();
+            }
+        }
     }
 
     public interface ITradeOrderHelper
@@ -72,5 +77,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task<TradeOrder> GetTradeOrder(int id);
         Task<List<TradeOrder>> GetTradeOrders();
         Task<List<TradeOrder>> GetRunningTradeOrders();
+        bool AnyRunning();
     }
 }

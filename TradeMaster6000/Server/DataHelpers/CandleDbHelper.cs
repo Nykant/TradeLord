@@ -42,7 +42,7 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public Task Flush()
+        public async Task Flush()
         {
             using (var context = contextFactory.CreateDbContext())
             {
@@ -53,9 +53,8 @@ namespace TradeMaster6000.Server.DataHelpers
                         context.Remove(candle);
                     }
                 }
-                context.SaveChanges();
+                await context.SaveChangesAsync();
             }
-            return Task.FromResult(0);
         }
     }
     public interface ICandleDbHelper

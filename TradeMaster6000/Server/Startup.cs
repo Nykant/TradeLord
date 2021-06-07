@@ -108,10 +108,10 @@ namespace TradeMaster6000.Server
                     PrepareSchemaIfNecessary = true,
                     DashboardJobListLimit = 50000,
                     TransactionTimeout = TimeSpan.FromMinutes(1),
-                    TablesPrefix = "Hangfire"
+                    TablesPrefix = "Prefix"
                 })));
 
-            services.AddHangfireServer();
+            services.AddHangfireServer(x => x.CancellationCheckInterval = TimeSpan.FromSeconds(5));
 
             //-------------------
             services.TryAddSingleton<IProtectionService, ProtectionService>();
@@ -123,7 +123,7 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ITickDbHelper, TickDbHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
             //-------------------
-            services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
+            //services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
             services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.TryAddSingleton<ITradeHelper, TradeHelper>();
             services.TryAddSingleton<ITimeHelper, TimeHelper>();
@@ -207,8 +207,14 @@ namespace TradeMaster6000.Server
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IBackgroundJobClient backgroundJobs/*, IRunningOrderService running*/, IKiteService kiteService, IInstrumentHelper instrumentHelper, IInstrumentService instrumentService, ITickerService tickerService)
         {
+            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+            //backgroundJobs.Enqueue(() => running.UpdateOrders(cancellationTokenSource.Token));
+            backgroundJobs.Enqueue(() => kiteService.KiteManager(cancellationTokenSource.Token));
+            backgroundJobs.Enqueue(() => tickerService.StartFlushing(cancellationTokenSource.Token));
+            instrumentHelper.LoadInstruments(instrumentService.GetInstruments());
+
             app.UseForwardedHeaders();
             app.UseResponseCompression();
 

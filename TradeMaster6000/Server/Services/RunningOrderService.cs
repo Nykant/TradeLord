@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Hangfire;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,110 +12,115 @@ using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.Services
 {
-    public class RunningOrderService : IRunningOrderService
-    {
-        private ConcurrentDictionary<int, TradeOrder> Orders { get; set; }
-        private ConcurrentQueue<SomeLog> RunningLogs { get; set; }
-        private readonly ITradeOrderHelper tradeOrderHelper;
-        public RunningOrderService(ITradeOrderHelper tradeOrderHelper)
-        {
-            Orders = new ();
-            RunningLogs = new();
-            this.tradeOrderHelper = tradeOrderHelper;
-        }
+    //public class RunningOrderService : IRunningOrderService
+    //{
+    //    private ConcurrentQueue<SomeLog> RunningLogs { get; set; }
+    //    private readonly ITradeOrderHelper tradeOrderHelper;
+    //    private readonly IBackgroundJobClient backgroundJobs;
+    //    public RunningOrderService(ITradeOrderHelper tradeOrderHelper, IBackgroundJobClient backgroundJobs)
+    //    {
+    //        Orders = new ();
+    //        RunningLogs = new();
+    //        this.tradeOrderHelper = tradeOrderHelper;
+    //        this.backgroundJobs = backgroundJobs;
 
-        public void Add(TradeOrder order)
-        {
-            if(!Orders.TryAdd(order.Id, order))
-            {
-                AddLog($"couldn't add order -> {order.Id}", LogType.RunningOrder);
-            }
-        }
+    //        //RecurringJob.AddOrUpdate(() => UpdateOrders(), "*/5 * * * *");
+    //    }
 
-        public void Remove(int id)
-        {
-            foreach(var order in Orders)
-            {
-                if(order.Key == id)
-                {
-                    if (!Orders.TryRemove(order))
-                    {
-                        AddLog($"couldn't remove order -> {id}", LogType.RunningOrder);
-                    }
-                    break;
-                }
-            }
-        }
+    //    public void Add(TradeOrder order)
+    //    {
+    //        if(!Orders.TryAdd(order.Id, order))
+    //        {
+    //            AddLog($"couldn't add order -> {order.Id}", LogType.RunningOrder);
+    //        }
+    //    }
 
-        public async Task UpdateOrders()
-        {
-            var orders = await tradeOrderHelper.GetRunningTradeOrders();
+    //    public void Remove(int id)
+    //    {
+    //        foreach(var order in Orders)
+    //        {
+    //            if(order.Key == id)
+    //            {
+    //                if (!Orders.TryRemove(order))
+    //                {
+    //                    AddLog($"couldn't remove order -> {id}", LogType.RunningOrder);
+    //                }
+    //                break;
+    //            }
+    //        }
+    //    }
 
-            await Task.Run(() =>
-            {
-                foreach (var order in orders)
-                {
-                    try
-                    {
-                        Orders.TryGetValue(order.Id, out TradeOrder value);
-                        if (value != null)
-                        {
-                            order.TokenSource = value.TokenSource;
-                            Orders.TryUpdate(order.Id, order, Orders[order.Id]);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        AddLog($"{order.Id} -> {e.Message}", LogType.Exception);
-                    }
-                }
-            });
-        }
+    //    public async Task UpdateOrders(CancellationToken token)
+    //    {
+    //        while (!token.IsCancellationRequested)
+    //        {
+    //            var orders = await tradeOrderHelper.GetRunningTradeOrders();
 
-        private void AddLog(string log, LogType type)
-        {
-            RunningLogs.Enqueue(new()
-            {
-                Log = log,
-                Timestamp = DateTime.Now,
-                LogType = type
-            });
-        }
+    //            foreach (var order in orders)
+    //            {
+    //                try
+    //                {
+    //                    Orders.TryGetValue(order.Id, out TradeOrder value);
+    //                    if (value != null)
+    //                    {
+    //                        Orders.TryUpdate(order.Id, order, Orders[order.Id]);
+    //                    }
+    //                }
+    //                catch (Exception e)
+    //                {
+    //                    AddLog($"{order.Id} -> {e.Message}", LogType.Exception);
+    //                }
+    //            }
 
-        public List<SomeLog> GetLogs()
-        {
-            return RunningLogs.ToList();
-        }
+    //            await Task.Delay(10000);
+    //        }
+    //    }
 
-        public List<TradeOrder> Get()
-        {
-            List<TradeOrder> orders = new();
-            foreach(var valuepair in Orders)
-            {
-                orders.Add(valuepair.Value);
-            }
-            return orders;
-        }
+    //    private void AddLog(string log, LogType type)
+    //    {
+    //        RunningLogs.Enqueue(new()
+    //        {
+    //            Log = log,
+    //            Timestamp = DateTime.Now,
+    //            LogType = type
+    //        });
+    //    }
 
-        public void StopOrder(int id)
-        {
-            var orders = Get();
-            foreach (var order in orders)
-            {
-                if (order.Id == id)
-                {
-                    order.TokenSource.Cancel();
-                }
-            }
-        }
-    }
-    public interface IRunningOrderService
-    {
-        void Add(TradeOrder order);
-        void Remove(int id);
-        List<TradeOrder> Get();
-        Task UpdateOrders();
-        List<SomeLog> GetLogs();
-        void StopOrder(int id);
-    }
+    //    public List<SomeLog> GetLogs()
+    //    {
+    //        return RunningLogs.ToList();
+    //    }
+
+    //    public List<TradeOrder> Get()
+    //    {
+    //        List<TradeOrder> orders = new();
+    //        var runnin = Orders;
+    //        foreach(var valuepair in runnin)
+    //        {
+    //            orders.Add(valuepair.Value);
+    //        }
+    //        return orders;
+    //    }
+
+    //    public void StopOrder(int id)
+    //    {
+    //        var orders = Get();
+    //        foreach (var order in orders)
+    //        {
+    //            if (order.Id == id)
+    //            {
+    //                backgroundJobs.Delete(order.JobId);
+    //            }
+    //        }
+    //    }
+    //}
+    //public interface IRunningOrderService
+    //{
+    //    void Add(TradeOrder order);
+    //    void Remove(int id);
+    //    List<TradeOrder> Get();
+    //    List<SomeLog> GetLogs();
+    //    void StopOrder(int id);
+    //    Task UpdateOrders(CancellationToken token);
+    //}
 }

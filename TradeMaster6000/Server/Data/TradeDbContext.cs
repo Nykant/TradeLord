@@ -22,7 +22,6 @@ namespace TradeMaster6000.Server.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<TradeOrder>().Ignore(e => e.TokenSource);
             modelBuilder.Entity<TradeOrder>().Ignore(e => e.Instrument);
         }
     }

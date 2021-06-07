@@ -1,4 +1,5 @@
 ﻿using KiteConnect;
+using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -26,19 +27,23 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IInstrumentHelper instrumentHelper;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly ITickerService tickerService;
-        private readonly IRunningOrderService running;
+        //private readonly IRunningOrderService running;
         private readonly IOrderManagerService orderManagerService;
+        private readonly IBackgroundJobClient backgroundJob;
         private IKiteService KiteService { get; set; }
+        private readonly CancellationTokenSource source;
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IRunningOrderService runningOrderService, IKiteService kiteService, IOrderManagerService orderManagerService)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob)
         {
             this.tickerService = tickerService;
             this.orderManagerService = orderManagerService;
-            running = runningOrderService;
+            this.backgroundJob = backgroundJob;
+            //running = runningOrderService;
             KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
+            source = new CancellationTokenSource();
         }
 
         public async Task NewOrder(TradeOrder order)
@@ -56,10 +61,13 @@ namespace TradeMaster6000.Server.Hubs
             await orderManagerService.AutoOrders(20).ConfigureAwait(false);
         }
 
-        public async Task StartMagic()
+        public void StartMagic()
         {
-            await tickerService.Start();
-            await tickerService.StartCandles();
+            tickerService.Start();
+            if (!tickerService.IsCandlesRunning())
+            {
+                backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
+            }
         }
 
         public async Task GetTick(string symbol)
@@ -69,18 +77,14 @@ namespace TradeMaster6000.Server.Hubs
             {
                 TradeInstrument tradeInstrument = new();
                 var instruments = await instrumentHelper.GetTradeInstruments();
-                await Task.Run(() =>
+                foreach (var instrument in instruments)
                 {
-                    foreach (var instrument in instruments)
+                    if (instrument.TradingSymbol == symbol)
                     {
-                        if (instrument.TradingSymbol == symbol)
-                        {
-                            tradeInstrument = instrument;
-                            break;
-                        }
+                        tradeInstrument = instrument;
+                        break;
                     }
-                });
-
+                }
                 var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
                 dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
                 await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
@@ -109,9 +113,8 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task Update()
         {
-            await running.UpdateOrders();
-            await Clients.Caller.SendAsync("ReceiveOrders", running.Get());
-            await Clients.Caller.SendAsync("ReceiveRunningLogs", running.GetLogs());
+            await Clients.Caller.SendAsync("ReceiveOrders", await tradeOrderHelper.GetRunningTradeOrders());
+            //await Clients.Caller.SendAsync("ReceiveRunningLogs", running.GetLogs());
         }
 
         public async Task GetLogs(int orderId)
@@ -121,7 +124,14 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StopOrderWork(int id)
         {
-            await Task.Run(()=>running.StopOrder(id)).ConfigureAwait(false);
+            var orders = await tradeOrderHelper.GetRunningTradeOrders();
+            foreach(var order in orders)
+            {
+                if(order.Id == id)
+                {
+                    backgroundJob.Delete(order.JobId);
+                }
+            }
         }
     }
 }
