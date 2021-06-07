@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNet.SignalR;
+﻿using Hangfire;
+using Microsoft.AspNet.SignalR;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +20,8 @@ namespace TradeMaster6000.Server.Services
         private readonly ITickerService tickerService;
         private readonly IServiceProvider serviceProvider;
         private readonly ITradeLogHelper tradeLogHelper;
-        public OrderManagerService(IRunningOrderService runningOrderService, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper)
+        private readonly IBackgroundJobClient backgroundJobs;
+        public OrderManagerService(IRunningOrderService runningOrderService, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
         {
             this.instrumentHelper = instrumentHelper;
             this.kiteService = kiteService;
@@ -28,6 +30,7 @@ namespace TradeMaster6000.Server.Services
             this.tickerService = tickerService;
             this.serviceProvider = serviceProvider;
             this.tradeLogHelper = tradeLogHelper;
+            this.backgroundJobs = backgroundJobs;
         }
 
         public async Task StartOrder(TradeOrder order)
@@ -60,7 +63,7 @@ namespace TradeMaster6000.Server.Services
 
             await tickerService.Start();
 
-            await RunOrder(order).ConfigureAwait(false);
+            RunOrder(order);
 
             Ending:;
         }
@@ -114,37 +117,29 @@ namespace TradeMaster6000.Server.Services
 
             foreach (var order in orders)
             {
-                await RunOrder(order).ConfigureAwait(false);
+                RunOrder(order);
                 await Task.Delay(500);
             }
 
             Ending:;
         }
 
-        private async Task RunOrder(TradeOrder order)
+        private void RunOrder(TradeOrder order)
         {
-            try
+            tickerService.Subscribe(order.Instrument.Token);
+            OrderInstance orderWork = new(serviceProvider);
+            backgroundJobs.Enqueue(() => orderWork.StartWork(order, order.TokenSource.Token));
+        }
+
+        private async Task StopOrder(TradeOrder order)
+        {
+            tickerService.UnSubscribe(order.Instrument.Token);
+            running.Remove(order.Id);
+            if (running.Get().Count == 0)
             {
-                tickerService.Subscribe(order.Instrument.Token);
-                OrderInstance orderWork = new(serviceProvider);
-                await orderWork.StartWork(order, order.TokenSource.Token);
-                tickerService.UnSubscribe(order.Instrument.Token);
-                running.Remove(order.Id);
-                if (running.Get().Count == 0)
-                {
-                    tickerService.Stop();
-                }
-                await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
+                tickerService.Stop();
             }
-            catch (Exception e)
-            {
-                await tradeLogHelper.AddLog(order.Id, $"some error happened lol: {e.Message}...").ConfigureAwait(false);
-                try
-                {
-                    running.Remove(order.Id);
-                }
-                catch { }
-            }
+            await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
         }
         private static TradeOrder MakeOrder(int i, TradeOrder order, decimal ltp)
         {

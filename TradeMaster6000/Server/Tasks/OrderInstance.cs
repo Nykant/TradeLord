@@ -37,6 +37,8 @@ namespace TradeMaster6000.Server.Tasks
 
         private bool finished;
 
+        private SemaphoreSlim 
+
         public OrderInstance(IServiceProvider service)
         {
             OrderHelper = service.GetRequiredService<ITradeOrderHelper>();

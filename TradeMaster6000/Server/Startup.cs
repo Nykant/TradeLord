@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.MySql;
 using KiteConnect;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -22,6 +24,7 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
+using System.Transactions;
 using TradeMaster6000.Server.Data;
 using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Helpers;
@@ -50,6 +53,7 @@ namespace TradeMaster6000.Server
             string connectionString = Configuration.GetConnectionString("DefaultConnection");
             string keyConnection = Configuration.GetConnectionString("KeyConnection");
             string tradeConnection = Configuration.GetConnectionString("TradeConnection");
+            string hangfireConnection = Configuration.GetConnectionString("HangfireConnection");
 
             services.AddDbContext<MyKeysContext>(options =>
                 options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection), (x)=> { x.EnableRetryOnFailure(5); }));
@@ -90,6 +94,24 @@ namespace TradeMaster6000.Server
             services.AddAuthentication()
                 .AddIdentityServerJwt();
 
+            services.AddHangfire(config => config
+                .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
+                .UseColouredConsoleLogProvider()
+                .UseSimpleAssemblyNameTypeSerializer()
+                .UseRecommendedSerializerSettings()
+                .UseStorage(new MySqlStorage(hangfireConnection, new MySqlStorageOptions
+                {
+                    TransactionIsolationLevel = IsolationLevel.ReadCommitted,
+                    QueuePollInterval = TimeSpan.FromSeconds(15),
+                    JobExpirationCheckInterval = TimeSpan.FromHours(1),
+                    CountersAggregateInterval = TimeSpan.FromMinutes(5),
+                    PrepareSchemaIfNecessary = true,
+                    DashboardJobListLimit = 50000,
+                    TransactionTimeout = TimeSpan.FromMinutes(1),
+                    TablesPrefix = "Hangfire"
+                })));
+
+            services.AddHangfireServer();
 
             //-------------------
             services.TryAddSingleton<IProtectionService, ProtectionService>();
@@ -181,6 +203,7 @@ namespace TradeMaster6000.Server
             {
                 option.IterationCount = 12000;
             });
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -208,6 +231,8 @@ namespace TradeMaster6000.Server
             app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();
 
+            app.UseHangfireDashboard();
+
             app.UseRouting();
 
             app.UseIdentityServer();
@@ -219,6 +244,7 @@ namespace TradeMaster6000.Server
                 endpoints.MapRazorPages();
                 endpoints.MapControllers();
                 endpoints.MapHub<OrderHub>("/orderhub");
+                endpoints.MapHangfireDashboard();
                 endpoints.MapFallbackToFile("index.html");
             });
         }
