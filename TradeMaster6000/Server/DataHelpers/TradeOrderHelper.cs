@@ -44,9 +44,11 @@ namespace TradeMaster6000.Server.DataHelpers
 
         public async Task UpdateTradeOrder(TradeOrder order)
         {
-            using var context = contextFactory.CreateDbContext();
-            context.TradeOrders.Update(order);
-            await context.SaveChangesAsync();
+            using (var context = contextFactory.CreateDbContext())
+            {
+                context.TradeOrders.Update(order);
+                await context.SaveChangesAsync();
+            }
         }
 
         public async Task<TradeOrder> AddTradeOrder(TradeOrder tradeOrder)

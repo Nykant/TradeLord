@@ -113,7 +113,11 @@ namespace TradeMaster6000.Server.Services
             for (int i = 0; i < orders.Count; i++)
             {
                 orders[i].JobId = RunOrder(orders[i]);
-                await tradeOrderHelper.UpdateTradeOrder(orders[i]).ConfigureAwait(false);
+            }
+
+            foreach(var order in orders)
+            {
+                await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
             }
 
             Ending:;

@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.Data;
 using TradeMaster6000.Shared;
@@ -11,30 +12,40 @@ namespace TradeMaster6000.Server.DataHelpers
     public class OrderUpdatesDbHelper : IOrderUpdatesDbHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        private static SemaphoreSlim semaphore;
         public OrderUpdatesDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory)
         {
             contextFactory = dbContextFactory;
+            semaphore = new SemaphoreSlim(1, 1);
         }
 
         public async Task AddOrUpdate(OrderUpdate update)
         {
-            using (var context = contextFactory.CreateDbContext())
+            await semaphore.WaitAsync();
+            try
             {
-                var updateToUpdate = await context.OrderUpdates.FindAsync(update.OrderId);
-                if(updateToUpdate == null)
+                using (var context = contextFactory.CreateDbContext())
                 {
-                    context.OrderUpdates.Add(update);
-                    await context.SaveChangesAsync();
-                    goto Ending;
-                }
+                    var updateToUpdate = await context.OrderUpdates.FindAsync(update.OrderId);
+                    if (updateToUpdate == null)
+                    {
+                        await context.OrderUpdates.AddAsync(update);
+                        await context.SaveChangesAsync();
+                        goto Ending;
+                    }
 
-                if (updateToUpdate.FilledQuantity <= update.FilledQuantity)
-                {
-                    context.OrderUpdates.Update(update);
-                    await context.SaveChangesAsync();
-                }
+                    if (updateToUpdate.FilledQuantity <= update.FilledQuantity)
+                    {
+                        context.OrderUpdates.Update(update);
+                        await context.SaveChangesAsync();
+                    }
 
-                Ending:;
+                    Ending:;
+                }
+            }
+            finally
+            {
+                semaphore.Release();
             }
         }
         public async Task<OrderUpdate> Get(string orderId)
@@ -44,56 +55,6 @@ namespace TradeMaster6000.Server.DataHelpers
                 return await context.OrderUpdates.FindAsync(orderId);
             }
         }
-
-
-        //public async Task<MyTick> GetLast(uint token)
-        //{
-        //    using (var context = contextFactory.CreateDbContext())
-        //    {
-        //        var ticks = await context.Ticks.ToListAsync();
-        //        ticks.Reverse();
-        //        foreach (var tick in ticks)
-        //        {
-        //            if (tick.InstrumentToken == token)
-        //            {
-        //                return tick;
-        //            }
-        //        }
-        //    }
-        //    return default;
-        //}
-        //public async Task<bool> Exists(uint token)
-        //{
-        //    using (var context = contextFactory.CreateDbContext())
-        //    {
-        //        if (await context.Ticks.FirstOrDefaultAsync(x => x.InstrumentToken == token) != default)
-        //        {
-        //            return true;
-        //        }
-        //    }
-        //    return false;
-        //}
-        //public async Task Flush()
-        //{
-        //    using (var context = contextFactory.CreateDbContext())
-        //    {
-        //        foreach (var tick in context.Ticks)
-        //        {
-        //            if (DateTime.Compare(tick.EndTime, DateTime.Now) < 0)
-        //            {
-        //                context.Remove(tick);
-        //            }
-        //        }
-        //        await context.SaveChangesAsync();
-        //    }
-        //}
-        //public async Task<bool> Any()
-        //{
-        //    using (var context = contextFactory.CreateDbContext())
-        //    {
-        //        return await context.Ticks.AnyAsync();
-        //    }
-        //}
     }
     public interface IOrderUpdatesDbHelper
     {
