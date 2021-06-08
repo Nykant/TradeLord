@@ -347,7 +347,7 @@ namespace TradeMaster6000.Server.Tasks
                     High = tick.LTP,
                     Low = tick.LTP
                 };
-
+                 sdfsdf
                 Stopwatch stopwatch = new();
                 stopwatch.Start();
                 while (stopwatch.Elapsed.TotalSeconds < 60)
