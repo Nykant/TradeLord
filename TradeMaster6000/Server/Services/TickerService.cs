@@ -115,7 +115,7 @@ namespace TradeMaster6000.Server.Services
             while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
             {
                 var candle = new Candle() { InstrumentToken = instrument.Token, From = DateTime.Now, Kill = DateTime.Now.AddDays(1) };
-                await Task.Delay(59500, token);
+                await Task.Delay(60000, token);
 
                 await Task.Run(async() =>
                 {

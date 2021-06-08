@@ -1,6 +1,7 @@
 ﻿using Hangfire;
 using Microsoft.AspNet.SignalR;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,7 +22,7 @@ namespace TradeMaster6000.Server.Services
         private readonly IServiceProvider serviceProvider;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly IBackgroundJobClient backgroundJobs;
-        private readonly CancellationTokenSource source;
+        private ConcurrentDictionary<int, CancellationTokenSource> OrderTokenSources { get; set; }
         public OrderManagerService(/*IRunningOrderService runningOrderService, */IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
         {
             this.instrumentHelper = instrumentHelper;
@@ -32,7 +33,7 @@ namespace TradeMaster6000.Server.Services
             this.serviceProvider = serviceProvider;
             this.tradeLogHelper = tradeLogHelper;
             this.backgroundJobs = backgroundJobs;
-            source = new CancellationTokenSource();
+            OrderTokenSources = new ConcurrentDictionary<int, CancellationTokenSource>();
         }
 
         public async Task StartOrder(TradeOrder order)
@@ -59,7 +60,9 @@ namespace TradeMaster6000.Server.Services
 
             tickerService.Start();
 
-            RunOrder(order);
+            order.JobId = RunOrder(order);
+
+            await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
 
             Ending:;
         }
@@ -125,9 +128,17 @@ namespace TradeMaster6000.Server.Services
 
         private string RunOrder(TradeOrder order)
         {
+            CancellationTokenSource source = new CancellationTokenSource();
+            OrderTokenSources.TryAdd(order.Id, source);
             tickerService.Subscribe(order.Instrument.Token);
             OrderInstance orderWork = new(serviceProvider);
             return backgroundJobs.Enqueue(() => orderWork.StartWork(order, source.Token));
+        }
+
+        public void CancelToken(int id)
+        {
+            OrderTokenSources.TryGetValue(id, out CancellationTokenSource value);
+            value.Cancel();
         }
 
         public async Task StopOrder(TradeOrder order)
@@ -193,5 +204,6 @@ namespace TradeMaster6000.Server.Services
         Task AutoOrders(int k);
         Task StartOrder(TradeOrder order);
         Task StopOrder(TradeOrder order);
+        void CancelToken(int id);
     }
 }

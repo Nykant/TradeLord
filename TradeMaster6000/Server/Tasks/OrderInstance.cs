@@ -347,24 +347,31 @@ namespace TradeMaster6000.Server.Tasks
                     High = tick.LTP,
                     Low = tick.LTP
                 };
-                 sdfsdf
-                Stopwatch stopwatch = new();
-                stopwatch.Start();
-                while (stopwatch.Elapsed.TotalSeconds < 60)
+
+                await Task.Delay(59500);
+
+                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token);
+
+                await Task.Run(() =>
                 {
-                    tick = await TickDbHelper.GetLast(TradeOrder.Instrument.Token);
-                    if (candle.High < tick.LTP)
+                    candle.To = DateTime.Now;
+                    candle.High = ticks[0].LTP;
+                    candle.Low = ticks[0].LTP;
+                    for (int i = 0; i < ticks.Count; i++)
                     {
-                        candle.High = tick.LTP;
+                        if (candle.High < ticks[i].LTP)
+                        {
+                            candle.High = ticks[i].LTP;
+                        }
+                        if (candle.Low > ticks[i].LTP)
+                        {
+                            candle.Low = ticks[i].LTP;
+                        }
                     }
-                    if (candle.Low > tick.LTP)
-                    {
-                        candle.Low = tick.LTP;
-                    }
-                    await Task.Delay(200);
-                }
-                candle.Close = tick.LTP;
-                stopwatch.Stop();
+                    candle.Open = ticks[0].LTP;
+                    candle.Close = ticks[^1].LTP;
+                });
+
                 await semaphore.WaitAsync();
                 TradeOrder.StopLoss = SLMHelper.GetTriggerPrice(TradeOrder, candle);
                 semaphore.Release();
@@ -437,7 +444,8 @@ namespace TradeMaster6000.Server.Tasks
             await semaphore.WaitAsync();
             try
             {
-                TradeOrder = order;
+                TradeOrder = await OrderHelper.GetTradeOrder(order.Id);
+                TradeOrder.Instrument = order.Instrument;
 
                 if (TradeOrder.TransactionType.ToString() == "BUY")
                 {

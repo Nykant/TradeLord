@@ -17,6 +17,7 @@ using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Services;
 using TradeMaster6000.Server.Tasks;
 using TradeMaster6000.Shared;
+using System.Collections.Concurrent;
 
 namespace TradeMaster6000.Server.Hubs
 {
@@ -129,6 +130,7 @@ namespace TradeMaster6000.Server.Hubs
             {
                 if(order.Id == id)
                 {
+                    orderManagerService.CancelToken(id);
                     backgroundJob.Delete(order.JobId);
                 }
             }
