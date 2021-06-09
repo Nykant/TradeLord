@@ -22,7 +22,7 @@ namespace TradeMaster6000.Server.Services
         private readonly IServiceProvider serviceProvider;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly IBackgroundJobClient backgroundJobs;
-        private ConcurrentDictionary<int, CancellationTokenSource> OrderTokenSources { get; set; }
+        private static ConcurrentDictionary<int, CancellationTokenSource> OrderTokenSources { get; set; }
         public OrderManagerService(/*IRunningOrderService runningOrderService, */IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
         {
             this.instrumentHelper = instrumentHelper;

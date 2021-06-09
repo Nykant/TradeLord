@@ -8,6 +8,7 @@ namespace TradeMaster6000.Shared
 {
     public class OrderUpdate
     {
+        
         [Key]
         public string OrderId { get; set; }
         public uint InstrumentToken { get; set; }
@@ -19,8 +20,8 @@ namespace TradeMaster6000.Shared
         public int Quantity { get; set; }
         public string Status { get; set; }
 
-        [Timestamp]
-        public byte[] RowVersion { get; set; }
+        //[Timestamp]
+        //public byte[] RowVersion { get; set; }
 
     }
 }

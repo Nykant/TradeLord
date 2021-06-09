@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TradeMaster6000.Server.data.migrations.keys
 {
-    public partial class Sex : Migration
+    public partial class IOntitia : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {

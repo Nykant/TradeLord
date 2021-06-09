@@ -8,8 +8,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.keys
 {
     [DbContext(typeof(MyKeysContext))]
-    [Migration("20210530203228_Sex")]
-    partial class Sex
+    [Migration("20210609093124_IOntitia")]
+    partial class IOntitia
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {

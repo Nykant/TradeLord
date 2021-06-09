@@ -60,16 +60,17 @@ namespace TradeMaster6000.Server.Tasks
             finished = false;
         }
 
+        [AutomaticRetry(Attempts = 0)]
         public async Task StartWork(TradeOrder order, CancellationToken token)
         {
             await Initialize(order);
 
             while(!await TickDbHelper.Exists(order.Instrument.Token))
             {
-                await Task.Delay(500, token);
+                await Task.Delay(500);
             }
 
-            await semaphore.WaitAsync(token);
+            await semaphore.WaitAsync();
             try
             {
                 TradeOrder.EntryId = await TradeHelper.PlaceEntry(TradeOrder);
@@ -85,7 +86,7 @@ namespace TradeMaster6000.Server.Tasks
             }
 
             var response = await TradeHelper.PlacePreSLM(TradeOrder);
-            await semaphore.WaitAsync(token);
+            await semaphore.WaitAsync();
             try
             {
                 if (response == "cancelled")
@@ -123,7 +124,7 @@ namespace TradeMaster6000.Server.Tasks
                     goto Stopping;
                 }
 
-                await Task.Delay(5000, token);
+                await Task.Delay(5000);
             }
             while (!await TimeHelper.IsPreMarketOpen(TradeOrder.Id));
 
@@ -151,8 +152,10 @@ namespace TradeMaster6000.Server.Tasks
                 goto Stopping;
             }
 
-            backgroundJob.Enqueue(() => PlaceTarget(token));
-            backgroundJob.Enqueue(() => PlaceStopLoss());
+            //backgroundJob.Enqueue(() => PlaceTarget(token));
+            //backgroundJob.Enqueue(() => PlaceStopLoss());
+            await PlaceTarget(token).ConfigureAwait(false);
+            await PlaceStopLoss().ConfigureAwait(false);
 
             await LogHelper.AddLog(TradeOrder.Id, $"monitoring orders...").ConfigureAwait(false);
             while (true)
@@ -246,7 +249,7 @@ namespace TradeMaster6000.Server.Tasks
 
 
 
-        private async Task PlaceTarget(CancellationToken token)
+        public async Task PlaceTarget(CancellationToken token)
         {
             await LogHelper.AddLog(TradeOrder.Id, $"doing target logic...").ConfigureAwait(false);
 
@@ -331,7 +334,7 @@ namespace TradeMaster6000.Server.Tasks
         }
 
         // place stop loss
-        private async Task PlaceStopLoss()
+        public async Task PlaceStopLoss()
         {
             await LogHelper.AddLog(TradeOrder.Id, $"doing stoploss logic...").ConfigureAwait(false);
 
@@ -444,7 +447,17 @@ namespace TradeMaster6000.Server.Tasks
             await semaphore.WaitAsync();
             try
             {
-                TradeOrder = await OrderHelper.GetTradeOrder(order.Id);
+                while (true)
+                {
+                    TradeOrder = await OrderHelper.GetTradeOrder(order.Id);
+                    if(TradeOrder.JobId != null)
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(500);
+                }
+
                 TradeOrder.Instrument = order.Instrument;
 
                 if (TradeOrder.TransactionType.ToString() == "BUY")

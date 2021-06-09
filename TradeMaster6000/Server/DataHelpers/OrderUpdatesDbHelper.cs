@@ -13,31 +13,40 @@ namespace TradeMaster6000.Server.DataHelpers
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
         private static SemaphoreSlim semaphore;
+        private readonly object key = new object();
         public OrderUpdatesDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory)
         {
             contextFactory = dbContextFactory;
             semaphore = new SemaphoreSlim(1, 1);
         }
 
-        public async Task AddOrUpdate(OrderUpdate update)
+        public void AddOrUpdate(OrderUpdate update)
         {
-            await semaphore.WaitAsync();
+            semaphore.Wait();
             try
             {
+                OrderUpdate updateToUpdate;
                 using (var context = contextFactory.CreateDbContext())
                 {
-                    var updateToUpdate = await context.OrderUpdates.FindAsync(update.OrderId);
+                    updateToUpdate = context.OrderUpdates.Find(update.OrderId);
+                }
+
+
+                //lock (key)
+                //{
+                using (var context = contextFactory.CreateDbContext())
+                {
                     if (updateToUpdate == null)
                     {
-                        await context.OrderUpdates.AddAsync(update);
-                        await context.SaveChangesAsync();
+                        context.OrderUpdates.Add(update);
+                        context.SaveChanges();
                         goto Ending;
                     }
 
                     if (updateToUpdate.FilledQuantity <= update.FilledQuantity)
                     {
                         context.OrderUpdates.Update(update);
-                        await context.SaveChangesAsync();
+                        context.SaveChanges();
                     }
 
                     Ending:;
@@ -58,7 +67,7 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface IOrderUpdatesDbHelper
     {
-        Task AddOrUpdate(OrderUpdate update);
+        void AddOrUpdate(OrderUpdate update);
         Task<OrderUpdate> Get(string orderId);
     }
 }

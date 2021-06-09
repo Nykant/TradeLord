@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210607145710_Inititio")]
-    partial class Inititio
+    [Migration("20210609093050_IOntitia")]
+    partial class IOntitia
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -96,11 +96,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp(6)");
 
                     b.Property<string>("Status")
                         .HasColumnType("longtext");

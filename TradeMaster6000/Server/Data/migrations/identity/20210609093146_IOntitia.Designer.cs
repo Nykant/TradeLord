@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.identity
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20210530203323_Sex")]
-    partial class Sex
+    [Migration("20210609093146_IOntitia")]
+    partial class IOntitia
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {

@@ -95,11 +95,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
-                    b.Property<DateTime?>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp(6)");
-
                     b.Property<string>("Status")
                         .HasColumnType("longtext");
 

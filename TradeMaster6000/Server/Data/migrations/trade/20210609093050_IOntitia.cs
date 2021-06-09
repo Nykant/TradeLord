@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TradeMaster6000.Server.data.migrations.trade
 {
-    public partial class initial : Migration
+    public partial class IOntitia : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -46,9 +46,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     Price = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    RowVersion = table.Column<DateTime>(type: "timestamp(6)", rowVersion: true, nullable: true)
-                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.ComputedColumn)
+                        .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
@@ -128,7 +126,9 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     RegularSlmPlaced = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     TargetHit = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     TargetPlaced = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                    SquaredOff = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                    SquaredOff = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    JobId = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {

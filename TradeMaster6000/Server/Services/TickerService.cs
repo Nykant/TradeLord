@@ -3,6 +3,7 @@ using KiteConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -19,7 +20,7 @@ namespace TradeMaster6000.Server.Services
 {
     public class TickerService : ITickerService
     {
-
+        private readonly ILogger<TickerService> logger;
         private IConfiguration Configuration { get; }
         private readonly IKiteService kiteService;
         private readonly IInstrumentHelper instrumentHelper;
@@ -28,11 +29,13 @@ namespace TradeMaster6000.Server.Services
         private readonly ITickDbHelper tickDbHelper;
         private readonly IOrderUpdatesDbHelper updatesHelper;
         private readonly IBackgroundJobClient backgroundJob;
+        private readonly IContextExtension contextExtension;
 
         private static Ticker Ticker { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private bool CandlesRunning { get; set; }
-        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob)
+        //private readonly object key = new object();
+        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger)
         {
             this.kiteService = kiteService;
             Configuration = configuration;
@@ -42,6 +45,8 @@ namespace TradeMaster6000.Server.Services
             this.tickDbHelper = tickDbHelper;
             this.updatesHelper = orderUpdatesDbHelper;
             this.backgroundJob = backgroundJob;
+            this.contextExtension = contextExtension;
+            this.logger = logger;
             TickerLogs = new ();
         }
 
@@ -76,6 +81,8 @@ namespace TradeMaster6000.Server.Services
 
         public async Task RunCandles(CancellationToken token)
         {
+            //var context = contextExtension.GetContext();
+            //logger.LogInformation("---------------- the user logged in test --------------" + context.User.Identity.IsAuthenticated.ToString());
             CandlesRunning = true;
             await candleHelper.Flush();
 
@@ -166,7 +173,11 @@ namespace TradeMaster6000.Server.Services
                     Timestamp = DateTime.Now,
                     TriggerPrice = order.TriggerPrice
                 };
-                await updatesHelper.AddOrUpdate(newOrderUpdate);
+                //lock (key)
+                //{
+                    updatesHelper.AddOrUpdate(newOrderUpdate);
+                //}
+
                 return newOrderUpdate;
             }
             catch (KiteException e)
@@ -231,20 +242,24 @@ namespace TradeMaster6000.Server.Services
             });
         }
 
-        private async void OnOrderUpdate(Order orderData)
+        private void OnOrderUpdate(Order orderData)
         {
-            await updatesHelper.AddOrUpdate(new OrderUpdate
-            {
-                AveragePrice = orderData.AveragePrice,
-                FilledQuantity = orderData.FilledQuantity,
-                InstrumentToken = orderData.InstrumentToken,
-                OrderId = orderData.OrderId,
-                Price = orderData.Price,
-                Quantity = orderData.Quantity,
-                Status = orderData.Status,
-                Timestamp = DateTime.Now,
-                TriggerPrice = orderData.TriggerPrice
-            });
+            //lock (key)
+            //{
+                updatesHelper.AddOrUpdate(new OrderUpdate
+                {
+                    AveragePrice = orderData.AveragePrice,
+                    FilledQuantity = orderData.FilledQuantity,
+                    InstrumentToken = orderData.InstrumentToken,
+                    OrderId = orderData.OrderId,
+                    Price = orderData.Price,
+                    Quantity = orderData.Quantity,
+                    Status = orderData.Status,
+                    Timestamp = DateTime.Now,
+                    TriggerPrice = orderData.TriggerPrice
+                });
+            //}
+
         }
 
         private void OnError(string message)

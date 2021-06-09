@@ -31,14 +31,16 @@ namespace TradeMaster6000.Server.Hubs
         //private readonly IRunningOrderService running;
         private readonly IOrderManagerService orderManagerService;
         private readonly IBackgroundJobClient backgroundJob;
+        private readonly ICandleDbHelper candleDbHelper;
         private IKiteService KiteService { get; set; }
         private readonly CancellationTokenSource source;
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper)
         {
             this.tickerService = tickerService;
             this.orderManagerService = orderManagerService;
             this.backgroundJob = backgroundJob;
+            this.candleDbHelper = candleDbHelper;
             //running = runningOrderService;
             KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
@@ -123,6 +125,11 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveLogs", await tradeLogHelper.GetTradeLogs(orderId));
         }
 
+        public async Task GetCandles()
+        {
+            await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles());
+        }
+
         public async Task StopOrderWork(int id)
         {
             var orders = await tradeOrderHelper.GetRunningTradeOrders();
@@ -130,8 +137,8 @@ namespace TradeMaster6000.Server.Hubs
             {
                 if(order.Id == id)
                 {
-                    orderManagerService.CancelToken(id);
                     backgroundJob.Delete(order.JobId);
+                    orderManagerService.CancelToken(id);
                 }
             }
         }
