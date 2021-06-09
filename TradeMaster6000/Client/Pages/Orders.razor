@@ -14,7 +14,7 @@
     if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoUltraOrders()) Text="@AutoUltraText" />
+        @*<RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoUltraOrders()) Text="@AutoUltraText" />*@
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoOrders()) Text="@AutoText" />
         <RadzenButton Style="float: right" ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />        
         <hr />
@@ -127,7 +127,7 @@
         IsAutoLocked = true;
         StateHasChanged();
         await hubConnection.SendAsync("AutoOrders");
-        for(int i = 10; i >= 0; i--)
+        for(int i = 15; i >= 0; i--)
         {
             AutoText = i.ToString();
             AutoUltraText = i.ToString();
