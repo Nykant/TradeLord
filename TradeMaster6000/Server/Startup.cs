@@ -38,6 +38,7 @@ namespace TradeMaster6000.Server
 {
     public class Startup
     {
+        private static CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         public Startup(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             Configuration = configuration;
@@ -111,7 +112,8 @@ namespace TradeMaster6000.Server
                     PrepareSchemaIfNecessary = true,
                     DashboardJobListLimit = 50000,
                     TransactionTimeout = TimeSpan.FromMinutes(1),
-                    TablesPrefix = "HF"
+                    TablesPrefix = "HF",
+                    InvisibilityTimeout = TimeSpan.FromHours(24)
                 })));
 
             services.AddHangfireServer(x => { x.CancellationCheckInterval = TimeSpan.FromSeconds(5);  });
@@ -229,7 +231,6 @@ namespace TradeMaster6000.Server
                 //app.UseHsts();
             }
             ServicePointManager.DefaultConnectionLimit = 50;
-            GlobalJobFilters.Filters.Add(new AutomaticRetryAttribute { Attempts = 0 });
 
             app.UseCertificateForwarding();
             app.UseHttpsRedirection();
@@ -255,7 +256,6 @@ namespace TradeMaster6000.Server
                 endpoints.MapFallbackToFile("index.html");
             });
 
-            CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
             //backgroundJobs.Enqueue(() => running.UpdateOrders(cancellationTokenSource.Token));
             backgroundJobs.Enqueue(() => kiteService.KiteManager(cancellationTokenSource.Token));
             backgroundJobs.Enqueue(() => tickerService.StartFlushing(cancellationTokenSource.Token));
