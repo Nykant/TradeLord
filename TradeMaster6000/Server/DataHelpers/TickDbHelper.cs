@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,9 +13,11 @@ namespace TradeMaster6000.Server.DataHelpers
     public class TickDbHelper : ITickDbHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
-        public TickDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory)
+        private IWebHostEnvironment Env { get; set; }
+        public TickDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory, IWebHostEnvironment webHostEnvironment)
         {
             contextFactory = dbContextFactory;
+            Env = webHostEnvironment;
         }
 
         public async Task Add(MyTick tick)
@@ -28,7 +32,14 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Ticks.Where(x => x.InstrumentToken == token && DateTime.Compare(x.EndTime, DateTime.Now) > 0).ToListAsync();
+                if (Env.IsDevelopment())
+                {
+                    return await context.Ticks.Where(x => x.InstrumentToken == token && DateTime.Compare(x.EndTime, DateTime.Now.AddHours(3).AddMinutes(30)) > 0).ToListAsync();
+                }
+                else
+                {
+                    return await context.Ticks.Where(x => x.InstrumentToken == token && DateTime.Compare(x.EndTime, DateTime.Now.AddHours(5).AddMinutes(30)) > 0).ToListAsync();
+                }
             }
         }
         public async Task<MyTick> GetLast(uint token)
@@ -64,9 +75,19 @@ namespace TradeMaster6000.Server.DataHelpers
             {
                 foreach(var tick in context.Ticks)
                 {
-                    if(DateTime.Compare(tick.EndTime, DateTime.Now) < 0)
+                    if (Env.IsDevelopment())
                     {
-                        context.Remove(tick);
+                        if (DateTime.Compare(tick.EndTime, DateTime.Now.AddHours(3).AddMinutes(30)) < 0)
+                        {
+                            context.Remove(tick);
+                        }
+                    }
+                    else
+                    {
+                        if (DateTime.Compare(tick.EndTime, DateTime.Now.AddHours(5).AddMinutes(30)) < 0)
+                        {
+                            context.Remove(tick);
+                        }
                     }
                 }
                 await context.SaveChangesAsync();

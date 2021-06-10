@@ -116,7 +116,11 @@ namespace TradeMaster6000.Server
                     InvisibilityTimeout = TimeSpan.FromHours(24)
                 })));
 
-            services.AddHangfireServer(x => { x.CancellationCheckInterval = TimeSpan.FromSeconds(5);  });
+            services.AddHangfireServer(options => 
+            { 
+                options.CancellationCheckInterval = TimeSpan.FromSeconds(5); 
+                options.WorkerCount = 500; 
+            });
 
             services.TryAddTransient<IContextExtension, ContextExtension>();
             //-------------------
