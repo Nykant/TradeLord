@@ -127,7 +127,13 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetCandles()
         {
-            await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles());
+            var candles = await candleDbHelper.GetCandles();
+            for(int i = 0; i < candles.Count; i++)
+            {
+                var instrument = await instrumentHelper.Get(candles[i].InstrumentToken);
+                candles[i].InstrumentSymbol = instrument.TradingSymbol;
+            }
+            await Clients.Caller.SendAsync("ReceiveCandles", candles);
         }
 
         public async Task StopOrderWork(int id)

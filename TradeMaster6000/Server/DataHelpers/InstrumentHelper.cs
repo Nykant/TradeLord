@@ -42,10 +42,19 @@ namespace TradeMaster6000.Server.DataHelpers
                 }
             }
         }
+
+        public async Task<TradeInstrument> Get(uint token)
+        {
+            using (var context = ContextFactory.CreateDbContext())
+            {
+                return await context.TradeInstruments.FirstOrDefaultAsync(x => x.Token == token);
+            }
+        }
     }
     public interface IInstrumentHelper
     {
         Task<List<TradeInstrument>> GetTradeInstruments();
         void LoadInstruments(List<TradeInstrument> list);
+        Task<TradeInstrument> Get(uint token);
     }
 }
