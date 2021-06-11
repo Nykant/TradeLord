@@ -11,8 +11,11 @@ namespace TradeMaster6000.Server.Data
     {
         // A recommended constructor overload when using EF Core 
         // with dependency injection.
-        public MyKeysContext(DbContextOptions<MyKeysContext> options)
-            : base(options) { }
+        public MyKeysContext(DbContextOptions<MyKeysContext> options) : base(options) {
+            //Database.Migrate();
+        }
+
+            
 
         // This maps to the table that stores keys.
         public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }

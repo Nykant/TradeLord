@@ -37,8 +37,4 @@
     </PackageReference>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Data\migrations\" />
-  </ItemGroup>
-
 </Project>
