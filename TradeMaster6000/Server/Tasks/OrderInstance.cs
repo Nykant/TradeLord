@@ -69,7 +69,7 @@ namespace TradeMaster6000.Server.Tasks
             {
                 if (token.IsCancellationRequested)
                 {
-                    goto Stopping;
+                    goto Ending;
                 }
                 await Task.Delay(500);
             }

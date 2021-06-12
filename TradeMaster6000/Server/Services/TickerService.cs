@@ -183,7 +183,7 @@ namespace TradeMaster6000.Server.Services
                 };
                 //lock (key)
                 //{
-                    updatesHelper.AddOrUpdate(newOrderUpdate);
+                    await updatesHelper.AddOrUpdate(newOrderUpdate);
                 //}
 
                 return newOrderUpdate;
@@ -250,11 +250,11 @@ namespace TradeMaster6000.Server.Services
             });
         }
 
-        private void OnOrderUpdate(Order orderData)
+        private async void OnOrderUpdate(Order orderData)
         {
             //lock (key)
             //{
-                updatesHelper.AddOrUpdate(new OrderUpdate
+                await updatesHelper.AddOrUpdate(new OrderUpdate
                 {
                     AveragePrice = orderData.AveragePrice,
                     FilledQuantity = orderData.FilledQuantity,

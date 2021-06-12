@@ -13,40 +13,33 @@ namespace TradeMaster6000.Server.DataHelpers
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
         private static SemaphoreSlim semaphore;
-        private readonly object key = new object();
+        //private readonly object key = new object();
         public OrderUpdatesDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory)
         {
             contextFactory = dbContextFactory;
             semaphore = new SemaphoreSlim(1, 1);
         }
 
-        public void AddOrUpdate(OrderUpdate update)
+        public async Task AddOrUpdate(OrderUpdate update)
         {
-            semaphore.Wait();
+            await semaphore.WaitAsync();
             try
             {
-                OrderUpdate updateToUpdate;
+
                 using (var context = contextFactory.CreateDbContext())
                 {
-                    updateToUpdate = context.OrderUpdates.Find(update.OrderId);
-                }
-
-
-                //lock (key)
-                //{
-                using (var context = contextFactory.CreateDbContext())
-                {
-                    if (updateToUpdate == null)
+                    OrderUpdate updateToUpdate = await context.OrderUpdates.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == update.OrderId);
+                    if (updateToUpdate == default)
                     {
-                        context.OrderUpdates.Add(update);
-                        context.SaveChanges();
+                        await context.OrderUpdates.AddAsync(update);
+                        await context.SaveChangesAsync();
                         goto Ending;
                     }
 
                     if (updateToUpdate.FilledQuantity <= update.FilledQuantity)
                     {
                         context.OrderUpdates.Update(update);
-                        context.SaveChanges();
+                        await context.SaveChangesAsync();
                     }
 
                     Ending:;
@@ -67,7 +60,7 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface IOrderUpdatesDbHelper
     {
-        void AddOrUpdate(OrderUpdate update);
+        Task AddOrUpdate(OrderUpdate update);
         Task<OrderUpdate> Get(string orderId);
     }
 }
