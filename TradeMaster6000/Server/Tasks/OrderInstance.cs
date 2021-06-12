@@ -67,6 +67,10 @@ namespace TradeMaster6000.Server.Tasks
 
             while(!await TickDbHelper.Exists(order.Instrument.Token))
             {
+                if (token.IsCancellationRequested)
+                {
+                    goto Stopping;
+                }
                 await Task.Delay(500);
             }
 

@@ -9,7 +9,7 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.identity
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20210612103323_init")]
+    [Migration("20210612130813_init")]
     partial class init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

@@ -59,7 +59,7 @@ namespace TradeMaster6000.Server
             string hangfireConnection = Configuration.GetConnectionString("HangfireConnection");
 
             services.AddDbContext<MyKeysContext>(options =>
-                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection)));
+                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection), (e) => e.EnableRetryOnFailure(5)));
 
             if (Environment.IsDevelopment())
             {
@@ -77,11 +77,11 @@ namespace TradeMaster6000.Server
             }
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString), (e)=> e.EnableRetryOnFailure(5)));
 
             services.AddDbContextFactory<TradeDbContext>(options =>
             {
-                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection));
+                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection), (e) => e.EnableRetryOnFailure(5));
                 options.EnableSensitiveDataLogging(true);
                 options.EnableDetailedErrors(true);
                 options.ConfigureWarnings(options => options.Default(WarningBehavior.Log));
@@ -119,7 +119,7 @@ namespace TradeMaster6000.Server
             services.AddHangfireServer(options => 
             { 
                 options.CancellationCheckInterval = TimeSpan.FromSeconds(5); 
-                options.WorkerCount = 500;
+                options.WorkerCount = 20;
             });
 
             services.TryAddTransient<IContextExtension, ContextExtension>();
