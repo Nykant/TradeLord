@@ -8,7 +8,7 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.keys
 {
     [DbContext(typeof(MyKeysContext))]
-    [Migration("20210611114534_init")]
+    [Migration("20210612103331_init")]
     partial class init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -16,7 +16,7 @@ namespace TradeMaster6000.Server.data.migrations.keys
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("Relational:MaxIdentifierLength", 64)
-                .HasAnnotation("ProductVersion", "5.0.6");
+                .HasAnnotation("ProductVersion", "5.0.7");
 
             modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
                 {

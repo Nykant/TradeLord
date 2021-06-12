@@ -19,6 +19,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Logging;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using System;
 using System.Linq;
 using System.Net;
@@ -58,7 +59,7 @@ namespace TradeMaster6000.Server
             string hangfireConnection = Configuration.GetConnectionString("HangfireConnection");
 
             services.AddDbContext<MyKeysContext>(options =>
-                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection), (x)=> { x.EnableRetryOnFailure(5); }));
+                options.UseMySql(keyConnection, ServerVersion.AutoDetect(keyConnection)));
 
             if (Environment.IsDevelopment())
             {
@@ -76,16 +77,15 @@ namespace TradeMaster6000.Server
             }
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString), (x) => { x.EnableRetryOnFailure(5); }));
+                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
             services.AddDbContextFactory<TradeDbContext>(options =>
             {
-                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection), (x) => { x.EnableRetryOnFailure(5); });
+                options.UseMySql(tradeConnection, ServerVersion.AutoDetect(tradeConnection));
                 options.EnableSensitiveDataLogging(true);
                 options.EnableDetailedErrors(true);
                 options.ConfigureWarnings(options => options.Default(WarningBehavior.Log));
             });
-
 
             services.AddDefaultIdentity<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
                 .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -113,13 +113,13 @@ namespace TradeMaster6000.Server
                     DashboardJobListLimit = 50000,
                     TransactionTimeout = TimeSpan.FromMinutes(1),
                     TablesPrefix = "HF",
-                    InvisibilityTimeout = TimeSpan.FromHours(24)
+                    //InvisibilityTimeout = TimeSpan.FromHours(24)
                 })));
 
             services.AddHangfireServer(options => 
             { 
                 options.CancellationCheckInterval = TimeSpan.FromSeconds(5); 
-                options.WorkerCount = 500; 
+                options.WorkerCount = 500;
             });
 
             services.TryAddTransient<IContextExtension, ContextExtension>();

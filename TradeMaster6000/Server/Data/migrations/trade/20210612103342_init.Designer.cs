@@ -9,7 +9,7 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210611114346_init")]
+    [Migration("20210612103342_init")]
     partial class init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -17,7 +17,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("Relational:MaxIdentifierLength", 64)
-                .HasAnnotation("ProductVersion", "5.0.6");
+                .HasAnnotation("ProductVersion", "5.0.7");
 
             modelBuilder.Entity("TradeMaster6000.Shared.Candle", b =>
                 {

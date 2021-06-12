@@ -240,7 +240,8 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task<string> PlacePreSLM(TradeOrder order)
         {
-            var ltp = (await TickDbHelper.GetLast(order.Instrument.Token)).LTP;
+            var tick = await TickDbHelper.GetLast(order.Instrument.Token);
+            var ltp = tick.LTP;
             if (order.ExitTransactionType == "SELL")
             {
                 // if last price is more than stop loss then place slm

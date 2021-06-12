@@ -25,7 +25,7 @@ namespace TradeMaster6000.Server.Helpers
                 // check time once in a while, to figure out if it is time to wake up and go to work.
                 DateTime GST = DateTime.Now;
                 DateTime IST = GST.AddHours(3).AddMinutes(30);
-                DateTime opening = new (IST.Year, IST.Month, IST.Day, 9, 00, 00);
+                DateTime opening = new (IST.Year, IST.Month, IST.Day, 22, 00, 00);
                 DateTime closing = opening.AddHours(6).AddMinutes(30);
                 // if clock is 9 its time to get up and start the day!
                 if (DateTime.Compare(IST, opening) >= 0)
@@ -65,7 +65,7 @@ namespace TradeMaster6000.Server.Helpers
                 // check time once in a while, to figure out if it is time to wake up and go to work.
                 DateTime GST = DateTime.Now;
                 DateTime IST = GST.AddHours(3).AddMinutes(30);
-                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 00, 00);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 22, 00, 00);
                 DateTime closing = opening.AddHours(6).AddMinutes(30);
                 // if clock is 9 its time to get up and start the day!
                 if (DateTime.Compare(IST, opening) >= 0)
@@ -101,7 +101,7 @@ namespace TradeMaster6000.Server.Helpers
             if (Env.IsDevelopment())
             {
                 DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                if (IST.Hour == 15 && IST.Minute == 00)
+                if (IST.Hour == 00 && IST.Minute == 00)
                 {
                     return true;
                 }
@@ -110,7 +110,7 @@ namespace TradeMaster6000.Server.Helpers
             else
             {
                 DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                if (IST.Hour == 15 && IST.Minute == 00)
+                if (IST.Hour == 00 && IST.Minute == 00)
                 {
                     return true;
                 }
@@ -123,7 +123,7 @@ namespace TradeMaster6000.Server.Helpers
             if (Env.IsDevelopment())
             {
                 DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                if (IST.Hour == 15 && IST.Minute == 35)
+                if (IST.Hour == 00 && IST.Minute == 35)
                 {
                     return true;
                 }
@@ -132,7 +132,7 @@ namespace TradeMaster6000.Server.Helpers
             else
             {
                 DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                if (IST.Hour == 15 && IST.Minute == 35)
+                if (IST.Hour == 00 && IST.Minute == 35)
                 {
                     return true;
                 }
@@ -148,7 +148,7 @@ namespace TradeMaster6000.Server.Helpers
 
                 DateTime GST1 = DateTime.Now;
                 DateTime IST1 = GST1.AddHours(3).AddMinutes(30);
-                DateTime opening1 = new (IST1.Year, IST1.Month, IST1.Day, 9, 15, 0);
+                DateTime opening1 = new (IST1.Year, IST1.Month, IST1.Day, 22, 15, 0);
                 DateTime closing1 = opening1.AddHours(6).AddMinutes(15);
 
                 if (DateTime.Compare(IST1, opening1) < 0)
@@ -172,7 +172,7 @@ namespace TradeMaster6000.Server.Helpers
 
                 DateTime GST1 = DateTime.Now;
                 DateTime IST1 = GST1.AddHours(5).AddMinutes(30);
-                DateTime opening1 = new (IST1.Year, IST1.Month, IST1.Day, 9, 15, 0);
+                DateTime opening1 = new (IST1.Year, IST1.Month, IST1.Day, 22, 15, 0);
                 DateTime closing1 = opening1.AddHours(6).AddMinutes(15);
 
                 if (DateTime.Compare(IST1, opening1) < 0)
@@ -200,7 +200,7 @@ namespace TradeMaster6000.Server.Helpers
             {
                 DateTime GMT = DateTime.Now;
                 DateTime IST = GMT.AddHours(3).AddMinutes(30);
-                DateTime opening = new (IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime opening = new (IST.Year, IST.Month, IST.Day, 22, 15, 00);
                 DateTime closing = opening.AddHours(6).AddMinutes(15);
                 if (DateTime.Compare(IST, opening) >= 0)
                 {
@@ -236,7 +236,7 @@ namespace TradeMaster6000.Server.Helpers
             {
                 DateTime GMT = DateTime.Now;
                 DateTime IST = GMT.AddHours(3).AddMinutes(30);
-                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 22, 15, 00);
                 DateTime closing = opening.AddHours(6).AddMinutes(15);
                 if (DateTime.Compare(IST, opening) >= 0)
                 {
@@ -251,7 +251,7 @@ namespace TradeMaster6000.Server.Helpers
             {
                 DateTime GMT = DateTime.Now;
                 DateTime IST = GMT.AddHours(5).AddMinutes(30);
-                DateTime opening = new(IST.Year, IST.Month, IST.Day, 9, 15, 00);
+                DateTime opening = new(IST.Year, IST.Month, IST.Day, 22, 15, 00);
                 DateTime closing = opening.AddHours(6).AddMinutes(15);
                 if (DateTime.Compare(IST, opening) >= 0)
                 {
