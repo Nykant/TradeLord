@@ -31,7 +31,7 @@ namespace TradeMaster6000.Server.Services
 
             int timeFrameCount = 0;
             Candle temp = candles[0];
-            for(int i = 1; i < candles.Count; i++)
+            for(int i = 1, n = candles.Count; i < n; i++)
             {
                 if(temp.High < candles[i].High)
                 {
@@ -207,7 +207,7 @@ namespace TradeMaster6000.Server.Services
         {
             HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
             halfZone.BiggestBaseDiff = Math.Abs(fittyCandle.Candle.High - fittyCandle.Candle.Low);
-            for (int i = fittyCandle.Index; i < candles.Count && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            for (int i = fittyCandle.Index, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) <= 5; i++)
             {
                 if (halfZone.Top < candles[i].High)
                 {
@@ -242,7 +242,7 @@ namespace TradeMaster6000.Server.Services
         {
             HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
             halfZone.BiggestBaseDiff = downBiggestBaseDiff;
-            for (int i = fittyCandle.Index; i < candles.Count && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            for (int i = fittyCandle.Index, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) <= 5; i++)
             {
                 if (halfZone.Top < candles[i].High)
                 {
@@ -275,7 +275,7 @@ namespace TradeMaster6000.Server.Services
 
         private FittyCandle FittyFinder(List<Candle> candles, int index)
         {
-            for(int i = index; i < candles.Count; i++)
+            for(int i = index, n = candles.Count; i < n; i++)
             {
                 var fitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
                 if(Math.Abs(candles[i].Open - candles[i].Close) <= fitty)
