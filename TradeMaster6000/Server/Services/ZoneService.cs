@@ -10,9 +10,11 @@ namespace TradeMaster6000.Server.Services
     public class ZoneService : IZoneService
     {
         private readonly ICandleDbHelper candleHelper;
-        public ZoneService(ICandleDbHelper candleDbHelper)
+        private readonly IZoneDbHelper zoneHelper;
+        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper)
         {
             candleHelper = candleDbHelper;
+            zoneHelper = zoneDbHelper;
         }
 
         public async Task Start(List<TradeInstrument> instruments, int timeFrame)
@@ -44,6 +46,9 @@ namespace TradeMaster6000.Server.Services
 
                 if(timeFrameCount == timeFrame)
                 {
+                    temp.InstrumentSymbol = candles[i].InstrumentSymbol;
+                    temp.From = candles[i - 15].From;
+                    temp.To = candles[i].To;
                     temp.Open = candles[i - 15].Open;
                     temp.Close = candles[i].Close;
                     newCandles.Add(temp);
@@ -65,6 +70,8 @@ namespace TradeMaster6000.Server.Services
             {
                 goto Repeat;
             }
+
+            await zoneHelper.Add(zone);
 
             if(index == candles.Count - 1)
             {
@@ -110,7 +117,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone();
+            Zone zone = new Zone { From = down.Timestamp, To = up.Timestamp };
 
             if(up.Top > down.Top)
             {
@@ -152,6 +159,7 @@ namespace TradeMaster6000.Server.Services
                 decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (diff > diffx)
                 {
+                    halfZone.Timestamp = candles[i].From;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
@@ -187,6 +195,7 @@ namespace TradeMaster6000.Server.Services
                 decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (diff > diffx)
                 {
+                    halfZone.Timestamp = candles[i].From;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
@@ -222,6 +231,7 @@ namespace TradeMaster6000.Server.Services
                 decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (diff > diffx)
                 {
+                    halfZone.Timestamp = candles[i].To;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
@@ -257,6 +267,7 @@ namespace TradeMaster6000.Server.Services
                 decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (diff > diffx)
                 {
+                    halfZone.Timestamp = candles[i].To;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],

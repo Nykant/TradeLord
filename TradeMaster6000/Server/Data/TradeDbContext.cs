@@ -20,6 +20,7 @@ namespace TradeMaster6000.Server.Data
         public DbSet<Candle> Candles { get; set; }
         public DbSet<MyTick> Ticks { get; set; }
         public DbSet<OrderUpdate> OrderUpdates { get; set; }
+        public DbSet<Zone> Zones { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

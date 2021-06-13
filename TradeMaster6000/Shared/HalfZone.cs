@@ -10,6 +10,7 @@ namespace TradeMaster6000.Shared
         public decimal Top { get; set; }
         public decimal Bottom { get; set; }
         public decimal BiggestBaseDiff { get; set; }
+        public DateTime Timestamp { get; set; }
 
     }
 }
