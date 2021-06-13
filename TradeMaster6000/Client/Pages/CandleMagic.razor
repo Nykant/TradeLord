@@ -1,4 +1,4 @@
-﻿@page "/magic"
+﻿@page "/candlemagic"
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.WebAssembly.Authentication
 @using Microsoft.AspNetCore.SignalR.Client
@@ -11,7 +11,7 @@
 
     if (IsConnected)
     {
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartMagic" Text="Start magic" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartCandleMagic" Text="Start magic" />
 
         <hr />
 
@@ -62,9 +62,9 @@
         await hubConnection.SendAsync("GetCandles");
     }
 
-    private async Task StartMagic()
+    private async Task StartCandleMagic()
     {
-        await hubConnection.SendAsync("StartMagic");
+        await hubConnection.SendAsync("StartCandleMagic");
     }
 
     public bool IsConnected =>

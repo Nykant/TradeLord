@@ -64,13 +64,18 @@ namespace TradeMaster6000.Server.Hubs
             await orderManagerService.AutoOrders(20).ConfigureAwait(false);
         }
 
-        public void StartMagic()
+        public void StartCandleMagic()
         {
             tickerService.Start();
             if (!tickerService.IsCandlesRunning())
             {
                 backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
             }
+        }
+
+        public void StartZoneService()
+        {
+            backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
         }
 
         public async Task GetTick(string symbol)
