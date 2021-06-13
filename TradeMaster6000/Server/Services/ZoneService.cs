@@ -17,7 +17,10 @@ namespace TradeMaster6000.Server.Services
 
         public async Task Start(List<TradeInstrument> instruments)
         {
-
+            foreach(var instrument in instruments)
+            {
+                await ZoneFinder(instrument);
+            }
         }
 
         private async Task ZoneFinder(TradeInstrument instrument)
@@ -53,61 +56,194 @@ namespace TradeMaster6000.Server.Services
 
         private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle)
         {
-            ExplosiveCandle up;
-            ExplosiveCandle down;
+            HalfZone up = new HalfZone();
+            HalfZone down = new HalfZone();
             Parallel.Invoke(
                 () => down = FindDown(candles, fittyCandle),
                 () => up = FindUp(candles, fittyCandle));
 
+            REPEAT:;
+            if(down == default || up == default)
+            {
+                return default;
+            }
 
-            return default;
+            if(up.ExplosiveCandle.HL_Diff < (down.BiggestBaseDiff * (decimal)1.2))
+            {
+                up = FindUp(candles, fittyCandle, down.BiggestBaseDiff);
+                goto REPEAT;
+            }
+
+            if(down.ExplosiveCandle.HL_Diff < (up.BiggestBaseDiff * (decimal)1.2))
+            {
+                down = FindDown(candles, fittyCandle, up.BiggestBaseDiff);
+                goto REPEAT;
+            }
+
+            int range = up.ExplosiveCandle.RangeFromFitty + down.ExplosiveCandle.RangeFromFitty;
+            if(range > 6)
+            {
+                return default;
+            }
+
+            Zone zone = new Zone();
+
+            if(up.Top > down.Top)
+            {
+                zone.Top = up.Top;
+            }
+            else
+            {
+                zone.Top = down.Top;
+            }
+
+            if(up.Bottom < down.Bottom)
+            {
+                zone.Bottom = up.Bottom;
+            }
+            else
+            {
+                zone.Bottom = down.Bottom;
+            }
+
+            return zone;
         }
 
-        private ExplosiveCandle FindDown(List<Candle> candles, FittyCandle fittyCandle)
+        private HalfZone FindDown(List<Candle> candles, FittyCandle fittyCandle)
         {
-            Candle biggestBase = fittyCandle.Candle;
-            decimal biggestDiff = Math.Abs(biggestBase.High - biggestBase.Low);
-            for (int i = fittyCandle.Index; i < candles.Count && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
+            halfZone.BiggestBaseDiff = Math.Abs(fittyCandle.Candle.High - fittyCandle.Candle.Low);
+            for (int i = fittyCandle.Index; i >= 0 && Math.Abs(i - fittyCandle.Index) <= 5; i--)
             {
-                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal diffx = diff * (decimal)1.2;
-                if (diffx > biggestDiff)
+                if(halfZone.Top < candles[i].High)
                 {
-                    return new ExplosiveCandle
+                    halfZone.Top = candles[i].High;
+                }
+                if(halfZone.Bottom > candles[i].Low)
+                {
+                    halfZone.Bottom = candles[i].Low;
+                }
+
+                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
+                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (diff > diffx)
+                {
+                    halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
-                        HL_Diff = diffx,
+                        HL_Diff = diff,
                         RangeFromFitty = Math.Abs(i - fittyCandle.Index)
                     };
+                    return halfZone;
                 }
-                else if (diff > biggestDiff)
+                else if (diff > halfZone.BiggestBaseDiff)
                 {
-                    biggestDiff = diff;
+                    halfZone.BiggestBaseDiff = diff;
                 }
             }
             return default;
         }
 
-        private ExplosiveCandle FindUp(List<Candle> candles, FittyCandle fittyCandle)
+        private HalfZone FindDown(List<Candle> candles, FittyCandle fittyCandle, decimal upBiggestBaseDiff)
         {
-            Candle biggestBase = fittyCandle.Candle;
-            decimal biggestDiff = Math.Abs(biggestBase.High - biggestBase.Low);
-            for (int i = fittyCandle.Index; i >= 0 && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
+            halfZone.BiggestBaseDiff = upBiggestBaseDiff;
+            for (int i = fittyCandle.Index; i <= 0 && Math.Abs(i - fittyCandle.Index) <= 5; i--)
             {
-                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal diffx = diff * (decimal)1.2;
-                if (diffx > biggestDiff)
+                if (halfZone.Top < candles[i].High)
                 {
-                    return new ExplosiveCandle
+                    halfZone.Top = candles[i].High;
+                }
+                if (halfZone.Bottom > candles[i].Low)
+                {
+                    halfZone.Bottom = candles[i].Low;
+                }
+
+                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
+                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (diff > diffx)
+                {
+                    halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
-                        HL_Diff = diffx,
+                        HL_Diff = diff,
                         RangeFromFitty = Math.Abs(i - fittyCandle.Index)
                     };
+                    return halfZone;
                 }
-                else if(diff > biggestDiff)
+                else if (diff > halfZone.BiggestBaseDiff)
                 {
-                    biggestDiff = diff;
+                    halfZone.BiggestBaseDiff = diff;
+                }
+            }
+            return default;
+        }
+
+        private HalfZone FindUp(List<Candle> candles, FittyCandle fittyCandle)
+        {
+            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
+            halfZone.BiggestBaseDiff = Math.Abs(fittyCandle.Candle.High - fittyCandle.Candle.Low);
+            for (int i = fittyCandle.Index; i < candles.Count && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            {
+                if (halfZone.Top < candles[i].High)
+                {
+                    halfZone.Top = candles[i].High;
+                }
+                if (halfZone.Bottom > candles[i].Low)
+                {
+                    halfZone.Bottom = candles[i].Low;
+                }
+
+                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
+                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (diff > diffx)
+                {
+                    halfZone.ExplosiveCandle = new ExplosiveCandle
+                    {
+                        Candle = candles[i],
+                        HL_Diff = diff,
+                        RangeFromFitty = Math.Abs(i - fittyCandle.Index)
+                    };
+                    return halfZone;
+                }
+                else if (diff > halfZone.BiggestBaseDiff)
+                {
+                    halfZone.BiggestBaseDiff = diff;
+                }
+            }
+            return default;
+        }
+
+        private HalfZone FindUp(List<Candle> candles, FittyCandle fittyCandle, decimal downBiggestBaseDiff)
+        {
+            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
+            halfZone.BiggestBaseDiff = downBiggestBaseDiff;
+            for (int i = fittyCandle.Index; i < candles.Count && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            {
+                if (halfZone.Top < candles[i].High)
+                {
+                    halfZone.Top = candles[i].High;
+                }
+                if (halfZone.Bottom > candles[i].Low)
+                {
+                    halfZone.Bottom = candles[i].Low;
+                }
+
+                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
+                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (diff > diffx)
+                {
+                    halfZone.ExplosiveCandle = new ExplosiveCandle
+                    {
+                        Candle = candles[i],
+                        HL_Diff = diff,
+                        RangeFromFitty = Math.Abs(i - fittyCandle.Index)
+                    };
+                    return halfZone;
+                }
+                else if (diff > halfZone.BiggestBaseDiff)
+                {
+                    halfZone.BiggestBaseDiff = diff;
                 }
             }
             return default;
