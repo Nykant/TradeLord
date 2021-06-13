@@ -15,28 +15,52 @@ namespace TradeMaster6000.Server.Services
             candleHelper = candleDbHelper;
         }
 
-        public async Task Start(List<TradeInstrument> instruments)
+        public async Task Start(List<TradeInstrument> instruments, int timeFrame)
         {
             foreach(var instrument in instruments)
             {
-                await ZoneFinder(instrument);
+                await ZoneFinder(instrument, timeFrame);
             }
         }
 
-        private async Task ZoneFinder(TradeInstrument instrument)
+        private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
             int index = 0;
             List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
+            List<Candle> newCandles = new List<Candle>();
+
+            int timeFrameCount = 0;
+            Candle temp = candles[0];
+            for(int i = 1; i < candles.Count; i++)
+            {
+                if(temp.High < candles[i].High)
+                {
+                    temp.High = candles[i].High;
+                }
+                if(temp.Low > candles[i].Low)
+                {
+                    temp.Low = candles[i].Low;
+                }
+
+                if(timeFrameCount == timeFrame)
+                {
+                    temp.Open = candles[i - 15].Open;
+                    temp.Close = candles[i].Close;
+                    newCandles.Add(temp);
+                    timeFrameCount = 0;
+                }
+                timeFrameCount++;
+            }
 
             Repeat:;
-            FittyCandle fittyCandle = await Task.Run(() => FittyFinder(candles, index));
+            FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, index));
             index = fittyCandle.Index;
             if(fittyCandle == default)
             {
                 goto Ending;
             }
 
-            Zone zone = await Task.Run(() => FindZone(candles, fittyCandle));
+            Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle));
             if(zone == default)
             {
                 goto Repeat;
@@ -264,6 +288,6 @@ namespace TradeMaster6000.Server.Services
     }
     public interface IZoneService
     {
-        Task Start(List<TradeInstrument> instruments);
+        Task Start(List<TradeInstrument> instruments, int timeFrame);
     }
 }
