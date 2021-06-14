@@ -94,11 +94,6 @@ namespace TradeMaster6000.Server.Services
                 await Task.Delay(1000);
             }
 
-            await AnalyzeCandles(token);
-        }
-
-        private async Task AnalyzeCandles(CancellationToken token)
-        {
             var instruments = await instrumentHelper.GetTradeInstruments();
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < instruments.Count; i++)

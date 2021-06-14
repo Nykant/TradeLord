@@ -75,7 +75,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public void StartZoneService()
         {
-            backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
+            //backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
         }
 
         public async Task GetTick(string symbol)
