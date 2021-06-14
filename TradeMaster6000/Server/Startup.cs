@@ -113,7 +113,7 @@ namespace TradeMaster6000.Server
                     DashboardJobListLimit = 50000,
                     TransactionTimeout = TimeSpan.FromMinutes(1),
                     TablesPrefix = "HF",
-                    //InvisibilityTimeout = TimeSpan.FromHours(24)
+                    InvisibilityTimeout = TimeSpan.FromHours(20)
                 })));
 
             services.AddHangfireServer(options => 
@@ -213,7 +213,6 @@ namespace TradeMaster6000.Server
             {
                 option.IterationCount = 12000;
             });
-
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -232,7 +231,7 @@ namespace TradeMaster6000.Server
             {
                 app.UseExceptionHandler("/Error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                //app.UseHsts();
+                app.UseHsts();
             }
             ServicePointManager.DefaultConnectionLimit = 50;
 

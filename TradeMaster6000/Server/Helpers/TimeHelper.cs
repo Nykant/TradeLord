@@ -140,6 +140,29 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
+        public DateTime CurrentTime()
+        {
+            if (Env.IsDevelopment())
+            {
+                return DateTime.Now.AddHours(3).AddMinutes(30);
+            }
+            else
+            {
+                return DateTime.Now.AddHours(5).AddMinutes(30);
+            }
+        }
+
+        public DateTime OpeningTime()
+        {
+            DateTime now = DateTime.Now;
+            return new DateTime(now.Year, now.Month, now.Day, 09, 15, 00);
+        }
+
+        public TimeSpan GetDuration(DateTime end, DateTime start)
+        {
+            return new TimeSpan(end.Ticks - start.Ticks);
+        }
+
         public string GetCurrentVariety()
         {
             if (Env.IsDevelopment())
@@ -298,6 +321,9 @@ namespace TradeMaster6000.Server.Helpers
         bool IsMarketEnding();
         bool IsMarketEnded();
         bool IsRefreshTime();
+        DateTime CurrentTime();
+        DateTime OpeningTime();
+        TimeSpan GetDuration(DateTime end, DateTime start);
 
     }
 }

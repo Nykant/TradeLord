@@ -28,14 +28,26 @@ namespace TradeMaster6000.Server.Services
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
             int index = 0;
+            int timeFrameCount = 0;
             List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
             List<Candle> newCandles = new List<Candle>();
 
-            int timeFrameCount = 0;
+            DateTime time = new DateTime(candles[0].From.Year, candles[0].From.Month, candles[0].From.Day, 09, 15, 00);
+            if (candles[i].From.Hour != time.Hour && candles[i].From.Minute != time.Minute)
+            {
+                goto SKIP;
+            }
             Candle temp = candles[0];
             for(int i = 1, n = candles.Count; i < n; i++)
             {
-                if(temp.High < candles[i].High)
+                if(candles[i].From.Hour != time.Hour && candles[i].From.Minute != time.Minute)
+                {
+                    goto SKIP;
+                }
+
+                timeFrameCount++;
+
+                if (temp.High < candles[i].High)
                 {
                     temp.High = candles[i].High;
                 }
@@ -54,7 +66,10 @@ namespace TradeMaster6000.Server.Services
                     newCandles.Add(temp);
                     timeFrameCount = 0;
                 }
-                timeFrameCount++;
+
+
+
+                SKIP:;
             }
 
             Repeat:;
