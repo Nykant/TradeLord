@@ -100,42 +100,49 @@ namespace TradeMaster6000.Server.Services
         private async Task AnalyzeCandles(CancellationToken token)
         {
             var instruments = await instrumentHelper.GetTradeInstruments();
-            for (int i = 0; i < 10; i++)
+            List<Task> tasks = new List<Task>();
+            for (int i = 0; i < instruments.Count; i++)
             {
-                try
-                {
-                    Subscribe(instruments[i].Token);
-                    backgroundJob.Enqueue(() =>  Analyze(instruments[i], token));
-                }
-                catch (Exception e)
-                {
-                    AddLog($"{e.Message}...", LogType.Exception);
-                }
+                Subscribe(instruments[i].Token);
+                tasks.Add(Analyze(instruments[i], token));
             }
+
+            await Task.WhenAll(tasks);
         }
 
         public async Task Analyze(TradeInstrument instrument, CancellationToken token)
         {
-            while (true)
+            DateTime time = timeHelper.OpeningTime();
+            DateTime current = timeHelper.CurrentTime();
+            if (DateTime.Compare(time.AddMinutes(1), current) < 0)
             {
-                var ticks = await tickDbHelper.Get(instrument.Token);
+                time = new DateTime(current.Year, current.Month, current.Day, current.Hour, current.Minute, 00);
+            }
+
+            List<MyTick> ticks;
+            while (!token.IsCancellationRequested)
+            {
+                ticks = await tickDbHelper.Get(instrument.Token, time);
                 if(ticks.Count > 0)
                 {
                     break;
                 }
                 await Task.Delay(500);
             }
-                
-            AddLog($"analysing: {instrument.Token}...", LogType.Notification);
+
             while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
             {
-                await Task.Delay(60000, token);
-
-                var ticks = await tickDbHelper.Get(instrument.Token);
-                var candle = new Candle() { InstrumentToken = instrument.Token, From = ticks[0].StartTime, Kill = DateTime.Now.AddDays(1) };
-                await Task.Run(async() =>
+                current = timeHelper.CurrentTime();
+                if (DateTime.Compare(time, current) > 0)
                 {
-                    candle.To = DateTime.Now;
+                    TimeSpan duration = timeHelper.GetDuration(time, timeHelper.CurrentTime());
+                    await Task.Delay(duration, token);
+                }
+
+                ticks = await tickDbHelper.Get(instrument.Token, time);
+                Candle candle = new Candle() { InstrumentToken = instrument.Token, From = time, Kill = time.AddDays(2) };
+                await Task.Run(() =>
+                {
                     candle.High = ticks[0].LTP;
                     candle.Low = ticks[0].LTP;
                     for (int i = 0; i < ticks.Count; i++)
@@ -151,9 +158,9 @@ namespace TradeMaster6000.Server.Services
                     }
                     candle.Open = ticks[0].LTP;
                     candle.Close = ticks[^1].LTP;
-
-                    await candleHelper.AddCandle(candle).ConfigureAwait(false);
-                }).ConfigureAwait(false);
+                });
+                await candleHelper.AddCandle(candle).ConfigureAwait(false);
+                time = time.AddMinutes(1);
             }
             CandlesRunning = false;
         }
@@ -246,7 +253,7 @@ namespace TradeMaster6000.Server.Services
                 InstrumentToken = tickData.InstrumentToken,
                 LTP = tickData.LastPrice,
                 StartTime = tickData.Timestamp.Value,
-                EndTime = tickData.Timestamp.Value.AddMinutes(1)
+                EndTime = tickData.Timestamp.Value.AddMinutes(2)
             });
         }
 
