@@ -32,8 +32,6 @@ namespace TradeMaster6000.Server.Services
 
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
-            timeFrame--;
-            int index = 0;
             List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
             if(candles.Count == 0)
             {
@@ -77,11 +75,9 @@ namespace TradeMaster6000.Server.Services
                         temp.Close = candles[i].Close;
                         newCandles.Add(temp);
                         tfCount = 0;
-                        goto Skippy;
                     }
 
                     tfCount++;
-                    Skippy:;
                     i++;
                 }
                 else
@@ -92,9 +88,10 @@ namespace TradeMaster6000.Server.Services
                 time.AddMinutes(1);
             }
 
+            int fittyIndex = 0;
             Repeat:;
-            FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, index));
-            index = fittyCandle.Index;
+            FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, fittyIndex));
+            fittyIndex = fittyCandle.Index;
             if(fittyCandle == default)
             {
                 goto Ending;
@@ -108,7 +105,7 @@ namespace TradeMaster6000.Server.Services
 
             await zoneHelper.Add(zone);
 
-            if(index == candles.Count - 1)
+            if(fittyIndex == candles.Count - 1)
             {
                 goto Ending;
             }
