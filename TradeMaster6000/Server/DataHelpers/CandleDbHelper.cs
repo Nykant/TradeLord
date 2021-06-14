@@ -33,6 +33,14 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
+        public async Task<Candle> GetCandle(DateTime time)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.Candles.FirstOrDefaultAsync(x => x.From.Hour == time.Hour && x.From.Minute == time.Minute);
+            }
+        }
+
         public async Task AddCandle(Candle candle)
         {
             using (var context = contextFactory.CreateDbContext())

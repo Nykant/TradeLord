@@ -355,13 +355,13 @@ namespace TradeMaster6000.Server.Tasks
                     Low = tick.LTP
                 };
 
-                await Task.Delay(59500);
+                await Task.Delay(60000);
 
-                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token);
+                DateTime time = TimeHelper.CurrentTime().Subtract(new TimeSpan(1200));
+                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token, time);
 
                 await Task.Run(() =>
                 {
-                    candle.To = DateTime.Now;
                     candle.High = ticks[0].LTP;
                     candle.Low = ticks[0].LTP;
                     for (int i = 0; i < ticks.Count; i++)

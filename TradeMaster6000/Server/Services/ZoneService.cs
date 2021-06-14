@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
+using TradeMaster6000.Server.Helpers;
 using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.Services
@@ -11,67 +12,84 @@ namespace TradeMaster6000.Server.Services
     {
         private readonly ICandleDbHelper candleHelper;
         private readonly IZoneDbHelper zoneHelper;
-        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper)
+        private readonly ITimeHelper timeHelper;
+        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper)
         {
+            this.timeHelper = timeHelper;
             candleHelper = candleDbHelper;
             zoneHelper = zoneDbHelper;
         }
 
         public async Task Start(List<TradeInstrument> instruments, int timeFrame)
         {
+            List<Task> tasks = new List<Task>();
             foreach(var instrument in instruments)
             {
-                await ZoneFinder(instrument, timeFrame);
+                tasks.Add(ZoneFinder(instrument, timeFrame));
             }
+            await Task.WhenAll(tasks);
         }
 
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
             timeFrame--;
             int index = 0;
-            int timeFrameCount = 0;
             List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
-            List<Candle> newCandles = new List<Candle>();
-
-            DateTime time = new DateTime(candles[0].From.Year, candles[0].From.Month, candles[0].From.Day, 09, 15, 00);
-            if (candles[i].From.Hour != time.Hour && candles[i].From.Minute != time.Minute)
+            if(candles.Count == 0)
             {
-                goto SKIP;
+                goto Ending;
             }
-            Candle temp = candles[0];
-            for(int i = 1, n = candles.Count; i < n; i++)
+            List<Candle> newCandles = new List<Candle>();
+            DateTime time = timeHelper.OpeningTime();
+            while(true)
             {
-                if(candles[i].From.Hour != time.Hour && candles[i].From.Minute != time.Minute)
+                if(candles[0].From.Hour == time.Hour && candles[0].From.Minute == time.Minute)
                 {
-                    goto SKIP;
+                    break;
+                }
+                time = time.AddMinutes(1);
+            }
+
+            Candle temp = candles[0];
+            time.AddMinutes(1);
+
+            int i = 1;
+            int n = candles.Count;
+            int tfCount = 1;
+            while(i < n)
+            {
+                if(candles[i].From.Hour == time.Hour && candles[i].From.Minute == time.Minute)
+                {
+                    if (temp.High < candles[i].High)
+                    {
+                        temp.High = candles[i].High;
+                    }
+                    if (temp.Low > candles[i].Low)
+                    {
+                        temp.Low = candles[i].Low;
+                    }
+
+                    if (tfCount == timeFrame)
+                    {
+                        temp.InstrumentSymbol = candles[i].InstrumentSymbol;
+                        temp.From = candles[i - timeFrame].From;
+                        temp.Open = candles[i - timeFrame].Open;
+                        temp.Close = candles[i].Close;
+                        newCandles.Add(temp);
+                        tfCount = 0;
+                        goto Skippy;
+                    }
+
+                    tfCount++;
+                    Skippy:;
+                    i++;
+                }
+                else
+                {
+                    // anything else?
                 }
 
-                timeFrameCount++;
-
-                if (temp.High < candles[i].High)
-                {
-                    temp.High = candles[i].High;
-                }
-                if(temp.Low > candles[i].Low)
-                {
-                    temp.Low = candles[i].Low;
-                }
-
-                if(timeFrameCount == timeFrame)
-                {
-                    temp.InstrumentSymbol = candles[i].InstrumentSymbol;
-                    temp.From = candles[i - timeFrame].From;
-                    temp.To = candles[i].To;
-                    temp.Open = candles[i - timeFrame].Open;
-                    temp.Close = candles[i].Close;
-                    newCandles.Add(temp);
-                    timeFrameCount = 0;
-                    temp = candles[i + 1];
-                }
-
-
-
-                SKIP:;
+                time.AddMinutes(1);
             }
 
             Repeat:;
@@ -248,7 +266,7 @@ namespace TradeMaster6000.Server.Services
                 decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (diff > diffx)
                 {
-                    halfZone.Timestamp = candles[i].To;
+                    halfZone.Timestamp = candles[i].From;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
@@ -284,7 +302,7 @@ namespace TradeMaster6000.Server.Services
                 decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (diff > diffx)
                 {
-                    halfZone.Timestamp = candles[i].To;
+                    halfZone.Timestamp = candles[i].From;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
