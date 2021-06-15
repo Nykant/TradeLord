@@ -46,7 +46,6 @@ namespace TradeMaster6000.Server.Hubs
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
-            source = new CancellationTokenSource();
         }
 
         public async Task NewOrder(TradeOrder order)
@@ -66,6 +65,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public void StartCandleMagic()
         {
+            source = new CancellationTokenSource();
             tickerService.Start();
             if (!tickerService.IsCandlesRunning())
             {

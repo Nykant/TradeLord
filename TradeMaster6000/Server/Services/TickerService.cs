@@ -99,7 +99,7 @@ namespace TradeMaster6000.Server.Services
             for (int i = 0; i < 30; i++)
             {
                 Subscribe(instruments[i].Token);
-                tasks.Add(Analyze(instruments[i], token));
+                tasks.Add(Task.Run(async ()=> await Analyze(instruments[i], token)));
             }
 
             await Task.WhenAll(tasks);
