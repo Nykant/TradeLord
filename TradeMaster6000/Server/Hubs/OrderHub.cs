@@ -65,10 +65,10 @@ namespace TradeMaster6000.Server.Hubs
 
         public void StartCandleMagic()
         {
-            source = new CancellationTokenSource();
             tickerService.Start();
             if (!tickerService.IsCandlesRunning())
             {
+                source = new CancellationTokenSource();
                 backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
             }
         }
