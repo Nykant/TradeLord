@@ -110,17 +110,17 @@ namespace TradeMaster6000.Server.Services
 
         public async Task Analyze(TradeInstrument instrument, CancellationToken token)
         {
-            DateTime time = timeHelper.OpeningTime();
+            DateTime waittime = timeHelper.OpeningTime();
             DateTime current = timeHelper.CurrentTime();
-            if (DateTime.Compare(time.AddMinutes(1), current) < 0)
+            if (DateTime.Compare(waittime, current) < 0)
             {
-                time = new DateTime(current.Year, current.Month, current.Day, current.Hour, current.Minute, 00);
+                waittime = new DateTime(current.Year, current.Month, current.Day, current.Hour, current.Minute + 1, 00);
             }
 
             List<MyTick> ticks;
             while (!token.IsCancellationRequested)
             {
-                ticks = await tickDbHelper.Get(instrument.Token, time);
+                ticks = await tickDbHelper.Get(instrument.Token, waittime);
                 if(ticks.Count > 0)
                 {
                     break;
@@ -129,17 +129,18 @@ namespace TradeMaster6000.Server.Services
             }
 
             Candle previousCandle = new Candle();
+            DateTime candleTime = new DateTime();
+            TimeSpan oneMin = new TimeSpan(1200);
+            TimeSpan duration = new TimeSpan();
             while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
             {
-                current = timeHelper.CurrentTime();
-                if (DateTime.Compare(time.AddMinutes(1), current) > 0)
-                {
-                    TimeSpan duration = timeHelper.GetDuration(time.AddMinutes(1), current);
-                    await Task.Delay(duration);
-                }
+                candleTime = waittime.Subtract(oneMin);
+                duration = timeHelper.GetDuration(waittime, timeHelper.CurrentTime());
 
-                ticks = await tickDbHelper.Get(instrument.Token, time);
-                Candle candle = new Candle() { InstrumentToken = instrument.Token, From = time, Kill = time.AddDays(2) };
+                await Task.Delay(duration);
+
+                ticks = await tickDbHelper.Get(instrument.Token, candleTime);
+                Candle candle = new Candle() { InstrumentToken = instrument.Token, From = waittime, Kill = waittime.AddDays(2) };
                 if(ticks.Count > 0)
                 {
                     await Task.Run(() =>
@@ -170,7 +171,7 @@ namespace TradeMaster6000.Server.Services
                 }
 
                 previousCandle = await candleHelper.AddCandle(candle).ConfigureAwait(false);
-                time = time.AddMinutes(1);
+                waittime = waittime.AddMinutes(1);
             }
 
             UnSubscribe(instrument.Token);
