@@ -114,7 +114,14 @@ namespace TradeMaster6000.Server.Services
             DateTime current = timeHelper.CurrentTime();
             if (DateTime.Compare(waittime, current) < 0)
             {
-                waittime = new DateTime(current.Year, current.Month, current.Day, current.Hour, current.Minute + 1, 00);
+                int hour = current.Hour;
+                int minute = current.Minute;
+                if(minute == 59)
+                {
+                    hour++;
+                    minute = 0;
+                }
+                waittime = new DateTime(current.Year, current.Month, current.Day, hour, minute, 00);
             }
 
             List<MyTick> ticks;
@@ -134,8 +141,8 @@ namespace TradeMaster6000.Server.Services
             TimeSpan duration = new TimeSpan();
             while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
             {
-                candleTime = waittime.Subtract(oneMin);
                 duration = timeHelper.GetDuration(waittime, timeHelper.CurrentTime());
+                candleTime = waittime.Subtract(oneMin);
 
                 await Task.Delay(duration);
 

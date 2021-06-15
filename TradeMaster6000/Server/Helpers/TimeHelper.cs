@@ -160,7 +160,8 @@ namespace TradeMaster6000.Server.Helpers
 
         public TimeSpan GetDuration(DateTime end, DateTime start)
         {
-            return new TimeSpan(end.Ticks - start.Ticks);
+            var time = new TimeSpan(end.Ticks - start.Ticks);
+            return time;
         }
 
         public string GetCurrentVariety()
