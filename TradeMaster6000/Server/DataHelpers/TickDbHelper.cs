@@ -94,6 +94,14 @@ namespace TradeMaster6000.Server.DataHelpers
                 return await context.Ticks.AnyAsync();
             }
         }
+
+        public async Task<bool> Any(uint token)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.Ticks.AnyAsync(x => x.InstrumentToken == token);
+            }
+        }
     }
     public interface ITickDbHelper
     {
@@ -101,6 +109,7 @@ namespace TradeMaster6000.Server.DataHelpers
         Task Add(MyTick tick);
         Task Flush();
         Task<bool> Any();
+        Task<bool> Any(uint token);
         Task<MyTick> GetLast(uint token);
         Task<bool> Exists(uint token);
     }
