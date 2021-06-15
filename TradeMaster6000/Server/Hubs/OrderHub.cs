@@ -33,7 +33,7 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IBackgroundJobClient backgroundJob;
         private readonly ICandleDbHelper candleDbHelper;
         private IKiteService KiteService { get; set; }
-        private readonly CancellationTokenSource source;
+        private static CancellationTokenSource source;
 
         public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper)
         {

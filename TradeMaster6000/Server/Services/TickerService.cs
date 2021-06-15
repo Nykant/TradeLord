@@ -96,13 +96,16 @@ namespace TradeMaster6000.Server.Services
 
             var instruments = await instrumentHelper.GetTradeInstruments();
             List<Task> tasks = new List<Task>();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 30; i++)
             {
                 Subscribe(instruments[i].Token);
                 tasks.Add(Analyze(instruments[i], token));
             }
 
             await Task.WhenAll(tasks);
+
+            Stop();
+            CandlesRunning = false;
         }
 
         public async Task Analyze(TradeInstrument instrument, CancellationToken token)
@@ -132,7 +135,7 @@ namespace TradeMaster6000.Server.Services
                 if (DateTime.Compare(time.AddMinutes(1), current) > 0)
                 {
                     TimeSpan duration = timeHelper.GetDuration(time.AddMinutes(1), current);
-                    await Task.Delay(duration, token);
+                    await Task.Delay(duration);
                 }
 
                 ticks = await tickDbHelper.Get(instrument.Token, time);
@@ -169,7 +172,8 @@ namespace TradeMaster6000.Server.Services
                 previousCandle = await candleHelper.AddCandle(candle).ConfigureAwait(false);
                 time = time.AddMinutes(1);
             }
-            CandlesRunning = false;
+
+            UnSubscribe(instrument.Token);
         }
 
         public async Task<OrderUpdate> GetOrder(string id)
