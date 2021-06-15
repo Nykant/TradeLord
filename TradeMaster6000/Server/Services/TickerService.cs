@@ -34,6 +34,7 @@ namespace TradeMaster6000.Server.Services
         private static Ticker Ticker { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private static bool CandlesRunning { get; set; }
+        private static CancellationTokenSource source;
         //private readonly object key = new object();
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger)
         {
@@ -48,6 +49,7 @@ namespace TradeMaster6000.Server.Services
             this.contextExtension = contextExtension;
             this.logger = logger;
             TickerLogs = new ();
+            source = new CancellationTokenSource();
         }
 
         public void Start()
@@ -79,6 +81,11 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
+        public CancellationToken GetToken()
+        {
+            return source.Token;
+        }
+
         public async Task RunCandles(CancellationToken token)
         {
             CandlesRunning = true;
@@ -86,12 +93,12 @@ namespace TradeMaster6000.Server.Services
 
             while (!timeHelper.IsPreMarketOpen() && !token.IsCancellationRequested)
             {
-                await Task.Delay(10000);
+                await Task.Delay(10000, token);
             }
 
             while (!timeHelper.IsMarketOpen() && !token.IsCancellationRequested)
             {
-                await Task.Delay(1000);
+                await Task.Delay(1000, token);
             }
 
             var instruments = await instrumentHelper.GetTradeInstruments();
@@ -99,7 +106,7 @@ namespace TradeMaster6000.Server.Services
             for (int i = 0; i < 30; i++)
             {
                 Subscribe(instruments[i].Token);
-                tasks.Add(Task.Run(async ()=> await Analyze(instruments[i], token)));
+                tasks.Add(Task.Run(async ()=> await Analyze(instruments[i], token), token));
             }
 
             await Task.WhenAll(tasks);
@@ -116,10 +123,20 @@ namespace TradeMaster6000.Server.Services
             {
                 int hour = current.Hour;
                 int minute = current.Minute;
+                int second = current.Second;
                 if(minute == 59)
                 {
                     hour++;
                     minute = 0;
+                }
+                else
+                {
+                    minute++;
+                }
+
+                if (second > 50)
+                {
+                    minute++;
                 }
                 waittime = new DateTime(current.Year, current.Month, current.Day, hour, minute, 00);
             }
@@ -132,7 +149,7 @@ namespace TradeMaster6000.Server.Services
                 {
                     break;
                 }
-                await Task.Delay(500);
+                await Task.Delay(500, token);
             }
 
             Candle previousCandle = new Candle();
@@ -144,7 +161,7 @@ namespace TradeMaster6000.Server.Services
                 duration = timeHelper.GetDuration(waittime, timeHelper.CurrentTime());
                 candleTime = waittime.Subtract(oneMin);
 
-                await Task.Delay(duration);
+                await Task.Delay(duration, token);
 
                 ticks = await tickDbHelper.Get(instrument.Token, candleTime);
                 Candle candle = new Candle() { InstrumentToken = instrument.Token, From = waittime, Kill = waittime.AddDays(2) };
@@ -167,7 +184,7 @@ namespace TradeMaster6000.Server.Services
                         }
                         candle.Open = ticks[0].LTP;
                         candle.Close = ticks[^1].LTP;
-                    });
+                    }, token);
                 }
                 else
                 {
@@ -343,5 +360,6 @@ namespace TradeMaster6000.Server.Services
         Task RunCandles(CancellationToken token);
         bool IsCandlesRunning();
         Task Analyze(TradeInstrument instrument, CancellationToken token);
+        CancellationToken GetToken();
     }
 }
