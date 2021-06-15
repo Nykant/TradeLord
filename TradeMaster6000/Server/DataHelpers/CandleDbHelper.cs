@@ -41,12 +41,13 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public async Task AddCandle(Candle candle)
+        public async Task<Candle> AddCandle(Candle candle)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                await context.Candles.AddAsync(candle);
+                var added = await context.Candles.AddAsync(candle);
                 await context.SaveChangesAsync();
+                return added.Entity;
             }
         }
 
@@ -67,7 +68,7 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface ICandleDbHelper
     {
-        Task AddCandle(Candle candle);
+        Task<Candle> AddCandle(Candle candle);
         Task<List<Candle>> GetCandles();
         Task<List<Candle>> GetCandles(uint instrumentToken);
         Task Flush();

@@ -96,7 +96,7 @@ namespace TradeMaster6000.Server.Services
 
             var instruments = await instrumentHelper.GetTradeInstruments();
             List<Task> tasks = new List<Task>();
-            for (int i = 0; i < instruments.Count; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Subscribe(instruments[i].Token);
                 tasks.Add(Analyze(instruments[i], token));
@@ -125,36 +125,48 @@ namespace TradeMaster6000.Server.Services
                 await Task.Delay(500);
             }
 
+            Candle previousCandle = new Candle();
             while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
             {
                 current = timeHelper.CurrentTime();
-                if (DateTime.Compare(time, current) > 0)
+                if (DateTime.Compare(time.AddMinutes(1), current) > 0)
                 {
-                    TimeSpan duration = timeHelper.GetDuration(time, timeHelper.CurrentTime());
+                    TimeSpan duration = timeHelper.GetDuration(time.AddMinutes(1), current);
                     await Task.Delay(duration, token);
                 }
 
                 ticks = await tickDbHelper.Get(instrument.Token, time);
                 Candle candle = new Candle() { InstrumentToken = instrument.Token, From = time, Kill = time.AddDays(2) };
-                await Task.Run(() =>
+                if(ticks.Count > 0)
                 {
-                    candle.High = ticks[0].LTP;
-                    candle.Low = ticks[0].LTP;
-                    for (int i = 0; i < ticks.Count; i++)
+                    await Task.Run(() =>
                     {
-                        if (candle.High < ticks[i].LTP)
+                        candle.High = ticks[0].LTP;
+                        candle.Low = ticks[0].LTP;
+                        for (int i = 0; i < ticks.Count; i++)
                         {
-                            candle.High = ticks[i].LTP;
+                            if (candle.High < ticks[i].LTP)
+                            {
+                                candle.High = ticks[i].LTP;
+                            }
+                            if (candle.Low > ticks[i].LTP)
+                            {
+                                candle.Low = ticks[i].LTP;
+                            }
                         }
-                        if (candle.Low > ticks[i].LTP)
-                        {
-                            candle.Low = ticks[i].LTP;
-                        }
-                    }
-                    candle.Open = ticks[0].LTP;
-                    candle.Close = ticks[^1].LTP;
-                });
-                await candleHelper.AddCandle(candle).ConfigureAwait(false);
+                        candle.Open = ticks[0].LTP;
+                        candle.Close = ticks[^1].LTP;
+                    });
+                }
+                else
+                {
+                    candle.High = previousCandle.Close;
+                    candle.Low = previousCandle.Close;
+                    candle.Open = previousCandle.Close;
+                    candle.Close = previousCandle.Close;
+                }
+
+                previousCandle = await candleHelper.AddCandle(candle).ConfigureAwait(false);
                 time = time.AddMinutes(1);
             }
             CandlesRunning = false;
@@ -243,12 +255,21 @@ namespace TradeMaster6000.Server.Services
         // events
         private async void OnTick(Tick tickData)
         {
+            DateTime time;
+            if(tickData.Timestamp == null)
+            {
+                time = timeHelper.CurrentTime();
+            }
+            else
+            {
+                time = tickData.Timestamp.Value;
+            }
             await tickDbHelper.Add(new MyTick
             {
                 InstrumentToken = tickData.InstrumentToken,
                 LTP = tickData.LastPrice,
-                StartTime = tickData.Timestamp.Value,
-                EndTime = tickData.Timestamp.Value.AddMinutes(2)
+                StartTime = time,
+                EndTime = time.AddMinutes(2)
             });
         }
 
