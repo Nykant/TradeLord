@@ -24,9 +24,9 @@ namespace TradeMaster6000.Server.Controllers
         }
 
         [HttpGet]
-        public bool IsCandlesOn()
+        public string IsCandlesOn()
         {
-            return tickerService.IsCandlesRunning();
+            return tickerService.IsCandlesRunning().ToString();
         }
 
         [HttpGet]
@@ -48,15 +48,16 @@ namespace TradeMaster6000.Server.Controllers
         }
 
         [HttpGet]
-        public bool IsFlushing()
+        public string IsFlushing()
         {
-            return tickerService.IsFlushing();
+            var stri = tickerService.IsFlushing().ToString();
+            return stri;
         }
 
         [HttpGet]
-        public bool IsTickerInUse()
+        public string IsTickerInUse()
         {
-            return tickerService.IsTickerInUse();
+            return tickerService.IsTickerInUse().ToString();
         }
     }
 }
