@@ -67,7 +67,7 @@ namespace TradeMaster6000.Server.Hubs
             tickerService.Start();
             if (!tickerService.IsCandlesRunning())
             {
-                backgroundJob.Enqueue(() => tickerService.RunCandles(tickerService.GetToken()));
+                tickerService.RunCandles();
             }
         }
 
