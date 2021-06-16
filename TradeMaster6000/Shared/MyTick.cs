@@ -8,8 +8,8 @@ namespace TradeMaster6000.Shared
     {
         public int Id { get; set; }
         public decimal LTP { get; set; }
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
+        public DateTime Timestamp { get; set; }
+        public DateTime Flushtime { get; set; }
         public uint InstrumentToken { get; set; }
     }
 }

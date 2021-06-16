@@ -39,7 +39,7 @@ namespace TradeMaster6000.Server
 {
     public class Startup
     {
-        private static CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        private static CancellationTokenSource source = new CancellationTokenSource();
         public Startup(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             Configuration = configuration;
@@ -113,7 +113,7 @@ namespace TradeMaster6000.Server
                     DashboardJobListLimit = 50000,
                     TransactionTimeout = TimeSpan.FromMinutes(1),
                     TablesPrefix = "HF",
-                    InvisibilityTimeout = TimeSpan.FromHours(20)
+                    InvisibilityTimeout = TimeSpan.FromHours(23)
                 })));
 
             services.AddHangfireServer(options => 
@@ -133,7 +133,6 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ITickDbHelper, TickDbHelper>();
             services.TryAddSingleton<IKiteService, KiteService>();
             //-------------------
-            //services.TryAddSingleton<IRunningOrderService, RunningOrderService>();
             services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.TryAddSingleton<ITradeHelper, TradeHelper>();
             services.TryAddSingleton<ITimeHelper, TimeHelper>();
@@ -153,7 +152,7 @@ namespace TradeMaster6000.Server
                 options.ClientTimeoutInterval = TimeSpan.FromMinutes(10);
                 options.HandshakeTimeout = TimeSpan.FromMinutes(5);
                 options.MaximumReceiveMessageSize = null;
-                options.StreamBufferCapacity = 50;
+                options.StreamBufferCapacity = 10;
             });
 
             services.AddControllersWithViews();
@@ -260,8 +259,8 @@ namespace TradeMaster6000.Server
             });
 
             //backgroundJobs.Enqueue(() => running.UpdateOrders(cancellationTokenSource.Token));
-            backgroundJobs.Enqueue(() => kiteService.KiteManager(cancellationTokenSource.Token));
-            backgroundJobs.Enqueue(() => tickerService.StartFlushing(cancellationTokenSource.Token));
+            backgroundJobs.Enqueue(() => kiteService.KiteManager(source.Token));
+            backgroundJobs.Enqueue(() => tickerService.StartFlushing(source.Token));
             instrumentHelper.LoadInstruments(instrumentService.GetInstruments());
         }
     }

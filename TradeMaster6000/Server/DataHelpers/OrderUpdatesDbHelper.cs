@@ -13,7 +13,6 @@ namespace TradeMaster6000.Server.DataHelpers
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
         private static SemaphoreSlim semaphore;
-        //private readonly object key = new object();
         public OrderUpdatesDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory)
         {
             contextFactory = dbContextFactory;

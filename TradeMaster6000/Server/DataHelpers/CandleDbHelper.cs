@@ -37,7 +37,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.FirstOrDefaultAsync(x => x.From.Hour == time.Hour && x.From.Minute == time.Minute);
+                return await context.Candles.FirstOrDefaultAsync(x => x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute);
             }
         }
 

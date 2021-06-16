@@ -71,6 +71,11 @@ namespace TradeMaster6000.Server.Hubs
             }
         }
 
+        public void StopCandleMagic()
+        {
+            tickerService.StopCandles();
+        }
+
         public void StartZoneService()
         {
             //backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));

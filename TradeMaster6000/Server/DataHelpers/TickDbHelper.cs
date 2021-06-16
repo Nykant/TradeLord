@@ -24,16 +24,15 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                context.Ticks.Add(tick);
+                await context.Ticks.AddAsync(tick);
                 await context.SaveChangesAsync();
             }
         }
-        public async Task<List<MyTick>> Get(uint token, DateTime time)
+        public IQueryable<MyTick> Get(uint token, DateTime time)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var list = await context.Ticks.Where(x => x.InstrumentToken == token && x.StartTime.Hour == time.Hour && x.StartTime.Minute == time.Minute).ToListAsync();
-                return list;
+                return context.Ticks.Where(x => x.InstrumentToken == token && x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute);
             }
         }
         public async Task<MyTick> GetLast(uint token)
@@ -52,17 +51,7 @@ namespace TradeMaster6000.Server.DataHelpers
             }
             return default;
         }
-        public async Task<bool> Exists(uint token)
-        {
-            using (var context = contextFactory.CreateDbContext())
-            {
-                if (await context.Ticks.FirstOrDefaultAsync(x => x.InstrumentToken == token) != default)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
+
         public async Task Flush()
         {
             using (var context = contextFactory.CreateDbContext())
@@ -71,14 +60,14 @@ namespace TradeMaster6000.Server.DataHelpers
                 {
                     if (Env.IsDevelopment())
                     {
-                        if (DateTime.Compare(tick.EndTime, DateTime.Now.AddHours(3).AddMinutes(30)) < 0)
+                        if (DateTime.Compare(tick.Flushtime, DateTime.Now.AddHours(3).AddMinutes(30)) < 0)
                         {
                             context.Remove(tick);
                         }
                     }
                     else
                     {
-                        if (DateTime.Compare(tick.EndTime, DateTime.Now.AddHours(5).AddMinutes(30)) < 0)
+                        if (DateTime.Compare(tick.Flushtime, DateTime.Now.AddHours(5).AddMinutes(30)) < 0)
                         {
                             context.Remove(tick);
                         }
@@ -105,12 +94,11 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface ITickDbHelper
     {
-        Task<List<MyTick>> Get(uint token, DateTime time);
+        IQueryable<MyTick> Get(uint token, DateTime time);
         Task Add(MyTick tick);
         Task Flush();
         Task<bool> Any();
         Task<bool> Any(uint token);
         Task<MyTick> GetLast(uint token);
-        Task<bool> Exists(uint token);
     }
 }

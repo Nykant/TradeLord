@@ -65,7 +65,7 @@ namespace TradeMaster6000.Server.Tasks
         {
             await Initialize(order);
 
-            while(!await TickDbHelper.Exists(order.Instrument.Token))
+            while(!await TickDbHelper.Any(order.Instrument.Token))
             {
                 if (token.IsCancellationRequested)
                 {
@@ -358,7 +358,7 @@ namespace TradeMaster6000.Server.Tasks
                 await Task.Delay(60000);
 
                 DateTime time = TimeHelper.CurrentTime().Subtract(new TimeSpan(1200));
-                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token, time);
+                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token, time).ToListAsync();
 
                 await Task.Run(() =>
                 {
