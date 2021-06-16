@@ -35,9 +35,11 @@ namespace TradeMaster6000.Server.Services
         private static Ticker Ticker { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private static bool CandlesRunning { get; set; }
+        private static CancellationTokenSource CandleSource { get; set; }
         private static CancellationTokenSource Source { get; set; }
-        private static bool InUse { get; set; }
-        //private readonly object key = new object();
+        private static bool TickerInUse { get; set; }
+        private static bool Flushing { get; set; }
+
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger)
         {
             this.kiteService = kiteService;
@@ -51,7 +53,7 @@ namespace TradeMaster6000.Server.Services
             this.contextExtension = contextExtension;
             this.logger = logger;
             TickerLogs = new ();
-
+            Source = new CancellationTokenSource();
         }
 
         public void Start()
@@ -76,11 +78,13 @@ namespace TradeMaster6000.Server.Services
 
         public async Task StartFlushing(CancellationToken token)
         {
+            Flushing = true;
             while(!token.IsCancellationRequested)
             {
                 await tickDbHelper.Flush();
                 await Task.Delay(10000);
             }
+            Flushing = false;
         }
 
         public async Task RunCandles()
@@ -93,28 +97,41 @@ namespace TradeMaster6000.Server.Services
 
         public void StopCandles()
         {
+            CandleSource.Cancel();
+        }
+
+        public bool IsTickerInUse()
+        {
+            return TickerInUse;
+        }
+        public void UseTicker()
+        {
+            TickerInUse = true;
+        }
+        public void StopUsingTicker()
+        {
+            TickerInUse = false;
+        }
+
+        public bool IsFlushing()
+        {
+            return Flushing;
+        }
+
+        public CancellationToken GetToken()
+        {
+            return Source.Token;
+        }
+
+        public void CancelToken()
+        {
             Source.Cancel();
-        }
-
-        public bool IsInUse()
-        {
-            return InUse;
-        }
-
-        public void StartUsing()
-        {
-            InUse = true;
-        }
-
-        public void StopUsing()
-        {
-            InUse = false;
         }
 
         public async Task AnalyzeCandles()
         {
-            Source = new CancellationTokenSource();
-            CancellationToken token = Source.Token;
+            CandleSource = new CancellationTokenSource();
+            CancellationToken token = CandleSource.Token;
 
             while (!timeHelper.IsPreMarketOpen() && !token.IsCancellationRequested)
             {
@@ -251,10 +268,9 @@ namespace TradeMaster6000.Server.Services
                     Timestamp = DateTime.Now,
                     TriggerPrice = order.TriggerPrice
                 };
-                //lock (key)
-                //{
+
                     await updatesHelper.AddOrUpdate(newOrderUpdate);
-                //}
+
 
                 return newOrderUpdate;
             }
@@ -285,6 +301,7 @@ namespace TradeMaster6000.Server.Services
             Ticker.DisableReconnect();
             Ticker.Close();
             Ticker = null;
+            TickerInUse = false;
         }
 
         public void Subscribe(uint token)
@@ -378,8 +395,11 @@ namespace TradeMaster6000.Server.Services
         Task Analyze(TradeInstrument instrument, CancellationToken token);
         Task AnalyzeCandles();
         void StopCandles();
-        void StartUsing();
-        bool IsInUse();
-        void StopUsing();
+        bool IsTickerInUse();
+        CancellationToken GetToken();
+        void CancelToken();
+        bool IsFlushing();
+        void StopUsingTicker();
+        void UseTicker();
     }
 }

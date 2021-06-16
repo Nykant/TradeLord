@@ -1,0 +1,50 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+<div class="status-box">
+    <RadzenLabel Text="Candles Maker" />
+    <RadzenSelectBar @bind-Value=@candlesOn TValue="bool" Change=@(args => OnChangeCandles(args))>
+        <Items>
+            <RadzenSelectBarItem Text="On" Value="true" />
+            <RadzenSelectBarItem Text="Off" Value="false" />
+        </Items>
+    </RadzenSelectBar>
+</div>
+
+<div class="status-box">
+    <RadzenLabel Text="Tick Flusher" />
+    <RadzenSelectBar @bind-Value=@flusherOn TValue="bool" Change=@(args => OnChangeFlusher(args))>
+        <Items>
+            <RadzenSelectBarItem Text="On" Value="true" />
+            <RadzenSelectBarItem Text="Off" Value="false" />
+        </Items>
+    </RadzenSelectBar>
+</div>
+
+@code {
+    bool candlesOn = false;
+    bool flusherOn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    void OnChangeFlusher(object value)
+    {
+
+    }
+
+    async Task OnChangeCandles(object value)
+    {
+        if (!(bool)value)
+        {
+            await Http.GetAsync("Status/IsCandlesOn");
+        }
+        else if ((bool)value)
+        {
+            await Http.GetAsync("Status/StopCandles");
+        }
+    }
+}

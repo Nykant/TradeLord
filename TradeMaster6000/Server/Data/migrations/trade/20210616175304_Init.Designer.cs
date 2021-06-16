@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210615054609_Initio")]
-    partial class Initio
+    [Migration("20210616175304_Init")]
+    partial class Init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -28,9 +28,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<decimal>("Close")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<DateTime>("From")
-                        .HasColumnType("datetime(6)");
-
                     b.Property<decimal>("High")
                         .HasColumnType("decimal(65,30)");
 
@@ -46,6 +43,9 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<decimal>("Open")
                         .HasColumnType("decimal(65,30)");
 
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("datetime(6)");
+
                     b.HasKey("Id");
 
                     b.ToTable("Candles");
@@ -57,7 +57,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("EndTime")
+                    b.Property<DateTime>("Flushtime")
                         .HasColumnType("datetime(6)");
 
                     b.Property<uint>("InstrumentToken")
@@ -66,7 +66,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<decimal>("LTP")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<DateTime>("StartTime")
+                    b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");

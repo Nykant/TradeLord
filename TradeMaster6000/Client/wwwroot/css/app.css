@@ -52,3 +52,15 @@ a, .btn-link {
 .padding-top {
     padding-top:10px;
 }
+
+.status-box {
+    padding: 20px;
+    float:left;
+}
+
+.footer {
+    height:100px;
+    position: fixed;
+    bottom: 0;
+    width:100%;
+}

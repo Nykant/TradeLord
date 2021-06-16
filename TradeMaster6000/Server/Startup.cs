@@ -39,7 +39,6 @@ namespace TradeMaster6000.Server
 {
     public class Startup
     {
-        private static CancellationTokenSource source = new CancellationTokenSource();
         public Startup(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             Configuration = configuration;
@@ -49,8 +48,6 @@ namespace TradeMaster6000.Server
         public IWebHostEnvironment Environment { get; }
         public IConfiguration Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
-        // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
             string connectionString = Configuration.GetConnectionString("DefaultConnection");
@@ -119,7 +116,7 @@ namespace TradeMaster6000.Server
             services.AddHangfireServer(options => 
             { 
                 options.CancellationCheckInterval = TimeSpan.FromSeconds(5); 
-                options.WorkerCount = 20;
+                options.WorkerCount = 10;
             });
 
             services.TryAddTransient<IContextExtension, ContextExtension>();
@@ -142,7 +139,6 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
             services.TryAddSingleton<IWatchingTargetHelper, WatchingTargetHelper>();
             services.TryAddSingleton<IOrderManagerService, OrderManagerService>();
-
             //-------------------
 
             services.AddSignalR(options =>
@@ -215,7 +211,7 @@ namespace TradeMaster6000.Server
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IBackgroundJobClient backgroundJobs/*, IRunningOrderService running*/, IKiteService kiteService, IInstrumentHelper instrumentHelper, IInstrumentService instrumentService, ITickerService tickerService, IHttpContextAccessor httpContextAccessor)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IRecurringJobManager recurringJobManager, IBackgroundJobClient backgroundJobs/*, IRunningOrderService running*/, IKiteService kiteService, IInstrumentHelper instrumentHelper, IInstrumentService instrumentService, ITickerService tickerService, IHttpContextAccessor httpContextAccessor)
         {
 
             app.UseForwardedHeaders();
@@ -258,9 +254,8 @@ namespace TradeMaster6000.Server
                 endpoints.MapFallbackToFile("index.html");
             });
 
-            //backgroundJobs.Enqueue(() => running.UpdateOrders(cancellationTokenSource.Token));
-            backgroundJobs.Enqueue(() => kiteService.KiteManager(source.Token));
-            backgroundJobs.Enqueue(() => tickerService.StartFlushing(source.Token));
+            recurringJobManager.AddOrUpdate("Kite-Manager",() => kiteService.KiteManager(), Cron.Daily());
+            backgroundJobs.Enqueue(() => tickerService.StartFlushing(tickerService.GetToken()));
             instrumentHelper.LoadInstruments(instrumentService.GetInstruments());
         }
     }

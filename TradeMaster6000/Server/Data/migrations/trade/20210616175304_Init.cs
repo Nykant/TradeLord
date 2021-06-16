@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TradeMaster6000.Server.data.migrations.trade
 {
-    public partial class init : Migration
+    public partial class Init : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -22,8 +22,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     High = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Low = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Close = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    From = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    To = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     Kill = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
                 constraints: table =>
@@ -61,8 +60,8 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     LTP = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    StartTime = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    EndTime = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Flushtime = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     InstrumentToken = table.Column<uint>(type: "int unsigned", nullable: false)
                 },
                 constraints: table =>
@@ -137,6 +136,25 @@ namespace TradeMaster6000.Server.data.migrations.trade
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
+                name: "Zones",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    InstrumentSymbol = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Top = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    Bottom = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    From = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    To = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Zones", x => x.Id);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
                 name: "TradeLogs",
                 columns: table => new
                 {
@@ -181,6 +199,9 @@ namespace TradeMaster6000.Server.data.migrations.trade
 
             migrationBuilder.DropTable(
                 name: "TradeLogs");
+
+            migrationBuilder.DropTable(
+                name: "Zones");
 
             migrationBuilder.DropTable(
                 name: "TradeOrders");
