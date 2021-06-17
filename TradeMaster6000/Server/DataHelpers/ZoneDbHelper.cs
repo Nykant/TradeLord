@@ -15,6 +15,16 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             this.ContextFactory = ContextFactory;
         }
+
+        public async Task<List<Zone>> GetZones()
+        {
+            using (var context = ContextFactory.CreateDbContext())
+            {
+                return await context.Zones.ToListAsync();
+            }
+            
+        }
+
         public async Task Add(Zone zone)
         {
             using (var context = ContextFactory.CreateDbContext())
@@ -27,5 +37,6 @@ namespace TradeMaster6000.Server.DataHelpers
     public interface IZoneDbHelper
     {
         Task Add(Zone zone);
+        Task<List<Zone>> GetZones();
     }
 }

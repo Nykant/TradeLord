@@ -32,7 +32,7 @@ namespace TradeMaster6000.Server.Services
         {
             logger.LogInformation("zone service starting");
             List<Task> tasks = new List<Task>();
-            for(int i = 0; i < 1; i++)
+            for(int i = 0; i < 30; i++)
             {
                 tasks.Add(ZoneFinder(instruments[i], timeFrame));
             }
@@ -91,6 +91,7 @@ namespace TradeMaster6000.Server.Services
                             temp.Close = candles[i].Close;
                             newCandles.Add(temp);
                             candleCounter = 0;
+                            temp = new();
                         }
 
                         i++;
@@ -113,13 +114,13 @@ namespace TradeMaster6000.Server.Services
                 int fittyIndex = 0;
                 Repeat:;
                 FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, fittyIndex));
-                fittyIndex = fittyCandle.Index;
                 if (fittyCandle == default)
                 {
                     goto Ending;
                 }
+                fittyIndex = fittyCandle.Index;
 
-                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle));
+                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle, instrument.TradingSymbol));
                 if (fittyIndex == newCandles.Count - 1)
                 {
                     goto Ending;
@@ -158,7 +159,7 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle)
+        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol)
         {
             logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: started finding zone");
             HalfZone up = new HalfZone();
@@ -191,7 +192,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone { From = down.Timestamp, To = up.Timestamp };
+            Zone zone = new Zone { From = down.Timestamp, To = up.Timestamp, InstrumentSymbol = symbol };
 
             if(up.Top > down.Top)
             {

@@ -16,6 +16,12 @@
 
         <hr />
 
+        <RadzenListBox AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                       @bind-Value="tradingSymbol" Data=@instruments TextProperty="TradingSymbol"
+                       ValueProperty="TradingSymbol" Change=@((args) => GetCandles(args)) Style="height:200px" />
+
+        <hr />
+
         <RadzenDataGrid @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                         Data="@candles" TItem="Candle">
             <Columns>
@@ -24,7 +30,8 @@
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="From" Title="From" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Timestamp" Title="Timestamp" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
             </Columns>
         </RadzenDataGrid>
@@ -38,7 +45,10 @@
 @code {
     private HubConnection hubConnection;
     RadzenDataGrid<Candle> candlesGrid;
-    private IEnumerable<Candle> candles = new List<Candle>();
+    private List<Candle> candles = new List<Candle>();
+    private List<TradeInstrument> instruments = new List<TradeInstrument>();
+    private string tradingSymbol = null;
+
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
@@ -52,14 +62,25 @@
             StateHasChanged();
         });
 
+        hubConnection.On<List<TradeInstrument>>("ReceiveInstruments", (instruments) =>
+        {
+            this.instruments = instruments;
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
 
-        await GetCandles();
+        await GetInstruments();
     }
 
-    public async Task GetCandles()
+    public async Task GetCandles(object args)
     {
-        await hubConnection.SendAsync("GetCandles");
+        await hubConnection.SendAsync("GetCandles", (string)args);
+    }
+
+    private async Task GetInstruments()
+    {
+        await hubConnection.SendAsync("GetInstruments");
     }
 
     private async Task StartCandleMagic()

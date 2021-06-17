@@ -15,19 +15,16 @@
 
         <hr />
 
-        @*<RadzenDataGrid @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
-                        Data="@candles" TItem="Candle">
+        <RadzenDataGrid @ref="zonesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                        Data="@zones" TItem="Zone">
             <Columns>
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="InstrumentSymbol" Title="Instrument Symbol" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="From" Title="From" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="To" Title="To" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="InstrumentSymbol" Title="Instrument Symbol" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Top" Title="Top" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Bottom" Title="Bottom" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="From" Title="From" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="To" Title="To" />
             </Columns>
-        </RadzenDataGrid>*@
+        </RadzenDataGrid>
     }
     else
     {
@@ -37,30 +34,30 @@
 
 @code {
     private HubConnection hubConnection;
-    //RadzenDataGrid<Candle> candlesGrid;
-    //private IEnumerable<Candle> candles = new List<Candle>();
+    RadzenDataGrid<Zone> zonesGrid;
+    private IEnumerable<Zone> zones = new List<Zone>();
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
         .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
         .Build();
 
-        //hubConnection.On<List<Candle>>("ReceiveCandles", (list) =>
-        //{
-        //    candles = list;
-        //    candles.Reverse();
-        //    StateHasChanged();
-        //});
+        hubConnection.On<List<Zone>>("ReceiveZones", (list) =>
+        {
+            zones = list;
+            zones.Reverse();
+            StateHasChanged();
+        });
 
         await hubConnection.StartAsync();
 
-        //await GetCandles();
+        await GetZones();
     }
 
-    //public async Task GetCandles()
-    //{
-    //    await hubConnection.SendAsync("GetCandles");
-    //}
+    public async Task GetZones()
+    {
+        await hubConnection.SendAsync("GetZones");
+    }
 
     private async Task StartZoneService()
     {

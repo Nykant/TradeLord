@@ -33,10 +33,12 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IBackgroundJobClient backgroundJob;
         private readonly ICandleDbHelper candleDbHelper;
         private readonly IZoneService zoneService;
+        private readonly IZoneDbHelper zoneDbHelper;
         private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper)
         {
+            this.zoneDbHelper = zoneDbHelper;
             this.tickerService = tickerService;
             this.orderManagerService = orderManagerService;
             this.backgroundJob = backgroundJob;
@@ -81,6 +83,11 @@ namespace TradeMaster6000.Server.Hubs
         {
             List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
             backgroundJob.Enqueue(() => zoneService.Start(instruments, 5));
+        }
+
+        public async Task GetZones()
+        {
+            await Clients.Caller.SendAsync("ReceiveZones", await zoneDbHelper.GetZones());
         }
 
         public async Task GetTick(string symbol)
@@ -135,15 +142,20 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveLogs", await tradeLogHelper.GetTradeLogs(orderId));
         }
 
-        public async Task GetCandles()
+        public async Task GetCandles(string tradingSymbol)
         {
-            var candles = await candleDbHelper.GetCandles();
-            for(int i = 0; i < candles.Count; i++)
+            uint token = 0;
+            var instruments = await instrumentHelper.GetTradeInstruments();
+            foreach(var instrument in instruments)
             {
-                var instrument = await instrumentHelper.Get(candles[i].InstrumentToken);
-                candles[i].InstrumentSymbol = instrument.TradingSymbol;
+                if(instrument.TradingSymbol == tradingSymbol)
+                {
+                    token = instrument.Token;
+                    break;
+                }
             }
-            await Clients.Caller.SendAsync("ReceiveCandles", candles);
+
+            await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles(token));
         }
 
         public async Task StopOrderWork(int id)
