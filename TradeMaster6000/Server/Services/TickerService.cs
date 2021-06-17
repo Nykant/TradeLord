@@ -205,7 +205,7 @@ namespace TradeMaster6000.Server.Services
                     await Task.Delay(duration, CancellationToken.None);
 
                     ticks = await tickDbHelper.Get(instrument.Token, candleTime);
-                    Candle candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(2) };
+                    Candle candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(2), TicksCount = ticks.Count };
                     if (ticks.Count > 0)
                     {
                         candle.High = ticks[0].LTP;

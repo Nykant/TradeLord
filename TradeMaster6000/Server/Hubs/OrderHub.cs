@@ -32,15 +32,16 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IOrderManagerService orderManagerService;
         private readonly IBackgroundJobClient backgroundJob;
         private readonly ICandleDbHelper candleDbHelper;
+        private readonly IZoneService zoneService;
         private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService)
         {
             this.tickerService = tickerService;
             this.orderManagerService = orderManagerService;
             this.backgroundJob = backgroundJob;
             this.candleDbHelper = candleDbHelper;
-            //running = runningOrderService;
+            this.zoneService = zoneService;
             KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
@@ -76,9 +77,10 @@ namespace TradeMaster6000.Server.Hubs
             tickerService.StopCandles();
         }
 
-        public void StartZoneService()
+        public async Task StartZoneService()
         {
-            //backgroundJob.Enqueue(() => tickerService.RunCandles(source.Token));
+            List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
+            backgroundJob.Enqueue(() => zoneService.Start(instruments, 5));
         }
 
         public async Task GetTick(string symbol)

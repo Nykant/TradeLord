@@ -1,6 +1,9 @@
-﻿using System;
+﻿using Hangfire;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Helpers;
@@ -13,112 +16,151 @@ namespace TradeMaster6000.Server.Services
         private readonly ICandleDbHelper candleHelper;
         private readonly IZoneDbHelper zoneHelper;
         private readonly ITimeHelper timeHelper;
-        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper)
+        private readonly ILogger<ZoneService> logger;
+        private static SemaphoreSlim semaphoreSlim;
+        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<ZoneService> logger)
         {
             this.timeHelper = timeHelper;
+            this.logger = logger;
             candleHelper = candleDbHelper;
             zoneHelper = zoneDbHelper;
+            semaphoreSlim = new SemaphoreSlim(1, 1);
         }
 
+        [AutomaticRetry(Attempts = 0)]
         public async Task Start(List<TradeInstrument> instruments, int timeFrame)
         {
+            logger.LogInformation("zone service starting");
             List<Task> tasks = new List<Task>();
-            foreach(var instrument in instruments)
+            for(int i = 0; i < 1; i++)
             {
-                tasks.Add(ZoneFinder(instrument, timeFrame));
+                tasks.Add(ZoneFinder(instruments[i], timeFrame));
             }
             await Task.WhenAll(tasks);
+            logger.LogInformation("zone service done");
         }
 
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
-            List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
-            if(candles.Count == 0)
+            logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: zone finder started");
+            //await semaphoreSlim.WaitAsync();
+            try
             {
-                goto Ending;
-            }
-            List<Candle> newCandles = new List<Candle>();
-            DateTime time = timeHelper.OpeningTime();
-            while(true)
-            {
-                if(candles[0].Timestamp.Hour == time.Hour && candles[0].Timestamp.Minute == time.Minute)
+                List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
+                if (candles.Count == 0)
                 {
-                    break;
+                    goto Ending;
                 }
-                time = time.AddMinutes(1);
-            }
 
-            Candle temp = candles[0];
-            time.AddMinutes(1);
-
-            int i = 1;
-            int n = candles.Count;
-            int tfCount = 1;
-            while(i < n)
-            {
-                if(candles[i].Timestamp.Hour == time.Hour && candles[i].Timestamp.Minute == time.Minute)
+                List<Candle> newCandles = new List<Candle>();
+                DateTime time = timeHelper.OpeningTime();
+                while (true)
                 {
-                    if (temp.High < candles[i].High)
+                    if (candles[0].Timestamp.Hour == time.Hour && candles[0].Timestamp.Minute == time.Minute)
                     {
-                        temp.High = candles[i].High;
+                        break;
                     }
-                    if (temp.Low > candles[i].Low)
+                    time = time.AddMinutes(1);
+                }
+
+                Candle temp = new ();
+                int emptyCounter = 0;
+                int i = 0;
+                int n = candles.Count;
+                int candleCounter = 0;
+                while (i < n)
+                {
+                    if (candles[i].Timestamp.Hour == time.Hour && candles[i].Timestamp.Minute == time.Minute)
                     {
-                        temp.Low = candles[i].Low;
+                        candleCounter++;
+
+                        if (temp.High < candles[i].High || temp.High == default)
+                        {
+                            temp.High = candles[i].High;
+                        }
+                        if (temp.Low > candles[i].Low || temp.Low == default)
+                        {
+                            temp.Low = candles[i].Low;
+                        }
+
+                        if (candleCounter == timeFrame)
+                        {
+                            temp.InstrumentSymbol = candles[i].InstrumentSymbol;
+                            temp.Timestamp = candles[i - (timeFrame - 1)].Timestamp;
+                            temp.Open = candles[i - (timeFrame - 1)].Open;
+                            temp.Close = candles[i].Close;
+                            newCandles.Add(temp);
+                            candleCounter = 0;
+                        }
+
+                        i++;
+                    }
+                    else
+                    {
+                        emptyCounter++;
+                        if(emptyCounter + candleCounter == timeFrame)
+                        {
+                            newCandles.Add(temp);
+                            temp = new();
+                        }
                     }
 
-                    if (tfCount == timeFrame)
-                    {
-                        temp.InstrumentSymbol = candles[i].InstrumentSymbol;
-                        temp.Timestamp = candles[i - timeFrame].Timestamp;
-                        temp.Open = candles[i - timeFrame].Open;
-                        temp.Close = candles[i].Close;
-                        newCandles.Add(temp);
-                        tfCount = 0;
-                    }
+                    time = time.AddMinutes(1);
+                }
 
-                    tfCount++;
-                    i++;
+                logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: finished making new candles. amount: {newCandles.Count}");
+
+                int fittyIndex = 0;
+                Repeat:;
+                FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, fittyIndex));
+                fittyIndex = fittyCandle.Index;
+                if (fittyCandle == default)
+                {
+                    goto Ending;
+                }
+
+                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle));
+                if (fittyIndex == newCandles.Count - 1)
+                {
+                    goto Ending;
+                }
+                else if (zone == default)
+                {
+                    fittyIndex++;
+                    goto Repeat;
+                }
+
+                await zoneHelper.Add(zone).ConfigureAwait(false);
+                logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: added zone: {zone.Id}");
+
+                if (fittyIndex == newCandles.Count - 1)
+                {
+                    goto Ending;
                 }
                 else
                 {
-                    // anything else?
+                    fittyIndex++;
+                    goto Repeat;
                 }
 
-                time.AddMinutes(1);
-            }
+                Ending:;
 
-            int fittyIndex = 0;
-            Repeat:;
-            FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, fittyIndex));
-            fittyIndex = fittyCandle.Index;
-            if(fittyCandle == default)
+                logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: zone finder done");
+            }
+            catch (Exception e)
             {
-                goto Ending;
+                logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: there was an error: {e.Message}");
             }
-
-            Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle));
-            if(zone == default)
+            finally
             {
-                goto Repeat;
-            }
 
-            await zoneHelper.Add(zone);
-
-            if(fittyIndex == candles.Count - 1)
-            {
-                goto Ending;
+                //semaphoreSlim.Release();
             }
-            else
-            {
-                goto Repeat;
-            }
-
-            Ending:;
         }
 
         private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle)
         {
+            logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: started finding zone");
             HalfZone up = new HalfZone();
             HalfZone down = new HalfZone();
             Parallel.Invoke(
@@ -318,7 +360,8 @@ namespace TradeMaster6000.Server.Services
 
         private FittyCandle FittyFinder(List<Candle> candles, int index)
         {
-            for(int i = index, n = candles.Count; i < n; i++)
+            logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: starting fitty finder");
+            for (int i = index, n = candles.Count; i < n; i++)
             {
                 var fitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
                 if(Math.Abs(candles[i].Open - candles[i].Close) <= fitty)

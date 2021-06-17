@@ -8,7 +8,7 @@ using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.DataHelpers
 {
-    public class ZoneDbHelper
+    public class ZoneDbHelper : IZoneDbHelper
     {
         private IDbContextFactory<TradeDbContext> ContextFactory { get; }
         public ZoneDbHelper(IDbContextFactory<TradeDbContext> ContextFactory)
