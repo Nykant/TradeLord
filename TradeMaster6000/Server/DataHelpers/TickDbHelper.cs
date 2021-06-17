@@ -28,11 +28,11 @@ namespace TradeMaster6000.Server.DataHelpers
                 await context.SaveChangesAsync();
             }
         }
-        public IQueryable<MyTick> Get(uint token, DateTime time)
+        public async Task<List<MyTick>> Get(uint token, DateTime time)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return context.Ticks.Where(x => x.InstrumentToken == token && x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute);
+                return await context.Ticks.Where(x => x.InstrumentToken == token && x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute).ToListAsync();
             }
         }
         public async Task<MyTick> GetLast(uint token)
@@ -94,7 +94,7 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface ITickDbHelper
     {
-        IQueryable<MyTick> Get(uint token, DateTime time);
+        Task<List<MyTick>> Get(uint token, DateTime time);
         Task Add(MyTick tick);
         Task Flush();
         Task<bool> Any();

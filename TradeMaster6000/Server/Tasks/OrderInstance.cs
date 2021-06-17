@@ -358,7 +358,7 @@ namespace TradeMaster6000.Server.Tasks
                 await Task.Delay(60000);
 
                 DateTime time = TimeHelper.CurrentTime().Subtract(new TimeSpan(1200));
-                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token, time).ToListAsync();
+                var ticks = await TickDbHelper.Get(TradeOrder.Instrument.Token, time);
 
                 await Task.Run(() =>
                 {
