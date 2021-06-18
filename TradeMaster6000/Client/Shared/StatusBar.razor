@@ -2,95 +2,134 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
-<div class="status-box">
-    <RadzenLabel Text="Candle Maker On" />
-    <RadzenSelectBar @bind-Value=@candlesOn TValue="bool" Change=@(args => OnChangeCandles(args))>
-        <Items>
-            <RadzenSelectBarItem Text="On" Value="true" />
-            <RadzenSelectBarItem Text="Off" Value="false" />
-        </Items>
-    </RadzenSelectBar>
-</div>
 
-<div class="status-box">
-    <RadzenLabel Text="Tick Flusher On" />
-    <RadzenSelectBar @bind-Value=@flusherOn TValue="bool" Change=@(args => OnChangeFlusher(args))>
-        <Items>
-            <RadzenSelectBarItem Text="On" Value="true" />
-            <RadzenSelectBarItem Text="Off" Value="false" />
-        </Items>
-    </RadzenSelectBar>
-</div>
+        <div class="status-box">
+            <p>Candle Maker</p>
+            @{
+                if (candlesOn)
+                {
+                        <div class="on">
+                            on
+                        </div>
+                }
+                else
+                {
+        <div class="off">
+            off
+        </div>
+                }
+            }
+        </div>
 
-@*<div class="status-box">
-    <RadzenLabel Text="Ticker in use" />
-    <RadzenSelectBar @bind-Value=@flusherOn TValue="bool" Change=@(args => OnChangeFlusher(args))>
-        <Items>
-            <RadzenSelectBarItem Text="On" Value="true" />
-            <RadzenSelectBarItem Text="Off" Value="false" />
-        </Items>
-    </RadzenSelectBar>
-</div>*@
+        <div class="status-box">
+            <p>Tick Flusher</p>
+            @{
+                if (flusherOn)
+                {
+                        <div class="on">
+                            on
+                        </div>
+                }
+                else
+                {
+        <div class="off">
+            off
+        </div>
+                }
+            }
+        </div>
+
+        <div class="status-box">
+            <p>Tick Manager</p>
+            @{
+                if (tickManagerOn)
+                {
+                        <div class="on">
+                            on
+                        </div>
+                }
+                else
+                {
+        <div class="off">
+            off
+        </div>
+                }
+            }
+        </div>
+
+        <div class="status-box">
+            <p>Candle Manager</p>
+            @{
+                if (candleManagerOn)
+                {
+                    <div class="on">
+                        on
+                    </div>
+                }
+                else
+                {
+                    <div class="off">
+                        off
+                    </div>
+                }
+            }
+        </div>
+
+
 
 @code {
     bool candlesOn = false;
     bool flusherOn = false;
+    bool candleManagerOn = false;
+    bool tickManagerOn = false;
 
     protected override async Task OnInitializedAsync()
     {
-        //var response = await Http.GetAsync("Status/IsFlushing");
-        //var strin = await response.Content.ReadAsStringAsync();
-        //if(strin == "false")
-        //{
-        //    flusherOn = false;
-        //}
-        //else
-        //{
-        //    flusherOn = true;
-        //}
-
-        //var response1 = await Http.GetAsync("Status/IsCandlesOn");
-        //var strin1 = await response1.Content.ReadAsStringAsync();
-        //if(strin1 == "false")
-        //{
-        //    flusherOn = false;
-        //}
-        //else
-        //{
-        //    flusherOn = true;
-        //}
-
-        //var response2 = await Http.GetAsync("Status/IsTickerInUse");
-        //var strin2 = await response2.Content.ReadAsStringAsync();
-        //if (strin2 == "false")
-        //{
-        //    flusherOn = false;
-        //}
-        //else
-        //{
-        //    flusherOn = true;
-        //}
-
-        //StateHasChanged();
-    }
-
-    async Task OnChangeFlusher(object value)
-    {
-        if (!(bool)value)
+        var response = await Http.GetAsync("Status/IsFlushing");
+        var strin = await response.Content.ReadAsStringAsync();
+        if (strin == "False")
         {
-            //await Http.GetAsync("Status/StartFlushing");
+            flusherOn = false;
         }
-        else if ((bool)value)
+        else
         {
-            //await Http.GetAsync("Status/StopFlushing");
+            flusherOn = true;
         }
-    }
 
-    async Task OnChangeCandles(object value)
-    {
-        if (!(bool)value)
+        var response1 = await Http.GetAsync("Status/IsCandlesOn");
+        var strin1 = await response1.Content.ReadAsStringAsync();
+        if (strin1 == "False")
         {
-            //await Http.GetAsync("Status/StopCandles");
+            candlesOn = false;
         }
+        else
+        {
+            candlesOn = true;
+        }
+
+        var response2 = await Http.GetAsync("Status/IsTickManagerOn");
+        var strin2 = await response2.Content.ReadAsStringAsync();
+        if (strin2 == "False")
+        {
+            tickManagerOn = false;
+        }
+        else
+        {
+            tickManagerOn = true;
+        }
+
+
+        var response3 = await Http.GetAsync("Status/IsCandleManagerOn");
+        var strin3 = await response3.Content.ReadAsStringAsync();
+        if (strin3 == "False")
+        {
+            candleManagerOn = false;
+        }
+        else
+        {
+            candleManagerOn = true;
+        }
+
+        StateHasChanged();
     }
 }

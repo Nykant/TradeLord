@@ -144,18 +144,15 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetCandles(string tradingSymbol)
         {
-            uint token = 0;
             var instruments = await instrumentHelper.GetTradeInstruments();
             foreach(var instrument in instruments)
             {
                 if(instrument.TradingSymbol == tradingSymbol)
                 {
-                    token = instrument.Token;
+                    await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles(instrument.Token));
                     break;
                 }
             }
-
-            await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles(token));
         }
 
         public async Task StopOrderWork(int id)

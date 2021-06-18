@@ -25,7 +25,6 @@ namespace TradeMaster6000.Server.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<TradeOrder>().Ignore(e => e.Instrument);
-            modelBuilder.Entity<Candle>().Ignore(e => e.InstrumentSymbol);
             modelBuilder.Entity<OrderUpdate>().Property(x => x.OrderId).ValueGeneratedNever();
         }
     }

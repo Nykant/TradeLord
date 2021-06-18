@@ -85,7 +85,7 @@ namespace TradeMaster6000.Server.Services
 
                         if (candleCounter == timeFrame)
                         {
-                            temp.InstrumentSymbol = candles[i].InstrumentSymbol;
+                            temp.InstrumentToken = candles[i].InstrumentToken;
                             temp.Timestamp = candles[i - (timeFrame - 1)].Timestamp;
                             temp.Open = candles[i - (timeFrame - 1)].Open;
                             temp.Close = candles[i].Close;

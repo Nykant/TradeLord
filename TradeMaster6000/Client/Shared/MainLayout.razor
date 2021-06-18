@@ -1,27 +1,27 @@
 ﻿@inherits LayoutComponentBase
-    <Title Value="MONEY MACHINE"></Title>
+@using Microsoft.AspNetCore.Components.Authorization
+<Title Value="Robin Hood"></Title>
 
-    <div class="page">
-
-        <div class="sidebar">
-            <NavMenu />
-        </div>
-
-        <div class="main">
-            <div class="top-row px-4 auth">
-
-                <LoginDisplay />
-            </div>
-
-            <div class="content px-4">
-                @Body
-            </div>
-
-            <div class="footer">
-                <StatusBar />
-            </div>
-        </div>
-
-
-
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
     </div>
+
+    <div class="main">
+        <div class="top-row px-4 auth">
+            <LoginDisplay />
+        </div>
+
+        <div class="content px-4">
+            @Body
+        </div>
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="footer">
+                    <StatusBar />
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+</div>

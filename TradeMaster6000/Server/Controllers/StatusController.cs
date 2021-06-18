@@ -30,24 +30,6 @@ namespace TradeMaster6000.Server.Controllers
         }
 
         [HttpGet]
-        public void StopCandles()
-        {
-            tickerService.StopCandles();
-        }
-
-        [HttpGet]
-        public void StopFlushing()
-        {
-            tickerService.CancelToken();
-        }
-
-        [HttpGet]
-        public void StartFlushing()
-        {
-            backgroundJob.Enqueue(() => tickerService.StartFlushing(tickerService.GetToken()));
-        }
-
-        [HttpGet]
         public string IsFlushing()
         {
             var stri = tickerService.IsFlushing().ToString();
@@ -55,9 +37,17 @@ namespace TradeMaster6000.Server.Controllers
         }
 
         [HttpGet]
-        public string IsTickerInUse()
+        public string IsTickManagerOn()
         {
-            return tickerService.IsTickerInUse().ToString();
+            var stri = tickerService.IsCandleManagerOn().ToString();
+            return stri;
+        }
+
+        [HttpGet]
+        public string IsCandleManagerOn()
+        {
+            var stri = tickerService.IsTickManagerOn().ToString();
+            return stri;
         }
     }
 }

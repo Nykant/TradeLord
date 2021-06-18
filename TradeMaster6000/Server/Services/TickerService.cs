@@ -34,11 +34,19 @@ namespace TradeMaster6000.Server.Services
 
         private static Ticker Ticker { get; set; }
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
-        private static bool CandlesRunning { get; set; }
+        private List<MyTick> MyTicks { get; set; }
+        private List<Candle> Candles { get; set; }
+
         private static CancellationTokenSource CandleSource { get; set; }
-        private static CancellationTokenSource Source { get; set; }
-        private static bool TickerInUse { get; set; }
+        private static CancellationTokenSource FlushingSource { get; set; }
+        private static CancellationTokenSource TickManagerSource { get; set; }
+        private static CancellationTokenSource CandleManagerSource { get; set; }
         private static bool Flushing { get; set; }
+        private static bool TickManagerOn { get; set; }
+        private static bool CandleManagerOn { get; set; }
+        private static bool CandlesRunning { get; set; }
+        private static object myTicksKey;
+        private static object candlesKey;
 
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger)
         {
@@ -53,7 +61,10 @@ namespace TradeMaster6000.Server.Services
             this.contextExtension = contextExtension;
             this.logger = logger;
             TickerLogs = new ();
-            Source = new CancellationTokenSource();
+            MyTicks = new();
+            Candles = new List<Candle>();
+            myTicksKey = new object();
+            candlesKey = new object();
         }
 
         public void Start()
@@ -73,9 +84,60 @@ namespace TradeMaster6000.Server.Services
 
                 Ticker.EnableReconnect(Interval: 5, Retries: 50);
                 Ticker.Connect();
+
+                FlushingSource = new CancellationTokenSource();
+                TickManagerSource = new CancellationTokenSource();
+
+                backgroundJob.Enqueue(() => TickManager(TickManagerSource.Token));
+                backgroundJob.Enqueue(() => StartFlushing(FlushingSource.Token));
             }
         }
 
+        [AutomaticRetry(Attempts = 0)]
+        public async Task TickManager(CancellationToken token)
+        {
+            TickManagerOn = true;
+            while (!token.IsCancellationRequested)
+            {
+                List<MyTick> myTicks = MyTicks.ToList();
+                if (myTicks.Count > 0)
+                {
+                    await tickDbHelper.Add(myTicks);
+
+                    for (int i = 0; i < myTicks.Count; i++)
+                    {
+                        MyTicks.RemoveAt(i);
+                    }
+                }
+
+                await Task.Delay(10000);
+            }
+            TickManagerOn = false;
+        }
+
+        [AutomaticRetry(Attempts = 0)]
+        public async Task CandleManager(CancellationToken token)
+        {
+            CandleManagerOn = true;
+            while (!token.IsCancellationRequested)
+            {
+                List<Candle> myCandles = Candles;
+                if (myCandles.Count > 0)
+                {
+                    await candleHelper.Add(myCandles);
+
+                    for (int i = 0; i < myCandles.Count; i++)
+                    {
+                        Candles.RemoveAt(i);
+                    }
+                }
+
+                await Task.Delay(75000);
+            }
+            CandleManagerOn = false;
+        }
+
+        [AutomaticRetry(Attempts = 0)]
         public async Task StartFlushing(CancellationToken token)
         {
             Flushing = true;
@@ -87,30 +149,10 @@ namespace TradeMaster6000.Server.Services
             Flushing = false;
         }
 
-        public async Task RunCandles()
-        {
-            CandlesRunning = true;
-            await candleHelper.Flush();
-
-            backgroundJob.Enqueue(() => AnalyzeCandles());
-        }
 
         public void StopCandles()
         {
             CandleSource.Cancel();
-        }
-
-        public bool IsTickerInUse()
-        {
-            return TickerInUse;
-        }
-        public void UseTicker()
-        {
-            TickerInUse = true;
-        }
-        public void StopUsingTicker()
-        {
-            TickerInUse = false;
         }
 
         public bool IsFlushing()
@@ -118,29 +160,44 @@ namespace TradeMaster6000.Server.Services
             return Flushing;
         }
 
-        public CancellationToken GetToken()
+        public bool IsCandlesRunning()
         {
-            return Source.Token;
+            return CandlesRunning;
         }
 
-        public void CancelToken()
+        public bool IsTickManagerOn()
         {
-            Source.Cancel();
+            return TickManagerOn;
         }
 
+        public bool IsCandleManagerOn()
+        {
+            return CandleManagerOn;
+        }
+
+        public async Task RunCandles()
+        {
+            CandlesRunning = true;
+            await candleHelper.Flush();
+
+            CandleManagerSource = new CancellationTokenSource();
+            backgroundJob.Enqueue(() => CandleManager(CandleManagerSource.Token));
+            backgroundJob.Enqueue(() => AnalyzeCandles());
+        }
+
+        [AutomaticRetry(Attempts = 0)]
         public async Task AnalyzeCandles()
         {
             CandleSource = new CancellationTokenSource();
-            CancellationToken token = CandleSource.Token;
 
-            while (!timeHelper.IsPreMarketOpen() && !token.IsCancellationRequested)
+            while (!timeHelper.IsPreMarketOpen() && !CandleSource.Token.IsCancellationRequested)
             {
-                await Task.Delay(10000, token);
+                await Task.Delay(10000, CandleSource.Token);
             }
 
-            while (!timeHelper.IsMarketOpen() && !token.IsCancellationRequested)
+            while (!timeHelper.IsMarketOpen() && !CandleSource.Token.IsCancellationRequested)
             {
-                await Task.Delay(1000, token);
+                await Task.Delay(1000, CandleSource.Token);
             }
 
             var instruments = await instrumentHelper.GetTradeInstruments();
@@ -148,13 +205,13 @@ namespace TradeMaster6000.Server.Services
             for (int i = 0; i < 30; i++)
             {
                 Subscribe(instruments[i].Token);
-                tasks.Add(Analyze(instruments[i], token));
+                tasks.Add(Analyze(instruments[i], CandleSource.Token));
             }
 
             await Task.WhenAll(tasks);
 
-            Stop();
             CandlesRunning = false;
+            CandleManagerSource.Cancel();
         }
 
         public async Task Analyze(TradeInstrument instrument, CancellationToken token)
@@ -198,7 +255,7 @@ namespace TradeMaster6000.Server.Services
                 while (!timeHelper.IsMarketEnded() && !token.IsCancellationRequested)
                 {
                     current = timeHelper.CurrentTime();
-                    duration = timeHelper.GetDuration(waittime, current);
+                    duration = timeHelper.GetDuration(waittime, current).Add(TimeSpan.FromSeconds(11));
                     candleTime = waittime.Subtract(TimeSpan.FromSeconds(30));
                     candleTime = new DateTime(candleTime.Year, candleTime.Month, candleTime.Day, candleTime.Hour, candleTime.Minute, 00);
 
@@ -232,7 +289,12 @@ namespace TradeMaster6000.Server.Services
                         candle.Close = previousCandle.Close;
                     }
 
-                    previousCandle = await candleHelper.AddCandle(candle).ConfigureAwait(false);
+                    lock (candlesKey)
+                    {
+                        Candles.Add(candle);
+                    }
+
+                    previousCandle = candle;
                     waittime = waittime.AddMinutes(1);
                 }
 
@@ -281,11 +343,6 @@ namespace TradeMaster6000.Server.Services
             };
         }
 
-        public bool IsCandlesRunning()
-        {
-            return CandlesRunning;
-        }
-
         public void SetTicker(Ticker ticker)
         {
             Ticker = ticker;
@@ -301,7 +358,8 @@ namespace TradeMaster6000.Server.Services
             Ticker.DisableReconnect();
             Ticker.Close();
             Ticker = null;
-            TickerInUse = false;
+            FlushingSource.Cancel();
+            TickManagerSource.Cancel();
         }
 
         public void Subscribe(uint token)
@@ -327,16 +385,19 @@ namespace TradeMaster6000.Server.Services
 
         // ------------------------------------------- TICKER EVENTS -------------------------------------------------
 
-        private async void OnTick(Tick tickData)
+        private void OnTick(Tick tickData)
         {
             DateTime time = timeHelper.CurrentTime();
-            await tickDbHelper.Add(new MyTick
+            lock (myTicksKey)
             {
-                InstrumentToken = tickData.InstrumentToken,
-                LTP = tickData.LastPrice,
-                Timestamp = time,
-                Flushtime = time.AddMinutes(2).AddSeconds(30)
-            });
+                MyTicks.Add(new MyTick
+                {
+                    InstrumentToken = tickData.InstrumentToken,
+                    LTP = tickData.LastPrice,
+                    Timestamp = time,
+                    Flushtime = time.AddMinutes(2).AddSeconds(30)
+                });
+            }
         }
 
         private async void OnOrderUpdate(Order orderData)
@@ -391,15 +452,12 @@ namespace TradeMaster6000.Server.Services
         void SetTicker(Ticker ticker);
         Task StartFlushing(CancellationToken token);
         Task RunCandles();
-        bool IsCandlesRunning();
         Task Analyze(TradeInstrument instrument, CancellationToken token);
         Task AnalyzeCandles();
         void StopCandles();
-        bool IsTickerInUse();
-        CancellationToken GetToken();
-        void CancelToken();
+        bool IsCandlesRunning();
         bool IsFlushing();
-        void StopUsingTicker();
-        void UseTicker();
+        bool IsTickManagerOn();
+        bool IsCandleManagerOn();
     }
 }

@@ -28,6 +28,20 @@ namespace TradeMaster6000.Server.DataHelpers
                 await context.SaveChangesAsync();
             }
         }
+
+        public async Task Add(List<MyTick> myTicks)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                foreach(var tick in myTicks)
+                {
+                    await context.Ticks.AddAsync(tick);
+                }
+                
+                await context.SaveChangesAsync();
+            }
+        }
+
         public async Task<List<MyTick>> Get(uint token, DateTime time)
         {
             using (var context = contextFactory.CreateDbContext())
@@ -96,6 +110,7 @@ namespace TradeMaster6000.Server.DataHelpers
     {
         Task<List<MyTick>> Get(uint token, DateTime time);
         Task Add(MyTick tick);
+        Task Add(List<MyTick> myTicks);
         Task Flush();
         Task<bool> Any();
         Task<bool> Any(uint token);

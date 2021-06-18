@@ -16,18 +16,16 @@ namespace TradeMaster6000.Server.Services
     {
         private readonly IInstrumentHelper instrumentHelper;
         private readonly IKiteService kiteService;
-        //private readonly IRunningOrderService running;
         private readonly ITradeOrderHelper tradeOrderHelper;
         private readonly ITickerService tickerService;
         private readonly IServiceProvider serviceProvider;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly IBackgroundJobClient backgroundJobs;
         private static ConcurrentDictionary<int, CancellationTokenSource> OrderTokenSources { get; set; }
-        public OrderManagerService(/*IRunningOrderService runningOrderService, */IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
+        public OrderManagerService(IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
         {
             this.instrumentHelper = instrumentHelper;
             this.kiteService = kiteService;
-            //this.running = runningOrderService;
             this.tradeOrderHelper = tradeOrderHelper;
             this.tickerService = tickerService;
             this.serviceProvider = serviceProvider;
@@ -56,7 +54,6 @@ namespace TradeMaster6000.Server.Services
 
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
-            //running.Add(order);
 
             tickerService.Start();
 
