@@ -53,18 +53,40 @@ a, .btn-link {
     padding-top:10px;
 }
 
-.footer {
-    height: 100px;
+.footerbooter {
+    height: auto;
+    width: auto;
+    padding-top: 20px;
+    padding-bottom: 20px;
     position: fixed;
     bottom: 0;
-    width: 100%;
-    background-color: #230000;
+    right: 0;
+    left: 150px;
+    background-image: linear-gradient(to right, #230000 0%, #000000 70%);
+}
+
+.dissapear {
+    display:none;
+}
+.toggle-button{
+    right:10px;
+    bottom:110px;
+    position:fixed;
+}
+.toggle-button-down {
+    right: 10px;
+    bottom: 10px;
+    position: fixed;
 }
 
 .status-box {
     padding: 20px;
-    float: left;
-    width:auto;
+    float: right;
+    width: auto;
+    height:60px;
+    background: #2e2e2e;
+    color: #fff;
+    margin-right: 10px;
 }
 
 .status-box p {
@@ -72,9 +94,11 @@ a, .btn-link {
 }
 
 .on {
+    margin-left:5px;
+    padding: 5px;
     display: inline;
-/*    text-align: center;*/
-/*    padding-top: 15px;
+    /*    text-align: center;*/
+    /*    padding-top: 15px;
     height: 50px;
     width: 50px;*/
     background-color: #19dd02;
@@ -82,8 +106,10 @@ a, .btn-link {
 }
 
 .off {
+    margin-left: 5px;
+    padding: 5px;
     display: inline;
-/*    text-align: center;
+    /*    text-align: center;
     padding-top: 15px;
     height: 50px;
     width: 50px;*/

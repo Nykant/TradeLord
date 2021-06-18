@@ -2,134 +2,213 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
-
-        <div class="status-box">
-            <p>Candle Maker</p>
-            @{
-                if (candlesOn)
-                {
-                        <div class="on">
-                            on
-                        </div>
-                }
-                else
-                {
-        <div class="off">
-            off
-        </div>
-                }
+<button class="@buttonclass" @onclick="ToggleFooter" >@buttontext</button>
+<div class="@csclass">
+    <div class="status-box">
+        @{
+            <p>Api</p>
+            if (apiLoggedIn)
+            {
+                <div class="on">
+                    on
+                </div>
+                <div style="display:inline; float:right;">
+                    <button style="height:25px; padding:0;" class="nav-link btn btn-link" @onclick="Logout">Log out</button>
+                </div>
             }
-        </div>
-
-        <div class="status-box">
-            <p>Tick Flusher</p>
-            @{
-                if (flusherOn)
-                {
-                        <div class="on">
-                            on
-                        </div>
-                }
-                else
-                {
-        <div class="off">
-            off
-        </div>
-                }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+                <div style="display:inline; float:right;">
+                    <button style="height:25px; padding:0;" class="nav-link btn btn-link" @onclick="Login">Log In</button>
+                </div>
             }
-        </div>
 
-        <div class="status-box">
-            <p>Tick Manager</p>
-            @{
-                if (tickManagerOn)
-                {
-                        <div class="on">
-                            on
-                        </div>
-                }
-                else
-                {
-        <div class="off">
-            off
-        </div>
-                }
+
+        }
+    </div>
+    <div class="status-box">
+        <p>Candle Maker</p>
+        @{
+            if (candlesOn)
+            {
+                <div class="on">
+                    on
+                </div>
             }
-        </div>
-
-        <div class="status-box">
-            <p>Candle Manager</p>
-            @{
-                if (candleManagerOn)
-                {
-                    <div class="on">
-                        on
-                    </div>
-                }
-                else
-                {
-                    <div class="off">
-                        off
-                    </div>
-                }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
             }
-        </div>
-
-
-
-@code {
-    bool candlesOn = false;
-    bool flusherOn = false;
-    bool candleManagerOn = false;
-    bool tickManagerOn = false;
-
-    protected override async Task OnInitializedAsync()
-    {
-        var response = await Http.GetAsync("Status/IsFlushing");
-        var strin = await response.Content.ReadAsStringAsync();
-        if (strin == "False")
-        {
-            flusherOn = false;
         }
-        else
+    </div>
+
+    <div class="status-box">
+        <p>Tick Flusher</p>
+        @{
+            if (flusherOn)
+            {
+                <div class="on">
+                    on
+                </div>
+            }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+            }
+        }
+    </div>
+
+    <div class="status-box">
+        <p>Tick Manager</p>
+        @{
+            if (tickManagerOn)
+            {
+                <div class="on">
+                    on
+                </div>
+            }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+            }
+        }
+    </div>
+
+    <div class="status-box">
+        <p>Candle Manager</p>
+        @{
+            if (candleManagerOn)
+            {
+                <div class="on">
+                    on
+                </div>
+            }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+            }
+
+
+        }
+    </div>
+</div>
+
+    @code {
+        bool show = true;
+        bool candlesOn = false;
+        bool flusherOn = false;
+        bool candleManagerOn = false;
+        bool tickManagerOn = false;
+        bool apiLoggedIn = false;
+        string buttontext = "hide";
+        private bool collapse = false;
+        string buttonclass = "toggle-button";
+
+        private string csclass => collapse ? "dissapear" : "footerbooter";
+        private void ToggleFooter()
         {
-            flusherOn = true;
+            collapse = !collapse;
+            if (collapse)
+            {
+                buttontext = "show";
+                buttonclass = "toggle-button-down";
+            }
+            else
+            {
+                buttontext = "hide";
+                buttonclass = "toggle-button";
+            }
         }
 
-        var response1 = await Http.GetAsync("Status/IsCandlesOn");
-        var strin1 = await response1.Content.ReadAsStringAsync();
-        if (strin1 == "False")
+        protected override async Task OnInitializedAsync()
         {
-            candlesOn = false;
-        }
-        else
-        {
-            candlesOn = true;
+            var response = await Http.GetAsync("Status/IsFlushing");
+            var strin = await response.Content.ReadAsStringAsync();
+            if (strin == "False")
+            {
+                flusherOn = false;
+            }
+            else
+            {
+                flusherOn = true;
+            }
+
+            var response1 = await Http.GetAsync("Status/IsCandlesOn");
+            var strin1 = await response1.Content.ReadAsStringAsync();
+            if (strin1 == "False")
+            {
+                candlesOn = false;
+            }
+            else
+            {
+                candlesOn = true;
+            }
+
+            var response2 = await Http.GetAsync("Status/IsTickManagerOn");
+            var strin2 = await response2.Content.ReadAsStringAsync();
+            if (strin2 == "False")
+            {
+                tickManagerOn = false;
+            }
+            else
+            {
+                tickManagerOn = true;
+            }
+
+
+            var response3 = await Http.GetAsync("Status/IsCandleManagerOn");
+            var strin3 = await response3.Content.ReadAsStringAsync();
+            if (strin3 == "False")
+            {
+                candleManagerOn = false;
+            }
+            else
+            {
+                candleManagerOn = true;
+            }
+
+            await IsLoggedIn();
+
+            StateHasChanged();
         }
 
-        var response2 = await Http.GetAsync("Status/IsTickManagerOn");
-        var strin2 = await response2.Content.ReadAsStringAsync();
-        if (strin2 == "False")
+        private async Task IsLoggedIn()
         {
-            tickManagerOn = false;
-        }
-        else
-        {
-            tickManagerOn = true;
-        }
-
-
-        var response3 = await Http.GetAsync("Status/IsCandleManagerOn");
-        var strin3 = await response3.Content.ReadAsStringAsync();
-        if (strin3 == "False")
-        {
-            candleManagerOn = false;
-        }
-        else
-        {
-            candleManagerOn = true;
+            var response = await Http.GetAsync("ApiLogin/IsLoggedOn");
+            var booly = await response.Content.ReadAsStringAsync();
+            if (booly == "true")
+            {
+                apiLoggedIn = true;
+                StateHasChanged();
+            }
+            else
+            {
+                apiLoggedIn = false;
+                StateHasChanged();
+            }
         }
 
-        StateHasChanged();
+        private async Task Logout(MouseEventArgs args)
+        {
+            await Http.GetAsync("ApiLogin/Logout");
+            apiLoggedIn = false;
+            StateHasChanged();
+        }
+
+        private async Task Login(MouseEventArgs args)
+        {
+            var response = await Http.GetAsync("ApiLogin/Login");
+            Navigation.NavigateTo(await response.Content.ReadAsStringAsync());
+        }
     }
-}
