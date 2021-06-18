@@ -178,7 +178,7 @@ namespace TradeMaster6000.Server.Services
         public async Task RunCandles()
         {
             CandlesRunning = true;
-            await candleHelper.Flush();
+            //await candleHelper.Flush();
 
             CandleManagerSource = new CancellationTokenSource();
             backgroundJob.Enqueue(() => CandleManager(CandleManagerSource.Token));

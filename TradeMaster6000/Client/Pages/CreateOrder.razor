@@ -57,7 +57,7 @@
                             <label>LTP: @LTP</label>
                             <RadzenListBox AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                                            @bind-Value="tradeOrder.TradingSymbol" Data=@instruments TextProperty="TradingSymbol"
-                                           ValueProperty="TradingSymbol" Change=@((args) => GetTick(args)) Style="height:200px" />
+                                           ValueProperty="TradingSymbol" Change=@((args) => GetTick(args)) Style="height:200px; color:#000000;" />
                         </div>
 
                         <div class="padding-top">
