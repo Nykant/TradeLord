@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TradeMaster6000.Server.data.migrations.trade
 {
-    public partial class Init : Migration
+    public partial class Another : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -22,6 +22,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     High = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Low = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Close = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    TicksCount = table.Column<int>(type: "int", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     Kill = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },

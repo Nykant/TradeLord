@@ -83,7 +83,7 @@ namespace TradeMaster6000.Server.Services
                             temp.Low = candles[i].Low;
                         }
 
-                        if (candleCounter == timeFrame)
+                        if (emptyCounter + candleCounter == timeFrame)
                         {
                             temp.InstrumentToken = candles[i].InstrumentToken;
                             temp.Timestamp = candles[i - (timeFrame - 1)].Timestamp;
@@ -91,6 +91,7 @@ namespace TradeMaster6000.Server.Services
                             temp.Close = candles[i].Close;
                             newCandles.Add(temp);
                             candleCounter = 0;
+                            emptyCounter = 0;
                             temp = new();
                         }
 
@@ -99,10 +100,26 @@ namespace TradeMaster6000.Server.Services
                     else
                     {
                         emptyCounter++;
-                        if(emptyCounter + candleCounter == timeFrame)
+                        if(candleCounter > 0)
                         {
-                            newCandles.Add(temp);
-                            temp = new();
+                            if (emptyCounter + candleCounter == timeFrame)
+                            {
+                                if (temp.High != default)
+                                {
+                                    newCandles.Add(temp);
+                                    candleCounter = 0;
+                                    emptyCounter = 0;
+                                    temp = new();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if(emptyCounter == timeFrame)
+                            {
+                                emptyCounter = 0;
+                                temp = new();
+                            }
                         }
                     }
 
@@ -111,36 +128,32 @@ namespace TradeMaster6000.Server.Services
 
                 logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: finished making new candles. amount: {newCandles.Count}");
 
-                int fittyIndex = 0;
+                int index = 0;
+
                 Repeat:;
-                FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, fittyIndex));
+
+                if (index >= newCandles.Count)
+                {
+                    goto Ending;
+                }
+
+                FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, index));
                 if (fittyCandle == default)
                 {
                     goto Ending;
                 }
-                fittyIndex = fittyCandle.Index;
 
                 Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle, instrument.TradingSymbol));
-                if (fittyIndex == newCandles.Count - 1)
+                if (zone == default)
                 {
-                    goto Ending;
-                }
-                else if (zone == default)
-                {
-                    fittyIndex++;
+                    index++;
                     goto Repeat;
-                }
-
-                await zoneHelper.Add(zone).ConfigureAwait(false);
-                logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: added zone: {zone.Id}");
-
-                if (fittyIndex == newCandles.Count - 1)
-                {
-                    goto Ending;
                 }
                 else
                 {
-                    fittyIndex++;
+                    index = zone.EndIndex + 1;
+                    await zoneHelper.Add(zone).ConfigureAwait(false);
+                    logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: added zone: {zone.Id}");
                     goto Repeat;
                 }
 
@@ -192,7 +205,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone { From = down.Timestamp, To = up.Timestamp, InstrumentSymbol = symbol };
+            Zone zone = new Zone { From = down.Timestamp, To = up.Timestamp, InstrumentSymbol = symbol, EndIndex = up.ExplosiveCandle.Index };
 
             if(up.Top > down.Top)
             {
@@ -345,6 +358,7 @@ namespace TradeMaster6000.Server.Services
                     halfZone.Timestamp = candles[i].Timestamp;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
+                        Index = i,
                         Candle = candles[i],
                         HL_Diff = diff,
                         RangeFromFitty = Math.Abs(i - fittyCandle.Index)

@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210616175304_Init")]
-    partial class Init
+    [Migration("20210619073006_Another")]
+    partial class Another
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -42,6 +42,9 @@ namespace TradeMaster6000.Server.data.migrations.trade
 
                     b.Property<decimal>("Open")
                         .HasColumnType("decimal(65,30)");
+
+                    b.Property<int>("TicksCount")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime(6)");

@@ -9,5 +9,6 @@ namespace TradeMaster6000.Shared
         public Candle Candle { get; set; }
         public decimal HL_Diff { get; set; }
         public int RangeFromFitty { get; set; }
+        public int Index { get; set; }
     }
 }
