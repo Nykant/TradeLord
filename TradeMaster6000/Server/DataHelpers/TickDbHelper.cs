@@ -49,16 +49,17 @@ namespace TradeMaster6000.Server.DataHelpers
                 return await context.Ticks.Where(x => x.InstrumentToken == token && x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute).ToListAsync();
             }
         }
-        public MyTick GetLast(uint token)
+        public async Task<MyTick> GetLast(uint token)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var ticks = context.Ticks.Reverse();
-                foreach(var tick in ticks)
+                var ticks = await context.Ticks.ToListAsync();
+
+                for(int i = ticks.Count - 1; i >= 0; i--)
                 {
-                    if(tick.InstrumentToken == token)
+                    if (ticks[i].InstrumentToken == token)
                     {
-                        return tick;
+                        return ticks[i];
                     }
                 }
             }
@@ -113,6 +114,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task Flush();
         Task<bool> Any();
         Task<bool> Any(uint token);
-        MyTick GetLast(uint token);
+        Task<MyTick> GetLast(uint token);
     }
 }

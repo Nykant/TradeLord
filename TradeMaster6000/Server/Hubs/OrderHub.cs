@@ -62,6 +62,11 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task AutoOrders()
         {
+
+            if (!tickerService.IsOrderUpdateOn())
+            {
+                tickerService.StartOrderUpdatesManager();
+            }
             await orderManagerService.AutoOrders(5).ConfigureAwait(false);
         }
 
@@ -163,12 +168,12 @@ namespace TradeMaster6000.Server.Hubs
         public async Task StopOrderWork(int id)
         {
             var orders = await tradeOrderHelper.GetRunningTradeOrders();
-            foreach(var order in orders)
+            foreach (var order in orders)
             {
-                if(order.Id == id)
+                if (order.Id == id)
                 {
-                    backgroundJob.Delete(order.JobId);
                     orderManagerService.CancelToken(id);
+                    backgroundJob.Delete(order.JobId);
                 }
             }
         }

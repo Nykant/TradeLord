@@ -83,7 +83,8 @@ namespace TradeMaster6000.Server.Services
                 TradeOrder order = new();
                 int rng = random.Next(0, instruments.Count - 1);
                 order.Instrument = instruments[rng];
-                var ltp = kite.GetLTP(new[] { order.Instrument.Token.ToString() })[order.Instrument.Token.ToString()].LastPrice;
+                var dic = kite.GetLTP(new[] { order.Instrument.Token.ToString() });
+                var ltp = dic[order.Instrument.Token.ToString()].LastPrice;
                 order = MakeOrder(y, order, ltp);
                 orders.Add(order);
                 await Task.Delay(500);
@@ -144,6 +145,7 @@ namespace TradeMaster6000.Server.Services
             if (!tradeOrderHelper.AnyRunning())
             {
                 tickerService.Stop();
+                tickerService.StopOrderUpdatesManager();
             }
             await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
         }

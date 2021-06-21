@@ -33,21 +33,17 @@ namespace TradeMaster6000.Server.Services
         private readonly IContextExtension contextExtension;
 
         private static Ticker Ticker { get; set; }
-        private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
-        private static ConcurrentBag<MyTick> MyTicks { get; set; }
-        private static ConcurrentBag<Candle> Candles { get; set; }
-        private ConcurrentBag<OrderUpdate> OrderUpdates { get; set; }
+        private static readonly ConcurrentQueue<SomeLog> TickerLogs = new ConcurrentQueue<SomeLog>();
+        private static readonly ConcurrentQueue<MyTick> MyTicks = new ConcurrentQueue<MyTick>();
+        private static readonly ConcurrentQueue<Candle> Candles = new ConcurrentQueue<Candle>();
+        private static readonly ConcurrentQueue<OrderUpdate> OrderUpdates = new ConcurrentQueue<OrderUpdate>();
 
+        private static readonly CancellationGod CandleCancel = new CancellationGod();
+        private static readonly CancellationGod FlushingCancel = new CancellationGod();
+        private static readonly CancellationGod TickManagerCancel = new CancellationGod();
+        private static readonly CancellationGod CandleManagerCancel = new CancellationGod();
+        private static readonly CancellationGod OrderUpdatesCancel = new CancellationGod();
 
-        //private static CancellationTokenSource CandleSource = new CancellationTokenSource();
-        //private static CancellationTokenSource FlushingSource = new CancellationTokenSource();
-        //private static CancellationTokenSource TickManagerSource = new CancellationTokenSource();
-        //private static CancellationTokenSource CandleManagerSource = new CancellationTokenSource();
-        private static CancellationGod CandleCancel = new CancellationGod();
-        private static CancellationGod FlushingCancel = new CancellationGod();
-        private static CancellationGod TickManagerCancel = new CancellationGod();
-        private static CancellationGod CandleManagerCancel = new CancellationGod();
-        private static CancellationGod OrderUpdatesCancel = new CancellationGod();
         private static bool Flushing { get; set; }
         private static bool TickManagerOn { get; set; }
         private static bool CandleManagerOn { get; set; }
@@ -66,10 +62,6 @@ namespace TradeMaster6000.Server.Services
             this.backgroundJob = backgroundJob;
             this.contextExtension = contextExtension;
             this.logger = logger;
-            TickerLogs = new ();
-            MyTicks = new();
-            Candles = new();
-            OrderUpdates = new ConcurrentBag<OrderUpdate>();
         }
 
         public void Start()
@@ -107,7 +99,7 @@ namespace TradeMaster6000.Server.Services
                 List<MyTick> myTicks = new List<MyTick>();
                 while (!MyTicks.IsEmpty)
                 {
-                    MyTicks.TryTake(out MyTick tick);
+                    MyTicks.TryDequeue(out MyTick tick);
                     myTicks.Add(tick);
                 }
 
@@ -126,6 +118,18 @@ namespace TradeMaster6000.Server.Services
             TickManagerOn = false;
         }
 
+        public void StartOrderUpdatesManager()
+        {
+            OrderUpdatesCancel.Source = new CancellationTokenSource();
+            OrderUpdatesCancel.HangfireId = backgroundJob.Enqueue(() => OrderUpdatesManager(OrderUpdatesCancel.Source.Token));
+        }
+
+        public void StopOrderUpdatesManager()
+        {
+            OrderUpdatesCancel.Source.Cancel();
+            backgroundJob.Delete(OrderUpdatesCancel.HangfireId);
+        }
+
         [AutomaticRetry(Attempts = 0)]
         public async Task OrderUpdatesManager(CancellationToken token)
         {
@@ -135,7 +139,7 @@ namespace TradeMaster6000.Server.Services
                 List<OrderUpdate> orderUpdates = new List<OrderUpdate>();
                 while (!OrderUpdates.IsEmpty)
                 {
-                    OrderUpdates.TryTake(out OrderUpdate update);
+                    OrderUpdates.TryDequeue(out OrderUpdate update);
                     orderUpdates.Add(update);
                 }
 
@@ -151,7 +155,7 @@ namespace TradeMaster6000.Server.Services
 
                 await Task.Delay(2000, CancellationToken.None);
             }
-            TickManagerOn = false;
+            OrderUpdatesOn = false;
         }
 
         [AutomaticRetry(Attempts = 0)]
@@ -163,7 +167,7 @@ namespace TradeMaster6000.Server.Services
                 List<Candle> myCandles = new ();
                 while (!Candles.IsEmpty)
                 {
-                    Candles.TryTake(out Candle candle);
+                    Candles.TryDequeue(out Candle candle);
                     myCandles.Add(candle);
                 }
                 
@@ -200,6 +204,10 @@ namespace TradeMaster6000.Server.Services
             Flushing = false;
         }
 
+        public bool IsOrderUpdateOn()
+        {
+            return OrderUpdatesOn;
+        }
 
         public void StopCandles()
         {
@@ -347,7 +355,7 @@ namespace TradeMaster6000.Server.Services
                         candle.Close = previousCandle.Close;
                     }
 
-                    Candles.Add(candle);
+                    Candles.Enqueue(candle);
 
                     if (token.IsCancellationRequested)
                     {
@@ -390,7 +398,10 @@ namespace TradeMaster6000.Server.Services
                     TriggerPrice = order.TriggerPrice
                 };
 
-                OrderUpdates.Add(newOrderUpdate);
+                if (!OrderUpdates.Contains(newOrderUpdate))
+                {
+                    OrderUpdates.Enqueue(newOrderUpdate);
+                }
 
                 return newOrderUpdate;
             }
@@ -450,7 +461,7 @@ namespace TradeMaster6000.Server.Services
         private void OnTick(Tick tickData)
         {
             DateTime time = timeHelper.CurrentTime();
-            MyTicks.Add(new MyTick
+            MyTicks.Enqueue(new MyTick
             {
                 InstrumentToken = tickData.InstrumentToken,
                 LTP = tickData.LastPrice,
@@ -461,7 +472,7 @@ namespace TradeMaster6000.Server.Services
 
         private void OnOrderUpdate(Order orderData)
         {
-            OrderUpdates.Add(new OrderUpdate
+            OrderUpdates.Enqueue(new OrderUpdate
             {
                 AveragePrice = orderData.AveragePrice,
                 FilledQuantity = orderData.FilledQuantity,
@@ -518,5 +529,9 @@ namespace TradeMaster6000.Server.Services
         bool IsFlushing();
         bool IsTickManagerOn();
         bool IsCandleManagerOn();
+        bool IsOrderUpdateOn();
+        Task OrderUpdatesManager(CancellationToken token);
+        void StopOrderUpdatesManager();
+        void StartOrderUpdatesManager();
     }
 }

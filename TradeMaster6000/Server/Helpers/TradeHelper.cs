@@ -240,7 +240,7 @@ namespace TradeMaster6000.Server.Helpers
 
         public async Task<string> PlacePreSLM(TradeOrder order)
         {
-            var tick = TickDbHelper.GetLast(order.Instrument.Token);
+            var tick = await TickDbHelper.GetLast(order.Instrument.Token);
             var ltp = tick.LTP;
             if (order.ExitTransactionType == "SELL")
             {

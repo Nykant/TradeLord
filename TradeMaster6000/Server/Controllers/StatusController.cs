@@ -32,22 +32,20 @@ namespace TradeMaster6000.Server.Controllers
         [HttpGet]
         public string IsFlushing()
         {
-            var stri = tickerService.IsFlushing().ToString();
-            return stri;
+            return tickerService.IsFlushing().ToString();
         }
 
         [HttpGet]
         public string IsTickManagerOn()
         {
-            var stri = tickerService.IsCandleManagerOn().ToString();
-            return stri;
+            return tickerService.IsTickManagerOn().ToString();
+
         }
 
         [HttpGet]
         public string IsCandleManagerOn()
         {
-            var stri = tickerService.IsTickManagerOn().ToString();
-            return stri;
+            return tickerService.IsCandleManagerOn().ToString();
         }
     }
 }

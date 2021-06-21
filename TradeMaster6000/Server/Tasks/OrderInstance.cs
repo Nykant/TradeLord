@@ -71,7 +71,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     goto Ending;
                 }
-                await Task.Delay(1000);
+                await Task.Delay(1000, token);
             }
 
             await semaphore.WaitAsync();
@@ -319,7 +319,7 @@ namespace TradeMaster6000.Server.Tasks
                     semaphore.Release();
                     goto End;
                 }
-                if (TickDbHelper.GetLast(TradeOrder.Instrument.Token).LTP >= proximity)
+                if ((await TickDbHelper.GetLast(TradeOrder.Instrument.Token)).LTP >= proximity)
                 {
                     if (entryO.FilledQuantity != TradeOrder.Quantity)
                     {
@@ -599,7 +599,7 @@ namespace TradeMaster6000.Server.Tasks
             while (!finished)
             {
                 Parallel.Invoke(
-                    () => tick = TickDbHelper.GetLast(TradeOrder.Instrument.Token),
+                    async() => tick = await TickDbHelper.GetLast(TradeOrder.Instrument.Token),
                     async() => entry = await TickService.GetOrder(TradeOrder.EntryId),
                     async() => target = await TickService.GetOrder(TradeOrder.TargetId)
                 );

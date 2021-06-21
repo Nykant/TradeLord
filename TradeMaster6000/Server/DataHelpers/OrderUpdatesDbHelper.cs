@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,21 +25,21 @@ namespace TradeMaster6000.Server.DataHelpers
             {
                 foreach(var update in updates)
                 {
-                    var order = await context.OrderUpdates.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == update.OrderId);
-                    
+                    var order = await context.OrderUpdates.FirstOrDefaultAsync(x => x.OrderId == update.OrderId);
                     if(order == default)
                     {
-                        await context.AddAsync(update);
+                        var entry = await context.AddAsync(update);
+                        await context.SaveChangesAsync();
                     }
                     else
                     {
                         if(order.FilledQuantity <= update.FilledQuantity)
                         {
-                            context.Update(update);
+                            var entry = context.Update(update);
+                            await context.SaveChangesAsync();
                         }
                     }
                 }
-                await context.SaveChangesAsync();
             }
         }
         public async Task<OrderUpdate> Get(string orderId)
