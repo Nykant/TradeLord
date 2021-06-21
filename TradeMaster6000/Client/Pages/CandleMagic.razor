@@ -13,6 +13,7 @@
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartCandleMagic" Text="Start magic" />
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StopCandleMagic" Text="Stop magic" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@LoadExcelCandles" Text="Load Excel Candles" />
 
         <hr />
 
@@ -22,18 +23,18 @@
 
         <hr />
 
-            <RadzenDataGrid @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
-                            Data="@candles" TItem="Candle">
-                <Columns>
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Timestamp" Title="Timestamp" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
-                </Columns>
-            </RadzenDataGrid>
+        <RadzenDataGrid @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                        Data="@candles" TItem="Candle">
+            <Columns>
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Timestamp" Title="Timestamp" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
+                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
+            </Columns>
+        </RadzenDataGrid>
 
     }
     else
@@ -86,6 +87,11 @@
     private async Task StartCandleMagic()
     {
         await hubConnection.SendAsync("StartCandleMagic");
+    }
+
+    private async Task LoadExcelCandles()
+    {
+        await hubConnection.SendAsync("LoadExcelCandles");
     }
 
     private async Task StopCandleMagic()

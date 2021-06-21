@@ -50,6 +50,11 @@ namespace TradeMaster6000.Server.Hubs
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
         }
 
+        public void LoadExcelCandles()
+        {
+            candleDbHelper.LoadExcelCandles();
+        }
+
         public async Task NewOrder(TradeOrder order)
         {
             await orderManagerService.StartOrder(order);

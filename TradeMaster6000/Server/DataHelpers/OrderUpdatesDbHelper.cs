@@ -12,41 +12,33 @@ namespace TradeMaster6000.Server.DataHelpers
     public class OrderUpdatesDbHelper : IOrderUpdatesDbHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
-        private static SemaphoreSlim semaphore;
+
         public OrderUpdatesDbHelper(IDbContextFactory<TradeDbContext> dbContextFactory)
         {
             contextFactory = dbContextFactory;
-            semaphore = new SemaphoreSlim(1, 1);
         }
 
-        public async Task AddOrUpdate(OrderUpdate update)
+        public async Task Add(List<OrderUpdate> updates)
         {
-            await semaphore.WaitAsync();
-            try
+            using (var context = contextFactory.CreateDbContext())
             {
-
-                using (var context = contextFactory.CreateDbContext())
+                foreach(var update in updates)
                 {
-                    OrderUpdate updateToUpdate = await context.OrderUpdates.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == update.OrderId);
-                    if (updateToUpdate == default)
+                    var order = await context.OrderUpdates.AsNoTracking().FirstOrDefaultAsync(x => x.OrderId == update.OrderId);
+                    
+                    if(order == default)
                     {
-                        await context.OrderUpdates.AddAsync(update);
-                        await context.SaveChangesAsync();
-                        goto Ending;
+                        await context.AddAsync(update);
                     }
-
-                    if (updateToUpdate.FilledQuantity <= update.FilledQuantity)
+                    else
                     {
-                        context.OrderUpdates.Update(update);
-                        await context.SaveChangesAsync();
+                        if(order.FilledQuantity <= update.FilledQuantity)
+                        {
+                            context.Update(update);
+                        }
                     }
-
-                    Ending:;
                 }
-            }
-            finally
-            {
-                semaphore.Release();
+                await context.SaveChangesAsync();
             }
         }
         public async Task<OrderUpdate> Get(string orderId)
@@ -59,7 +51,7 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface IOrderUpdatesDbHelper
     {
-        Task AddOrUpdate(OrderUpdate update);
+        Task Add(List<OrderUpdate> updates);
         Task<OrderUpdate> Get(string orderId);
     }
 }

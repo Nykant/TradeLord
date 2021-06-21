@@ -36,6 +36,8 @@ namespace TradeMaster6000.Server.Services
         private ConcurrentQueue<SomeLog> TickerLogs { get; set; }
         private static ConcurrentBag<MyTick> MyTicks { get; set; }
         private static ConcurrentBag<Candle> Candles { get; set; }
+        private ConcurrentBag<OrderUpdate> OrderUpdates { get; set; }
+
 
         //private static CancellationTokenSource CandleSource = new CancellationTokenSource();
         //private static CancellationTokenSource FlushingSource = new CancellationTokenSource();
@@ -45,10 +47,12 @@ namespace TradeMaster6000.Server.Services
         private static CancellationGod FlushingCancel = new CancellationGod();
         private static CancellationGod TickManagerCancel = new CancellationGod();
         private static CancellationGod CandleManagerCancel = new CancellationGod();
+        private static CancellationGod OrderUpdatesCancel = new CancellationGod();
         private static bool Flushing { get; set; }
         private static bool TickManagerOn { get; set; }
         private static bool CandleManagerOn { get; set; }
         private static bool CandlesRunning { get; set; }
+        private static bool OrderUpdatesOn { get; set; }
 
         public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger)
         {
@@ -65,6 +69,7 @@ namespace TradeMaster6000.Server.Services
             TickerLogs = new ();
             MyTicks = new();
             Candles = new();
+            OrderUpdates = new ConcurrentBag<OrderUpdate>();
         }
 
         public void Start()
@@ -116,7 +121,35 @@ namespace TradeMaster6000.Server.Services
                     break;
                 }
 
-                await Task.Delay(10000, CancellationToken.None);
+                await Task.Delay(2000, CancellationToken.None);
+            }
+            TickManagerOn = false;
+        }
+
+        [AutomaticRetry(Attempts = 0)]
+        public async Task OrderUpdatesManager(CancellationToken token)
+        {
+            OrderUpdatesOn = true;
+            while (true)
+            {
+                List<OrderUpdate> orderUpdates = new List<OrderUpdate>();
+                while (!OrderUpdates.IsEmpty)
+                {
+                    OrderUpdates.TryTake(out OrderUpdate update);
+                    orderUpdates.Add(update);
+                }
+
+                if (orderUpdates.Count > 0)
+                {
+                    await updatesHelper.Add(orderUpdates);
+                }
+
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await Task.Delay(2000, CancellationToken.None);
             }
             TickManagerOn = false;
         }
@@ -357,7 +390,7 @@ namespace TradeMaster6000.Server.Services
                     TriggerPrice = order.TriggerPrice
                 };
 
-                await updatesHelper.AddOrUpdate(newOrderUpdate);
+                OrderUpdates.Add(newOrderUpdate);
 
                 return newOrderUpdate;
             }
@@ -414,7 +447,7 @@ namespace TradeMaster6000.Server.Services
 
         // ------------------------------------------- TICKER EVENTS -------------------------------------------------
 
-        private async void OnTick(Tick tickData)
+        private void OnTick(Tick tickData)
         {
             DateTime time = timeHelper.CurrentTime();
             MyTicks.Add(new MyTick
@@ -426,9 +459,9 @@ namespace TradeMaster6000.Server.Services
             });
         }
 
-        private async void OnOrderUpdate(Order orderData)
+        private void OnOrderUpdate(Order orderData)
         {
-            await updatesHelper.AddOrUpdate(new OrderUpdate
+            OrderUpdates.Add(new OrderUpdate
             {
                 AveragePrice = orderData.AveragePrice,
                 FilledQuantity = orderData.FilledQuantity,

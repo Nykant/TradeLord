@@ -71,7 +71,7 @@ namespace TradeMaster6000.Server.Tasks
                 {
                     goto Ending;
                 }
-                await Task.Delay(500);
+                await Task.Delay(1000);
             }
 
             await semaphore.WaitAsync();
@@ -108,7 +108,7 @@ namespace TradeMaster6000.Server.Tasks
             }
 
             TradeOrder temp = new();
-            do
+            while (!await TimeHelper.IsPreMarketOpen(TradeOrder.Id))
             {
                 await CheckOrderStatuses(token);
 
@@ -130,9 +130,9 @@ namespace TradeMaster6000.Server.Tasks
 
                 await Task.Delay(5000);
             }
-            while (!await TimeHelper.IsPreMarketOpen(TradeOrder.Id));
 
-            do
+
+            while (true)
             {
                 Parallel.Invoke(async () => await CheckOrderStatuses(token), async () => await CheckIfFilling());
 
@@ -147,17 +147,19 @@ namespace TradeMaster6000.Server.Tasks
                     await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
                 }
 
+                if(!await TimeHelper.IsMarketOpen(TradeOrder.Id))
+                {
+                    break;
+                }
+
                 await Task.Delay(1000);
             }
-            while (!await TimeHelper.IsMarketOpen(TradeOrder.Id));
             
             if (token.IsCancellationRequested)
             {
                 goto Stopping;
             }
 
-            //backgroundJob.Enqueue(() => PlaceTarget(token));
-            //backgroundJob.Enqueue(() => PlaceStopLoss());
             await PlaceTarget(token).ConfigureAwait(false);
             await PlaceStopLoss().ConfigureAwait(false);
 
@@ -317,7 +319,7 @@ namespace TradeMaster6000.Server.Tasks
                     semaphore.Release();
                     goto End;
                 }
-                if ((await TickDbHelper.GetLast(TradeOrder.Instrument.Token)).LTP >= proximity)
+                if (TickDbHelper.GetLast(TradeOrder.Instrument.Token).LTP >= proximity)
                 {
                     if (entryO.FilledQuantity != TradeOrder.Quantity)
                     {
@@ -347,13 +349,7 @@ namespace TradeMaster6000.Server.Tasks
             {
                 await LogHelper.AddLog(TradeOrder.Id, $"average price is less than stop loss, waiting 1 min for data...").ConfigureAwait(false);
 
-                var tick = await TickDbHelper.GetLast(TradeOrder.Instrument.Token);
-                var candle = new Candle()
-                {
-                    Open = tick.LTP,
-                    High = tick.LTP,
-                    Low = tick.LTP
-                };
+                var candle = new Candle();
 
                 await Task.Delay(60000);
 
@@ -362,6 +358,7 @@ namespace TradeMaster6000.Server.Tasks
 
                 await Task.Run(() =>
                 {
+                    candle.Open = ticks[0].LTP;
                     candle.High = ticks[0].LTP;
                     candle.Low = ticks[0].LTP;
                     for (int i = 0; i < ticks.Count; i++)
@@ -602,7 +599,7 @@ namespace TradeMaster6000.Server.Tasks
             while (!finished)
             {
                 Parallel.Invoke(
-                    async() => tick = await TickDbHelper.GetLast(TradeOrder.Instrument.Token),
+                    () => tick = TickDbHelper.GetLast(TradeOrder.Instrument.Token),
                     async() => entry = await TickService.GetOrder(TradeOrder.EntryId),
                     async() => target = await TickService.GetOrder(TradeOrder.TargetId)
                 );
@@ -648,7 +645,7 @@ namespace TradeMaster6000.Server.Tasks
         {
             if (!TradeOrder.IsOrderFilling)
             {
-                var entry = await TickService .GetOrder(TradeOrder.EntryId);
+                var entry = await TickService.GetOrder(TradeOrder.EntryId);
                 if (entry.FilledQuantity > 0)
                 {
                     await LogHelper.AddLog(TradeOrder.Id, $"entry order filling...").ConfigureAwait(false);
