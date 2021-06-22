@@ -25,21 +25,20 @@ namespace TradeMaster6000.Server.DataHelpers
             {
                 foreach(var update in updates)
                 {
-                    var order = await context.OrderUpdates.FirstOrDefaultAsync(x => x.OrderId == update.OrderId);
-                    if(order == default)
+                    var order = await context.OrderUpdates.FindAsync(update.OrderId);
+                    if(order == null)
                     {
-                        var entry = await context.AddAsync(update);
-                        await context.SaveChangesAsync();
+                        await context.AddAsync(update);
                     }
                     else
                     {
-                        if(order.FilledQuantity <= update.FilledQuantity)
+                        if (order.FilledQuantity <= update.FilledQuantity)
                         {
-                            var entry = context.Update(update);
-                            await context.SaveChangesAsync();
+                            context.Entry(order).CurrentValues.SetValues(update);
                         }
                     }
                 }
+                await context.SaveChangesAsync();
             }
         }
         public async Task<OrderUpdate> Get(string orderId)

@@ -18,6 +18,9 @@ namespace TradeMaster6000.Server.Services
         private readonly ITimeHelper timeHelper;
         private readonly ILogger<ZoneService> logger;
         private static SemaphoreSlim semaphoreSlim;
+
+        private static readonly List<Candle> zoneCandles = new List<Candle>();
+
         public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<ZoneService> logger)
         {
             this.timeHelper = timeHelper;
@@ -25,6 +28,11 @@ namespace TradeMaster6000.Server.Services
             candleHelper = candleDbHelper;
             zoneHelper = zoneDbHelper;
             semaphoreSlim = new SemaphoreSlim(1, 1);
+        }
+
+        public List<Candle> GetZoneCandles()
+        {
+            return zoneCandles;
         }
 
         [AutomaticRetry(Attempts = 0)]
@@ -127,36 +135,40 @@ namespace TradeMaster6000.Server.Services
                             }
                         }
                     }
-
                     time = time.AddMinutes(1);
+                }
+
+                foreach (var candle in newCandles)
+                {
+                    zoneCandles.Add(candle);
                 }
 
                 logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: finished making new candles. amount: {newCandles.Count}");
 
-                int index = 0;
+                int startIndex = 0;
 
                 Repeat:;
 
-                if (index >= newCandles.Count)
+                if (startIndex >= newCandles.Count)
                 {
                     goto Ending;
                 }
 
-                FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, index));
+                FittyCandle fittyCandle = await Task.Run(() => FittyFinder(newCandles, startIndex));
                 if (fittyCandle == default)
                 {
                     goto Ending;
                 }
-
-                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle, instrument.TradingSymbol, index));
+                asDFASDF
+                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle, instrument.TradingSymbol, startIndex));
                 if (zone == default)
                 {
-                    index = index + 2;
+                    startIndex = startIndex + 1;
                     goto Repeat;
                 }
                 else
                 {
-                    index = zone.EndIndex + 2;
+                    startIndex = zone.EndIndex;
                     await zoneHelper.Add(zone).ConfigureAwait(false);
                     logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: added zone: {zone.Id}");
                     goto Repeat;
@@ -177,106 +189,130 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol, int index)
+        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol, int prevEndIndex)
         {
             logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: started finding zone");
-            HalfZone up = new HalfZone();
-            HalfZone down = new HalfZone();
 
-            down = FindDown(candles, fittyCandle, index);
+            HalfZone forward = FindForward(candles, fittyCandle);
 
-            up = FindUp(candles, fittyCandle);
-
-            REPEAT:;
-
-            if (up == default || down == default)
+            if(forward == default)
             {
                 return default;
             }
 
-            if (up.ExplosiveCandle.HL_Diff < (down.BiggestBaseDiff * (decimal)1.2))
+            HalfZone backward = FindBackwards(candles, fittyCandle, forward.Top, forward.Bottom, prevEndIndex);
+
+            if(backward == default)
             {
-                up = FindUp(candles, fittyCandle, down.BiggestBaseDiff);
-                goto REPEAT;
+                return default;
             }
 
-            if(down.ExplosiveCandle.HL_Diff < (up.BiggestBaseDiff * (decimal)1.2))
+            if(backward.BiggestBaseDiff > forward.BiggestBaseDiff)
             {
-                down = FindDown(candles, fittyCandle, up.BiggestBaseDiff, index);
-                goto REPEAT;
+                forward = FindForward(candles, fittyCandle, backward.Top, backward.Bottom);
             }
 
-            int range = up.ExplosiveCandle.RangeFromFitty + down.ExplosiveCandle.RangeFromFitty;
+            //REPEAT:;
+
+            //if (forward == default || backward == default)
+            //{
+            //    return default;
+            //}
+
+            //if (forward.ExplosiveCandle.HL_Diff < (backward.BiggestBaseDiff * (decimal)1.2))
+            //{
+            //    forward = Find(candles, fittyCandle, backward.BiggestBaseDiff);
+            //    goto REPEAT;
+            //}
+
+            //if(backward.ExplosiveCandle.HL_Diff < (forward.BiggestBaseDiff * (decimal)1.2))
+            //{
+            //    backward = FindDown(candles, fittyCandle, forward.BiggestBaseDiff, index);
+            //    goto REPEAT;
+            //}
+
+            int range = forward.ExplosiveCandle.RangeFromFitty + backward.ExplosiveCandle.RangeFromFitty;
             if(range > 6)
             {
                 return default;
             }
 
-            Zone zone = new Zone { From = down.Timestamp, To = up.Timestamp, InstrumentSymbol = symbol, EndIndex = up.ExplosiveCandle.Index };
+            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, EndIndex = forward.ExplosiveCandle.Index };
 
-            if(up.Top > down.Top)
+            if(forward.Top > backward.Top)
             {
-                zone.Top = up.Top;
+                zone.Top = forward.Top;
             }
             else
             {
-                zone.Top = down.Top;
+                zone.Top = backward.Top;
             }
 
-            if(up.Bottom < down.Bottom)
+            if(forward.Bottom < backward.Bottom)
             {
-                zone.Bottom = up.Bottom;
+                zone.Bottom = forward.Bottom;
             }
             else
             {
-                zone.Bottom = down.Bottom;
+                zone.Bottom = backward.Bottom;
             }
 
             return zone;
         }
 
-        private HalfZone FindDown(List<Candle> candles, FittyCandle fittyCandle, int index)
-        {
-            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
-            halfZone.BiggestBaseDiff = Math.Abs(fittyCandle.Candle.High - fittyCandle.Candle.Low);
-            for (int i = fittyCandle.Index - 1; i >= 0 && i > index - 2 && Math.Abs(i - fittyCandle.Index) < 6; i--)
-            {
-                if(halfZone.Top < candles[i].High)
-                {
-                    halfZone.Top = candles[i].High;
-                }
-                if(halfZone.Bottom > candles[i].Low)
-                {
-                    halfZone.Bottom = candles[i].Low;
-                }
+        //private HalfZone FindBackwards(List<Candle> candles, FittyCandle fittyCandle)
+        //{
+        //    HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
+        //    for (int i = fittyCandle.Index - 1; i >= 0 && Math.Abs(i - fittyCandle.Index) < 7; i--)
+        //    {
+        //        if(halfZone.Top < candles[i].High)
+        //        {
+        //            halfZone.Top = candles[i].High;
+        //        }
+        //        if(halfZone.Bottom > candles[i].Low)
+        //        {
+        //            halfZone.Bottom = candles[i].Low;
+        //        }
 
-                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
-                if (diff > diffx)
+        //        decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+        //        halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
+        //        decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+        //        if (candleDiff > baseDiffx)
+        //        {
+        //            halfZone.Timestamp = candles[i].Timestamp;
+        //            halfZone.ExplosiveCandle = new ExplosiveCandle
+        //            {
+        //                Candle = candles[i],
+        //                HL_Diff = candleDiff,
+        //                RangeFromFitty = Math.Abs(i - fittyCandle.Index)
+        //            };
+        //            return halfZone;
+        //        }
+        //    }
+        //    return default;
+        //}
+
+        private HalfZone FindBackwards(List<Candle> candles, FittyCandle fittyCandle, decimal top, decimal bottom, int prevEndIndex)
+        {
+            HalfZone halfZone = new HalfZone { Top = top, Bottom = bottom };
+            for (int i = fittyCandle.Index - 1; i >= 0 && i > prevEndIndex && Math.Abs(i - fittyCandle.Index) < 7; i--)
+            {
+
+                decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+                halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
+                decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (candleDiff > baseDiffx)
                 {
                     halfZone.Timestamp = candles[i].Timestamp;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Candle = candles[i],
-                        HL_Diff = diff,
-                        RangeFromFitty = Math.Abs(fittyCandle.Index - i)
+                        HL_Diff = candleDiff,
+                        RangeFromFitty = Math.Abs(i - fittyCandle.Index)
                     };
                     return halfZone;
                 }
-                else if (diff > halfZone.BiggestBaseDiff)
-                {
-                    halfZone.BiggestBaseDiff = diff;
-                }
-            }
-            return default;
-        }
 
-        private HalfZone FindDown(List<Candle> candles, FittyCandle fittyCandle, decimal upBiggestBaseDiff, int index)
-        {
-            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
-            halfZone.BiggestBaseDiff = upBiggestBaseDiff;
-            for (int i = fittyCandle.Index - 1; i >= 0 && i > index - 2 && Math.Abs(i - fittyCandle.Index) < 6; i--)
-            {
                 if (halfZone.Top < candles[i].High)
                 {
                     halfZone.Top = candles[i].High;
@@ -285,71 +321,31 @@ namespace TradeMaster6000.Server.Services
                 {
                     halfZone.Bottom = candles[i].Low;
                 }
-
-                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
-                if (diff > diffx)
-                {
-                    halfZone.Timestamp = candles[i].Timestamp;
-                    halfZone.ExplosiveCandle = new ExplosiveCandle
-                    {
-                        Candle = candles[i],
-                        HL_Diff = diff,
-                        RangeFromFitty = Math.Abs(fittyCandle.Index - i)
-                    };
-                    return halfZone;
-                }
-                else if (diff > halfZone.BiggestBaseDiff)
-                {
-                    halfZone.BiggestBaseDiff = diff;
-                }
             }
             return default;
         }
 
-        private HalfZone FindUp(List<Candle> candles, FittyCandle fittyCandle)
+        private HalfZone FindForward(List<Candle> candles, FittyCandle fittyCandle)
         {
             HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
-            halfZone.BiggestBaseDiff = Math.Abs(fittyCandle.Candle.High - fittyCandle.Candle.Low);
-            for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) <= 5; i++)
+            for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) < 7; i++)
             {
-                if (halfZone.Top < candles[i].High)
-                {
-                    halfZone.Top = candles[i].High;
-                }
-                if (halfZone.Bottom > candles[i].Low)
-                {
-                    halfZone.Bottom = candles[i].Low;
-                }
-
-                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
-                if (diff > diffx)
+                decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+                halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
+                decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (candleDiff > baseDiffx)
                 {
                     halfZone.Timestamp = candles[i].Timestamp;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Index = i,
                         Candle = candles[i],
-                        HL_Diff = diff,
+                        HL_Diff = candleDiff,
                         RangeFromFitty = Math.Abs(i - fittyCandle.Index)
                     };
                     return halfZone;
                 }
-                else if (diff > halfZone.BiggestBaseDiff)
-                {
-                    halfZone.BiggestBaseDiff = diff;
-                }
-            }
-            return default;
-        }
 
-        private HalfZone FindUp(List<Candle> candles, FittyCandle fittyCandle, decimal downBiggestBaseDiff)
-        {
-            HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low };
-            halfZone.BiggestBaseDiff = downBiggestBaseDiff;
-            for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) <= 5; i++)
-            {
                 if (halfZone.Top < candles[i].High)
                 {
                     halfZone.Top = candles[i].High;
@@ -358,24 +354,39 @@ namespace TradeMaster6000.Server.Services
                 {
                     halfZone.Bottom = candles[i].Low;
                 }
+            }
+            return default;
+        }
 
-                decimal diff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal diffx = halfZone.BiggestBaseDiff * (decimal)1.2;
-                if (diff > diffx)
+        private HalfZone FindForward(List<Candle> candles, FittyCandle fittyCandle, decimal top, decimal bottom)
+        {
+            HalfZone halfZone = new HalfZone { Top = top, Bottom = bottom };
+            for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) < 7; i++)
+            {
+
+                decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+                halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
+                decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                if (candleDiff > baseDiffx)
                 {
                     halfZone.Timestamp = candles[i].Timestamp;
                     halfZone.ExplosiveCandle = new ExplosiveCandle
                     {
                         Index = i,
                         Candle = candles[i],
-                        HL_Diff = diff,
+                        HL_Diff = candleDiff,
                         RangeFromFitty = Math.Abs(i - fittyCandle.Index)
                     };
                     return halfZone;
                 }
-                else if (diff > halfZone.BiggestBaseDiff)
+
+                if (halfZone.Top < candles[i].High)
                 {
-                    halfZone.BiggestBaseDiff = diff;
+                    halfZone.Top = candles[i].High;
+                }
+                if (halfZone.Bottom > candles[i].Low)
+                {
+                    halfZone.Bottom = candles[i].Low;
                 }
             }
             return default;
@@ -399,5 +410,6 @@ namespace TradeMaster6000.Server.Services
     public interface IZoneService
     {
         Task Start(List<TradeInstrument> instruments, int timeFrame);
+        List<Candle> GetZoneCandles();
     }
 }
