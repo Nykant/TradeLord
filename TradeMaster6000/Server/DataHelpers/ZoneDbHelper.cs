@@ -22,7 +22,6 @@ namespace TradeMaster6000.Server.DataHelpers
             {
                 return await context.Zones.ToListAsync();
             }
-            
         }
 
         public async Task Add(Zone zone)

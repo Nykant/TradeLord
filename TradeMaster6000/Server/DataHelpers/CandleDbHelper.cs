@@ -21,7 +21,7 @@ namespace TradeMaster6000.Server.DataHelpers
 
         public void LoadExcelCandles()
         {
-            FileInfo existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\ACC.xlsx");
+            FileInfo existingFile = new FileInfo(@"C:\Users\Christian\Documents\ACC.xlsx");
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             List<Candle> excelCandles = new List<Candle>();
             using (ExcelPackage package = new ExcelPackage(existingFile))

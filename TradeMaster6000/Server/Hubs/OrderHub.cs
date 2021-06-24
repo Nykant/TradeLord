@@ -50,6 +50,11 @@ namespace TradeMaster6000.Server.Hubs
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
         }
 
+        public async Task GetZoneCandles()
+        {
+            await Clients.Caller.SendAsync("ReceiveZoneCandles", zoneService.GetZoneCandles());
+        }
+
         public void LoadExcelCandles()
         {
             candleDbHelper.LoadExcelCandles();

@@ -108,7 +108,7 @@ namespace TradeMaster6000.Server.Tasks
             }
 
             TradeOrder temp = new();
-            while (!await TimeHelper.IsPreMarketOpen(TradeOrder.Id))
+            while (true)
             {
                 await CheckOrderStatuses(token);
 
@@ -126,6 +126,11 @@ namespace TradeMaster6000.Server.Tasks
                 if (token.IsCancellationRequested)
                 {
                     goto Stopping;
+                }
+
+                if(await TimeHelper.IsPreMarketOpen(TradeOrder.Id))
+                {
+                    break;
                 }
 
                 await Task.Delay(5000);
@@ -147,7 +152,7 @@ namespace TradeMaster6000.Server.Tasks
                     await OrderHelper.UpdateTradeOrder(TradeOrder).ConfigureAwait(false);
                 }
 
-                if(!await TimeHelper.IsMarketOpen(TradeOrder.Id))
+                if(await TimeHelper.IsMarketOpen(TradeOrder.Id))
                 {
                     break;
                 }
