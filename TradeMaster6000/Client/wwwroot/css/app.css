@@ -90,7 +90,7 @@ a, .btn-link {
     bottom: 0;
     right: 0;
     left: 150px;
-    background-image: linear-gradient(to right, #330000 0%, #000000 70%);
+    background-image: linear-gradient(to right, #00fff7 0%, #000000 70%);
 }
 
 .dissapear {
