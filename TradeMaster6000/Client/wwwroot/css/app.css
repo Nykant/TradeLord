@@ -34,7 +34,6 @@ a, .btn-link {
             text-decoration: none;
         }
 
-
 .btn-primary {
     color: #fff;
     background-color: #1b6ec2;
@@ -85,12 +84,12 @@ a, .btn-link {
 .footerbooter {
     height: auto;
     width: auto;
-    padding:20px;
+    padding: 20px;
     position: fixed;
     bottom: 0;
     right: 0;
     left: 150px;
-    background-image: linear-gradient(to right, #330000 0%, #000000 70%);
+    background-image: linear-gradient(to right, #003538 0%, #000000 70%);
 }
 
 .dissapear {

@@ -149,6 +149,16 @@ namespace TradeMaster6000.Server.Services
 
                 Repeat:;
 
+                if(startIndex == 13)
+                {
+
+                }
+
+                if (startIndex == 14)
+                {
+
+                }
+
                 if (startIndex >= newCandles.Count)
                 {
                     goto Ending;
@@ -159,16 +169,15 @@ namespace TradeMaster6000.Server.Services
                 {
                     goto Ending;
                 }
+                startIndex = fittyCandle.Index + 1;
 
-                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle, instrument.TradingSymbol, startIndex));
+                Zone zone = await Task.Run(() => FindZone(newCandles, fittyCandle, instrument.TradingSymbol));
                 if (zone == default)
                 {
-                    startIndex = startIndex + 1;
                     goto Repeat;
                 }
                 else
                 {
-                    startIndex = zone.EndIndex;
                     await zoneHelper.Add(zone).ConfigureAwait(false);
                     logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: added zone: {zone.Id}");
                     goto Repeat;
@@ -188,7 +197,7 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol, int prevEndIndex)
+        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol)
         {
             logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: started finding zone");
 
@@ -199,7 +208,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            HalfZone backward = FindBackwards(candles, fittyCandle, forward.Top, forward.Bottom, prevEndIndex);
+            HalfZone backward = FindBackwards(candles, fittyCandle, forward.Top, forward.Bottom);
 
             if(backward == default)
             {
@@ -210,25 +219,6 @@ namespace TradeMaster6000.Server.Services
             {
                 forward = FindForward(candles, fittyCandle, backward.Top, backward.Bottom);
             }
-
-            //REPEAT:;
-
-            //if (forward == default || backward == default)
-            //{
-            //    return default;
-            //}
-
-            //if (forward.ExplosiveCandle.HL_Diff < (backward.BiggestBaseDiff * (decimal)1.2))
-            //{
-            //    forward = Find(candles, fittyCandle, backward.BiggestBaseDiff);
-            //    goto REPEAT;
-            //}
-
-            //if(backward.ExplosiveCandle.HL_Diff < (forward.BiggestBaseDiff * (decimal)1.2))
-            //{
-            //    backward = FindDown(candles, fittyCandle, forward.BiggestBaseDiff, index);
-            //    goto REPEAT;
-            //}
 
             int range = forward.ExplosiveCandle.RangeFromFitty + backward.ExplosiveCandle.RangeFromFitty - 1;
             if(range > 6)
@@ -291,11 +281,22 @@ namespace TradeMaster6000.Server.Services
         //    return default;
         //}
 
-        private HalfZone FindBackwards(List<Candle> candles, FittyCandle fittyCandle, decimal top, decimal bottom, int prevEndIndex)
+        private HalfZone FindBackwards(List<Candle> candles, FittyCandle fittyCandle, decimal top, decimal bottom)
         {
             HalfZone halfZone = new HalfZone { Top = top, Bottom = bottom, Timestamp = fittyCandle.Candle.Timestamp };
-            for (int i = fittyCandle.Index - 1; i >= 0 && i >= prevEndIndex && Math.Abs(i - fittyCandle.Index) < 7; i--)
+            for (int i = fittyCandle.Index - 1; i >= 0 && Math.Abs(i - fittyCandle.Index) < 7; i--)
             {
+                if (i == 12)
+                {
+
+                }
+
+                var HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                var OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                if (OCDiff < HLFitty)
+                {
+                    return default;
+                }
 
                 decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
                 halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
@@ -330,6 +331,13 @@ namespace TradeMaster6000.Server.Services
             HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low, Timestamp = fittyCandle.Candle.Timestamp };
             for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) < 7; i++)
             {
+                var HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                var OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                if (OCDiff < HLFitty)
+                {
+                    goto SKIP;
+                }
+
                 decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
                 halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
                 decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
@@ -344,6 +352,8 @@ namespace TradeMaster6000.Server.Services
                     };
                     return halfZone;
                 }
+
+                SKIP:;
 
                 if (halfZone.Top < candles[i].High)
                 {
@@ -364,7 +374,10 @@ namespace TradeMaster6000.Server.Services
             HalfZone halfZone = new HalfZone { Top = top, Bottom = bottom, Timestamp = fittyCandle.Candle.Timestamp };
             for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) < 7; i++)
             {
+                if (i == 14)
+                {
 
+                }
                 decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
                 halfZone.BiggestBaseDiff = Math.Abs(halfZone.Top - halfZone.Bottom);
                 decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
@@ -396,6 +409,7 @@ namespace TradeMaster6000.Server.Services
 
         private FittyCandle FittyFinder(List<Candle> candles, int index)
         {
+
             logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: starting fitty finder");
             for (int i = index, n = candles.Count; i < n; i++)
             {
