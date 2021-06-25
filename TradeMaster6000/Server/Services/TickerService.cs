@@ -31,6 +31,7 @@ namespace TradeMaster6000.Server.Services
         private readonly IOrderUpdatesDbHelper updatesHelper;
         private readonly IBackgroundJobClient backgroundJob;
         private readonly IContextExtension contextExtension;
+        private readonly ITradeOrderHelper tradeOrderHelper;
 
         private static Ticker Ticker { get; set; }
         private static readonly ConcurrentQueue<SomeLog> TickerLogs = new ConcurrentQueue<SomeLog>();
@@ -50,7 +51,7 @@ namespace TradeMaster6000.Server.Services
         private static bool CandlesRunning { get; set; }
         private static bool OrderUpdatesOn { get; set; }
 
-        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger)
+        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger , ITradeOrderHelper tradeOrderHelper)
         {
             this.kiteService = kiteService;
             Configuration = configuration;
@@ -62,6 +63,7 @@ namespace TradeMaster6000.Server.Services
             this.backgroundJob = backgroundJob;
             this.contextExtension = contextExtension;
             this.logger = logger;
+            this.tradeOrderHelper = tradeOrderHelper;
         }
 
         public void Start()
@@ -269,7 +271,10 @@ namespace TradeMaster6000.Server.Services
 
             await Task.WhenAll(tasks);
 
-            Stop();
+            if (!tradeOrderHelper.AnyRunning())
+            {
+                Stop();
+            }
             CandlesRunning = false;
             CandleManagerCancel.Source.Cancel();
             backgroundJob.Delete(CandleManagerCancel.HangfireId);

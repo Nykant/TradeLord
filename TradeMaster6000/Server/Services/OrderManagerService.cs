@@ -144,7 +144,10 @@ namespace TradeMaster6000.Server.Services
             tickerService.UnSubscribe(order.Instrument.Token);
             if (!tradeOrderHelper.AnyRunning())
             {
-                tickerService.Stop();
+                if (!tickerService.IsCandlesRunning())
+                {
+                    tickerService.Stop();
+                }
                 tickerService.StopOrderUpdatesManager();
             }
             await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
