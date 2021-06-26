@@ -8,14 +8,13 @@
 @attribute [Authorize]
 
 @{
-
     if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartZoneService" Text="Start zone service" />
 
         <hr />
 
-        <RadzenDataGrid @ref="zonesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+        <RadzenDataGrid Style="z-index:0;" @ref="zonesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                         Data="@zones" TItem="Zone">
             <Columns>
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="InstrumentSymbol" Title="Instrument Symbol" />
@@ -28,7 +27,7 @@
 
         <hr />
 
-        <RadzenDataGrid @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+        <RadzenDataGrid Style="z-index:0;" @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                         Data="@candles" TItem="Candle">
             <Columns>
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />

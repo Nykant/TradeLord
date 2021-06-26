@@ -13,15 +13,16 @@
 
     if (IsConnected)
     {
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
+        <RadzenButton Style="margin-bottom:5px;" ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
         @*<RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoUltraOrders()) Text="@AutoUltraText" />*@
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoOrders()) Text="@AutoText" />
-        <RadzenButton Style="float: right" ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />        
+        <RadzenButton Style="margin-bottom:5px;" ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoOrders()) Text="@AutoText" />
+        <hr />
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />        
         <hr />
 
         <div class="row">
             <div class="col-xl-12">
-                <RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                <RadzenDataGrid Style="z-index:0;" @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                                 Data="@orders" TItem="TradeOrder">
                     <Columns>
                         <RadzenDataGridColumn Width="100px" TItem="TradeOrder" Property="Id" Title="Id" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
@@ -45,10 +46,12 @@
                 </RadzenDataGrid>
             </div>
         </div>
+
         <hr />
+
         <div class="row">
             <div class="col-xl-12">
-                <RadzenDataGrid @ref="logsGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                <RadzenDataGrid Style="z-index:0;" @ref="logsGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                                 Data="@logs" TItem="SomeLog">
                     <Columns>
                         <RadzenDataGridColumn Width="300px" TItem="SomeLog" Property="Log" Title="Message" />
@@ -58,6 +61,8 @@
                 </RadzenDataGrid>
             </div>
         </div>
+
+
     }
     else
     {
@@ -65,6 +70,7 @@
         <h3>Connecting...</h3>
 
     }
+    <hr />
 }
 
 @code {

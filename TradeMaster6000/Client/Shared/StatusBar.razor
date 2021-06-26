@@ -2,7 +2,10 @@
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
-<button class="@buttonclass" @onclick="ToggleFooter" >@buttontext</button>
+<button class="@buttonclass" @onclick="ToggleFooter" >
+    <span class="material-icons">unfold_more</span>
+</button>
+
 <div class="@csclass">
     <div class="status-box" style="float:right;">
         @{

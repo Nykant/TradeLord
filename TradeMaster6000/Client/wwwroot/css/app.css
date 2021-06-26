@@ -1,5 +1,11 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
+*, *::after, *::before {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     background: #272727;
@@ -81,65 +87,145 @@ a, .btn-link {
     padding-top:10px;
 }
 
-.footerbooter {
-    height: auto;
-    width: auto;
-    padding: 20px;
-    position: fixed;
-    bottom: 0;
-    right: 0;
-    left: 150px;
+
+
+    .footerbooter {
+        height: 100px;
+        overflow-y:auto;
+        width: auto;
+        padding: 10px;
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        left: 150px;
+        background-image: linear-gradient(to right, #003538 0%, #000000 70%);
+    }
+
+    .dissapear {
+        display: none;
+    }
+
+.toggle-button, .toggle-button-down {
     background-image: linear-gradient(to right, #003538 0%, #000000 70%);
-}
-
-.dissapear {
-    display:none;
-}
-.toggle-button{
-    right:10px;
-    bottom:110px;
-    position:fixed;
-}
-.toggle-button-down {
+    color: #e5e5e5;
+    padding-top: 5px;
+    font-size: 30px;
+    border: none;
+    outline: none;
     right: 10px;
-    bottom: 10px;
+    bottom: 110px;
     position: fixed;
 }
 
-.status-box {
-    padding: 20px;
-    float: left;
-    width: auto;
-    height: 60px;
-    background: #2e2e2e;
-    color: #fff;
-    margin-right: 10px;
+.toggle-button-down {
+    bottom: 10px;
 }
 
-.status-box p {
-    display:inline;
-}
+    .toggle-button:hover, .toggle-button-down:hover {
+        background-image: linear-gradient(to right, #000000 0%, #003538 70%);
+    }
 
-.on {
-    margin-left:5px;
-    padding: 5px;
-    display: inline;
-    /*    text-align: center;*/
-    /*    padding-top: 15px;
+    .status-box {
+        padding: 20px;
+        float: left;
+        width: auto;
+        height: 60px;
+        background: #2e2e2e;
+        color: #fff;
+        margin: 10px;
+    }
+
+        .status-box p {
+            display: inline;
+        }
+
+    .on {
+        margin-left: 5px;
+        padding: 5px;
+        display: inline;
+        /*    text-align: center;*/
+        /*    padding-top: 15px;
     height: 50px;
     width: 50px;*/
-    background-color: #19dd02;
-    color: #000000;
-}
+        background-color: #19dd02;
+        color: #000000;
+    }
 
-.off {
-    margin-left: 5px;
-    padding: 5px;
-    display: inline;
-    /*    text-align: center;
+    .off {
+        margin-left: 5px;
+        padding: 5px;
+        display: inline;
+        /*    text-align: center;
     padding-top: 15px;
     height: 50px;
     width: 50px;*/
-    background-color: red;
-    color: #000000;
+        background-color: red;
+        color: #000000;
+    }
+
+
+@media only screen and (max-width: 600px) {
+    .footerbooter {
+        height:75px;
+        font-size: 10px;
+        left: 0px;
+    }
+
+    .status-box {
+        height: 40px;
+        padding: 10px;
+    }
+
+    .toggle-button {
+        bottom: 85px;
+    }
 }
+@media only screen and (min-width: 600px) {
+    .footerbooter {
+        height: 75px;
+        font-size: 10px;
+        left: 0px;
+    }
+    .status-box {
+        height: 40px;
+        padding: 10px;
+    }
+    .toggle-button {
+        bottom: 85px;
+    }
+}
+
+/*@media only screen and (min-width: 992px) {
+    .footerbooter {
+        height: 85px;
+        font-size: 12px;
+        left: 0px;
+    }
+
+    .status-box {
+        height: 50px;
+        padding: 15px;
+    }
+
+    .toggle-button {
+        bottom: 95px;
+    }
+}*/
+
+
+    @media only screen and (min-width: 1000px) {
+        .footerbooter {
+            height: 100px;
+            left: 150px;
+            font-size: 14px;
+        }
+
+        .status-box {
+            height: 60px;
+            padding: 20px;
+        }
+
+        .toggle-button {
+            bottom: 110px;
+        }
+    }

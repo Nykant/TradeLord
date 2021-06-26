@@ -27,7 +27,7 @@
                 <RadzenTextBox Value="@TradeOrder.Status.ToString()" />
             </div>
             <div class="col-lg-8 padding-top">
-                <RadzenDataGrid @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                <RadzenDataGrid Style="z-index:0;" @ref="ordersGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                                 Data="@tradeLogs" TItem="TradeLog">
                     <Columns>
                         <RadzenDataGridColumn Width="300px" TItem="TradeLog" Property="Log" Title="Log Message" />
@@ -76,14 +76,14 @@
             </div>
         </div>
     }
-            else
-            {
-                <h3>Connecting...</h3>
-            }
+    else
+    {
+        <h3>Connecting...</h3>
+    }
 }
 
 
-
+<hr />
 
 @code {
     [Parameter]
