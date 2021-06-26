@@ -11,7 +11,15 @@ namespace TradeMaster6000.Shared
         public string InstrumentSymbol { get; set; }
         public decimal Top { get; set; }
         public decimal Bottom { get; set; }
+        public ZoneType ZoneType { get; set; }
         public DateTime From { get; set; }
         public DateTime To { get; set; }
+    }
+    public enum ZoneType
+    {
+        RBR,
+        RBD,
+        DBR,
+        DBD
     }
 }
