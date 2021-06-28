@@ -13,6 +13,7 @@ namespace TradeMaster6000.Shared
         public ZoneType ZoneType { get; set; }
         public StayAway StayAway { get; set; }
         public bool Tested { get; set; }
+        public bool Tradeable { get; set; }
         public DateTime From { get; set; }
         public DateTime To { get; set; }
     }
