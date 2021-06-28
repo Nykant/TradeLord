@@ -21,7 +21,11 @@ namespace TradeMaster6000.Server.Services
         private readonly IServiceProvider serviceProvider;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly IBackgroundJobClient backgroundJobs;
-        private static ConcurrentDictionary<int, CancellationTokenSource> OrderTokenSources { get; set; }
+        private static readonly ConcurrentDictionary<int, CancellationTokenSource> OrderTokenSources = new ConcurrentDictionary<int, CancellationTokenSource>();
+        private static readonly ConcurrentQueue<Task> Tasks = new ConcurrentQueue<Task>();
+        private static bool taskManagerRunning = false;
+        private static CancellationTokenSource taskManagerSource = new CancellationTokenSource();
+        private static string taskManagerJobId = null;
         public OrderManagerService(IKiteService kiteService, IInstrumentHelper instrumentHelper, ITradeOrderHelper tradeOrderHelper, ITickerService tickerService, IServiceProvider serviceProvider, ITradeLogHelper tradeLogHelper, IBackgroundJobClient backgroundJobs)
         {
             this.instrumentHelper = instrumentHelper;
@@ -31,7 +35,33 @@ namespace TradeMaster6000.Server.Services
             this.serviceProvider = serviceProvider;
             this.tradeLogHelper = tradeLogHelper;
             this.backgroundJobs = backgroundJobs;
-            OrderTokenSources = new ConcurrentDictionary<int, CancellationTokenSource>();
+        }
+
+        private void StopOrderTaskManager()
+        {
+            taskManagerSource.Cancel();
+            backgroundJobs.Delete(taskManagerJobId);
+        }
+
+        private async Task OrderTaskManager(CancellationToken token)
+        {
+            taskManagerRunning = true;
+            while (true)
+            {
+                while (!Tasks.IsEmpty)
+                {
+                    Tasks.TryDequeue(out Task task);
+                    task.Start();
+                }
+
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                await Task.Delay(2000);
+            }
+            taskManagerRunning = false;
         }
 
         public async Task StartOrder(TradeOrder order)
@@ -57,7 +87,12 @@ namespace TradeMaster6000.Server.Services
 
             tickerService.Start();
 
-            order.JobId = RunOrder(order);
+            if (!taskManagerRunning)
+            {
+                taskManagerSource = new CancellationTokenSource();
+                taskManagerJobId = backgroundJobs.Enqueue(() => OrderTaskManager(taskManagerSource.Token));
+            }
+            Tasks.Enqueue(MakeTask(order));
 
             await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
 
@@ -111,9 +146,14 @@ namespace TradeMaster6000.Server.Services
 
             tickerService.Start();
 
+            if (!taskManagerRunning)
+            {
+                taskManagerSource = new CancellationTokenSource();
+                taskManagerJobId = backgroundJobs.Enqueue(() => OrderTaskManager(taskManagerSource.Token));
+            }
             for (int i = 0; i < orders.Count; i++)
             {
-                orders[i].JobId = RunOrder(orders[i]);
+                Tasks.Enqueue(MakeTask(orders[i]));
             }
 
             foreach(var order in orders)
@@ -124,13 +164,13 @@ namespace TradeMaster6000.Server.Services
             Ending:;
         }
 
-        private string RunOrder(TradeOrder order)
+        private Task MakeTask(TradeOrder order)
         {
             CancellationTokenSource source = new CancellationTokenSource();
             OrderTokenSources.TryAdd(order.Id, source);
             tickerService.Subscribe(order.Instrument.Token);
             OrderInstance orderWork = new(serviceProvider);
-            return backgroundJobs.Enqueue(() => orderWork.StartWork(order, source.Token));
+            return new Task(async() => await orderWork.StartWork(order, source.Token));
         }
 
         public void CancelToken(int id)
@@ -149,6 +189,7 @@ namespace TradeMaster6000.Server.Services
                     tickerService.Stop();
                 }
                 tickerService.StopOrderUpdatesManager();
+                StopOrderTaskManager();
             }
             await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
         }

@@ -47,7 +47,6 @@ namespace TradeMaster6000.Shared
         public bool TargetPlaced { get; set; } = false;
         public bool SquaredOff { get; set; } = false;
         public TradeInstrument Instrument { get; set; }
-        public string JobId { get; set; }
         public List<TradeLog> TradeLogs { get; set; }
     }
 
