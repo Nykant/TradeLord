@@ -35,7 +35,6 @@ namespace TradeMaster6000.Server.Tasks
         private IWatchingTargetHelper WatchingTargetHelper { get; set; }
         private ITickDbHelper TickDbHelper { get; set; }
         private readonly IOrderManagerService orderManager;
-        private readonly IBackgroundJobClient backgroundJob;
         private TradeOrder TradeOrder { get; set; }
 
         private bool finished;
@@ -54,7 +53,6 @@ namespace TradeMaster6000.Server.Tasks
             TimeHelper = service.GetRequiredService<ITimeHelper>();
             TickDbHelper = service.GetRequiredService<ITickDbHelper>();
             orderManager = service.GetRequiredService<IOrderManagerService>();
-            backgroundJob = service.GetRequiredService<IBackgroundJobClient>();
 
             semaphore = new SemaphoreSlim(1, 1);
             finished = false;

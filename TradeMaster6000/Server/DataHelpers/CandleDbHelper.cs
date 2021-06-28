@@ -69,10 +69,7 @@ namespace TradeMaster6000.Server.DataHelpers
                 }
                 using (var context = contextFactory.CreateDbContext())
                 { 
-                    foreach(var candle in excelCandles)
-                    {
-                        context.Add(candle);
-                    }
+                    context.Add(excelCandles);
                     context.SaveChanges();
                 }
             }
@@ -116,11 +113,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                foreach(var candle in candles)
-                {
-                    await context.Candles.AddAsync(candle);
-                }
-                
+                await context.AddAsync(candles);
                 await context.SaveChangesAsync();
             }
         }
@@ -129,7 +122,8 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                foreach (var candle in context.Candles)
+                var candles = context.Candles;
+                foreach (var candle in candles)
                 {
                     if (DateTime.Compare(candle.Kill, DateTime.Now) < 0)
                     {

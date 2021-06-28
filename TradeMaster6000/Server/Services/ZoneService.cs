@@ -57,6 +57,7 @@ namespace TradeMaster6000.Server.Services
 
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
+            List<Zone> zones = new List<Zone>();
             try
             {
                 List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
@@ -76,7 +77,6 @@ namespace TradeMaster6000.Server.Services
                     }
                     time = time.AddMinutes(1);
                 }
-
                 Candle temp = new ();
                 int emptyCounter = 0;
                 int i = 0;
@@ -168,16 +168,65 @@ namespace TradeMaster6000.Server.Services
                 }
                 else
                 {
-                    await zoneHelper.Add(zone).ConfigureAwait(false);
+
+
+                    zones.Add(zone);
                     goto Repeat;
                 }
 
                 Ending:;
+
+                await zoneHelper.Add(zones);
             }
             catch (Exception e)
             {
                 logger.LogInformation($"processor id: {Thread.GetCurrentProcessorId()} --- managed thread id: {Thread.CurrentThread.ManagedThreadId} --- timestamp: {DateTime.Now} --- description: there was an error: {e.Message}");
             }
+        }
+
+        private decimal ExplosiveZoneBackward(List<Candle> candles, ExplosiveCandle explosiveCandle, decimal start)
+        {
+            decimal high = start;
+            decimal HLFitty = 0;
+            decimal OCDiff = 0;
+            for(int i = explosiveCandle.Index - 1; i >= 0; i--)
+            {
+                if(high < candles[i].High)
+                {
+                    high = candles[i].High;
+                }
+
+                HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                if (OCDiff <= HLFitty)
+                {
+                    return Math.Abs(high - start);
+                }
+            }
+
+            return default;
+        }
+        private decimal ExplosiveZoneForward(List<Candle> candles, ExplosiveCandle explosiveCandle, decimal start)
+        {
+            decimal high = start;
+            decimal HLFitty = 0;
+            decimal OCDiff = 0;
+            for (int i = explosiveCandle.Index + 1; i >= 0; i++)
+            {
+                if (high < candles[i].High)
+                {
+                    high = candles[i].High;
+                }
+
+                HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                if (OCDiff <= HLFitty)
+                {
+                    return Math.Abs(high - start);
+                }
+            }
+
+            return default;
         }
 
         private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol)
@@ -196,11 +245,14 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            forward = FindForward(candles, fittyCandle, backward.Top, backward.Bottom, backward.BiggestBaseDiff);
-
-            if (forward == default)
+            if(backward.BiggestBaseDiff > forward.BiggestBaseDiff)
             {
-                return default;
+                forward = FindForward(candles, fittyCandle, backward.Top, backward.Bottom, backward.BiggestBaseDiff);
+
+                if (forward == default)
+                {
+                    return default;
+                }
             }
 
             int range = forward.ExplosiveCandle.RangeFromFitty + backward.ExplosiveCandle.RangeFromFitty - 1;
@@ -209,30 +261,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, EndIndex = forward.ExplosiveCandle.Index };
-
-            if(backward.ExplosiveCandle.Candle.Open < backward.ExplosiveCandle.Candle.Close)
-            {
-                if(forward.ExplosiveCandle.Candle.Open < forward.ExplosiveCandle.Candle.Close)
-                {
-                    zone.ZoneType = ZoneType.RBR;
-                }
-                else
-                {
-                    zone.ZoneType = ZoneType.RBD;
-                }
-            }
-            else
-            {
-                if (forward.ExplosiveCandle.Candle.Open < forward.ExplosiveCandle.Candle.Close)
-                {
-                    zone.ZoneType = ZoneType.DBR;
-                }
-                else
-                {
-                    zone.ZoneType = ZoneType.DBD;
-                }
-            }
+            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol };
 
             if(forward.Top > backward.Top)
             {
@@ -252,23 +281,115 @@ namespace TradeMaster6000.Server.Services
                 zone.Bottom = backward.Bottom;
             }
 
+            var zoneWidthX2 = Math.Abs(zone.Top - zone.Bottom) * (decimal)1.2;
+            var zoneWidthX05 = Math.Abs(zone.Top - zone.Bottom) * (decimal)0.5;
+            if (backward.ExplosiveCandle.Candle.Open < backward.ExplosiveCandle.Candle.Close)
+            {
+                if (forward.ExplosiveCandle.Candle.Open < forward.ExplosiveCandle.Candle.Close)
+                {
+                    if(backward.ExplosiveCandle.Candle.High > (zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10)))
+                    {
+                        return default;
+                    }
+                    if (forward.ExplosiveCandle.Candle.Low < zone.Bottom)
+                    {
+                        return default;
+                    }
+
+                    if (zoneWidthX2 < ExplosiveZoneForward(candles, forward.ExplosiveCandle, zone.Top)
+                        && zoneWidthX05 < ExplosiveZoneBackward(candles, forward.ExplosiveCandle, zone.Bottom))
+                    {
+                        zone.StayAway = StayAway.Good;
+                    }
+                    else
+                    {
+                        zone.StayAway = StayAway.Bad;
+                    }
+
+                    zone.ZoneType = ZoneType.RBR;
+                }
+                else
+                {
+                    if (backward.ExplosiveCandle.Candle.High > zone.Top)
+                    {
+                        return default;
+                    }
+                    if (forward.ExplosiveCandle.Candle.High > zone.Top)
+                    {
+                        return default;
+                    }
+
+                    if ((Math.Abs(zone.Top - zone.Bottom) * (decimal)1.2) < ExplosiveZoneForward(candles, forward.ExplosiveCandle))
+                    {
+                        zone.StayAway =;
+                    }
+
+                    zone.ZoneType = ZoneType.RBD;
+                }
+            }
+            else
+            {
+                if (forward.ExplosiveCandle.Candle.Open < forward.ExplosiveCandle.Candle.Close)
+                {
+                    if (backward.ExplosiveCandle.Candle.Low < zone.Bottom)
+                    {
+                        return default;
+                    }
+                    if (forward.ExplosiveCandle.Candle.Low < zone.Bottom)
+                    {
+                        return default;
+                    }
+
+                    if ((Math.Abs(zone.Top - zone.Bottom) * (decimal)1.2) < ExplosiveZoneForward(candles, forward.ExplosiveCandle))
+                    {
+                        zone.StayAway =;
+                    }
+
+                    zone.ZoneType = ZoneType.DBR;
+                }
+                else
+                {
+                    if (backward.ExplosiveCandle.Candle.Low < (zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10)))
+                    {
+                        return default;
+                    }
+                    if (forward.ExplosiveCandle.Candle.High > zone.Top)
+                    {
+                        return default;
+                    }
+
+                    if ((Math.Abs(zone.Top - zone.Bottom) * (decimal)1.2) < ExplosiveZoneForward(candles, forward.ExplosiveCandle))
+                    {
+                        zone.StayAway =;
+                    }
+
+                    zone.ZoneType = ZoneType.DBD;
+                }
+            }
+
+
+
             return zone;
         }
 
         private HalfZone FindBackwards(List<Candle> candles, FittyCandle fittyCandle, decimal top, decimal bottom, decimal biggestBaseDiff)
         {
             HalfZone halfZone = new HalfZone { Top = top, Bottom = bottom, Timestamp = fittyCandle.Candle.Timestamp, BiggestBaseDiff = biggestBaseDiff };
+            decimal HLFitty = 0;
+            decimal OCDiff = 0;
+            decimal baseDiffx = 0;
+            decimal candleDiff = 0;
             for (int i = fittyCandle.Index - 1; i >= 0 && Math.Abs(i - fittyCandle.Index) < 7; i--)
             {
-                var HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
-                var OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
                 if (OCDiff <= HLFitty)
                 {
                     return default;
                 }
 
-                decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
-                decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+                baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (candleDiff > baseDiffx)
                 {
                     halfZone.ExplosiveCandle = new ExplosiveCandle
@@ -301,18 +422,22 @@ namespace TradeMaster6000.Server.Services
 
         private HalfZone FindForward(List<Candle> candles, FittyCandle fittyCandle)
         {
+            decimal HLFitty = 0;
+            decimal OCDiff = 0;
+            decimal baseDiffx = 0;
+            decimal candleDiff = 0;
             HalfZone halfZone = new HalfZone { Top = fittyCandle.Candle.High, Bottom = fittyCandle.Candle.Low, Timestamp = fittyCandle.Candle.Timestamp, BiggestBaseDiff = Math.Abs(fittyCandle.Candle.High - fittyCandle.Candle.Low) };
             for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) < 7; i++)
             {
-                var HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
-                var OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
-                decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+                HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                candleDiff = Math.Abs(candles[i].High - candles[i].Low);
                 if (OCDiff <= HLFitty)
                 {
                     goto SKIP;
                 }
 
-                decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (candleDiff > baseDiffx)
                 {
                     halfZone.ExplosiveCandle = new ExplosiveCandle
@@ -348,18 +473,22 @@ namespace TradeMaster6000.Server.Services
 
         private HalfZone FindForward(List<Candle> candles, FittyCandle fittyCandle, decimal top, decimal bottom, decimal biggestBaseDiff)
         {
+            decimal HLFitty = 0;
+            decimal OCDiff = 0;
+            decimal baseDiffx = 0;
+            decimal candleDiff = 0;
             HalfZone halfZone = new HalfZone { Top = top, Bottom = bottom, Timestamp = fittyCandle.Candle.Timestamp, BiggestBaseDiff = biggestBaseDiff };
             for (int i = fittyCandle.Index + 1, n = candles.Count; i < n && Math.Abs(i - fittyCandle.Index) < 7; i++)
             {
-                var HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
-                var OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
-                decimal candleDiff = Math.Abs(candles[i].High - candles[i].Low);
+                HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                candleDiff = Math.Abs(candles[i].High - candles[i].Low);
                 if (OCDiff <= HLFitty)
                 {
                     goto SKIP;
                 }
 
-                decimal baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
+                baseDiffx = halfZone.BiggestBaseDiff * (decimal)1.2;
                 if (candleDiff > baseDiffx)
                 {
                     halfZone.ExplosiveCandle = new ExplosiveCandle
@@ -395,10 +524,12 @@ namespace TradeMaster6000.Server.Services
 
         private FittyCandle FittyFinder(List<Candle> candles, int index)
         {
+            decimal HLFitty = 0;
+            decimal OCDiff = 0;
             for (int i = index, n = candles.Count; i < n; i++)
             {
-                var HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
-                var OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
+                HLFitty = (candles[i].High - candles[i].Low) * (decimal)0.5;
+                OCDiff = Math.Abs(candles[i].Open - candles[i].Close);
                 if (OCDiff <= HLFitty)
                 {
                     return new FittyCandle { Candle = candles[i], Index = i };

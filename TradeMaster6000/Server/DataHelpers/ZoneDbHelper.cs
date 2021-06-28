@@ -32,10 +32,21 @@ namespace TradeMaster6000.Server.DataHelpers
                 await context.SaveChangesAsync();
             }
         }
+
+        public async Task Add(List<Zone> zones)
+        {
+            using (var context = ContextFactory.CreateDbContext())
+            {
+                await context.AddAsync(zones);
+                await context.SaveChangesAsync();
+            }
+        }
     }
     public interface IZoneDbHelper
     {
+
         Task Add(Zone zone);
         Task<List<Zone>> GetZones();
+        Task Add(List<Zone> zones);
     }
 }
