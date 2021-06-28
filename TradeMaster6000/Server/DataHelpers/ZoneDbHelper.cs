@@ -37,7 +37,11 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = ContextFactory.CreateDbContext())
             {
-                await context.AddAsync(zones);
+                foreach(var zone in zones)
+                {
+                    await context.Zones.AddAsync(zone);
+                }
+
                 await context.SaveChangesAsync();
             }
         }

@@ -362,17 +362,17 @@ namespace TradeMaster6000.Server.Tasks
                 await Task.Run(() =>
                 {
                     candle.Open = ticks[0].LTP;
-                    candle.High = ticks[0].LTP;
                     candle.Low = ticks[0].LTP;
+                    candle.High = ticks[0].LTP;
                     for (int i = 0; i < ticks.Count; i++)
                     {
-                        if (candle.High < ticks[i].LTP)
-                        {
-                            candle.High = ticks[i].LTP;
-                        }
-                        if (candle.Low > ticks[i].LTP)
+                        if (candle.Low < ticks[i].LTP)
                         {
                             candle.Low = ticks[i].LTP;
+                        }
+                        if (candle.High > ticks[i].LTP)
+                        {
+                            candle.High = ticks[i].LTP;
                         }
                     }
                     candle.Open = ticks[0].LTP;
@@ -454,12 +454,12 @@ namespace TradeMaster6000.Server.Tasks
                 while (true)
                 {
                     TradeOrder = await OrderHelper.GetTradeOrder(order.Id);
-                    if(TradeOrder.JobId != null)
+                    if(TradeOrder != null)
                     {
                         break;
                     }
 
-                    await Task.Delay(500);
+                    await Task.Delay(1000);
                 }
 
                 TradeOrder.Instrument = order.Instrument;

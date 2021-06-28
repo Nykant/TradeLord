@@ -26,13 +26,13 @@ namespace TradeMaster6000.Server.Helpers
             decimal triggerPrice;
             if (order.ExitTransactionType == "BUY")
             {
-                triggerPrice = candle.High;
+                triggerPrice = candle.Low;
                 triggerPrice *= (decimal)1.00015;
                 triggerPrice = MathHelper.RoundUp(triggerPrice, (decimal)0.05);
             }
             else
             {
-                triggerPrice = candle.Low;
+                triggerPrice = candle.High;
                 triggerPrice *= (decimal)0.99985;
                 triggerPrice = MathHelper.RoundDown(triggerPrice, (decimal)0.05);
             }

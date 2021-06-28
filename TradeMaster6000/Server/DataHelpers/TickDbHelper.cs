@@ -33,7 +33,11 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                await context.AddAsync(myTicks);
+                foreach(var tick in myTicks)
+                {
+                    await context.Ticks.AddAsync(tick);
+                }
+                
                 await context.SaveChangesAsync();
             }
         }

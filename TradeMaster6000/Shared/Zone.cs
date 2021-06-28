@@ -12,6 +12,7 @@ namespace TradeMaster6000.Shared
         public decimal Bottom { get; set; }
         public ZoneType ZoneType { get; set; }
         public StayAway StayAway { get; set; }
+        public bool Tested { get; set; }
         public DateTime From { get; set; }
         public DateTime To { get; set; }
     }
@@ -24,7 +25,7 @@ namespace TradeMaster6000.Shared
     }
     public enum StayAway
     {
-        Good,
-        Bad
+        Bad,
+        Good
     }
 }

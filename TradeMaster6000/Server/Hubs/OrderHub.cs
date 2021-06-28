@@ -178,7 +178,6 @@ namespace TradeMaster6000.Server.Hubs
                 if (order.Id == id)
                 {
                     orderManagerService.CancelToken(id);
-                    backgroundJob.Delete(order.JobId);
                 }
             }
         }

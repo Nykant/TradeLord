@@ -43,7 +43,7 @@ namespace TradeMaster6000.Server.Services
             backgroundJobs.Delete(taskManagerJobId);
         }
 
-        private async Task OrderTaskManager(CancellationToken token)
+        public async Task OrderTaskManager(CancellationToken token)
         {
             taskManagerRunning = true;
             while (true)

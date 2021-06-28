@@ -95,10 +95,11 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task TickManager(CancellationToken token)
         {
+            List<MyTick> myTicks = new List<MyTick>();
             TickManagerOn = true;
             while (true)
             {
-                List<MyTick> myTicks = new List<MyTick>();
+                myTicks = new List<MyTick>();
                 while (!MyTicks.IsEmpty)
                 {
                     MyTicks.TryDequeue(out MyTick tick);
@@ -135,10 +136,11 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task OrderUpdatesManager(CancellationToken token)
         {
+            List<OrderUpdate> orderUpdates = new List<OrderUpdate>();
             OrderUpdatesOn = true;
             while (true)
             {
-                List<OrderUpdate> orderUpdates = new List<OrderUpdate>();
+                orderUpdates = new List<OrderUpdate>();
                 while (!OrderUpdates.IsEmpty)
                 {
                     OrderUpdates.TryDequeue(out OrderUpdate update);
@@ -163,10 +165,11 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task CandleManager(CancellationToken token)
         {
+            List<Candle> myCandles = new();
             CandleManagerOn = true;
             while (true)
             {
-                List<Candle> myCandles = new ();
+                myCandles = new ();
                 while (!Candles.IsEmpty)
                 {
                     Candles.TryDequeue(out Candle candle);
@@ -336,17 +339,17 @@ namespace TradeMaster6000.Server.Services
                     Candle candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(2), TicksCount = ticks.Count };
                     if (ticks.Count > 0)
                     {
-                        candle.High = ticks[0].LTP;
                         candle.Low = ticks[0].LTP;
+                        candle.High = ticks[0].LTP;
                         for (int i = 0; i < ticks.Count; i++)
                         {
-                            if (candle.High < ticks[i].LTP)
-                            {
-                                candle.High = ticks[i].LTP;
-                            }
-                            if (candle.Low > ticks[i].LTP)
+                            if (candle.Low < ticks[i].LTP)
                             {
                                 candle.Low = ticks[i].LTP;
+                            }
+                            if (candle.High > ticks[i].LTP)
+                            {
+                                candle.High = ticks[i].LTP;
                             }
                         }
                         candle.Open = ticks[0].LTP;
@@ -354,8 +357,8 @@ namespace TradeMaster6000.Server.Services
                     }
                     else
                     {
-                        candle.High = previousCandle.Close;
                         candle.Low = previousCandle.Close;
+                        candle.High = previousCandle.Close;
                         candle.Open = previousCandle.Close;
                         candle.Close = previousCandle.Close;
                     }

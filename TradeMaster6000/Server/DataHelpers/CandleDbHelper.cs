@@ -48,12 +48,12 @@ namespace TradeMaster6000.Server.DataHelpers
                                     candle.Open = result1;
                                     break;
                                 case 3:
-                                    Decimal.TryParse(value.ToString(), out decimal result2);
-                                    candle.High = result2;
+                                    Decimal.TryParse(value.ToString(), out decimal result3);
+                                    candle.High = result3;
                                     break;
                                 case 4:
-                                    Decimal.TryParse(value.ToString(), out decimal result3);
-                                    candle.Low = result3;
+                                    Decimal.TryParse(value.ToString(), out decimal result2);
+                                    candle.Low = result2;
                                     break;
                                 case 5:
                                     Decimal.TryParse(value.ToString(), out decimal result4);
@@ -69,7 +69,10 @@ namespace TradeMaster6000.Server.DataHelpers
                 }
                 using (var context = contextFactory.CreateDbContext())
                 { 
-                    context.Add(excelCandles);
+                    foreach(var candle in excelCandles)
+                    {
+                        context.Candles.Add(candle);
+                    }
                     context.SaveChanges();
                 }
             }
@@ -113,7 +116,11 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                await context.AddAsync(candles);
+                foreach(var candle in candles)
+                {
+                    await context.Candles.AddAsync(candle);
+                }
+                
                 await context.SaveChangesAsync();
             }
         }

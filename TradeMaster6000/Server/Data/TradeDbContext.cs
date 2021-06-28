@@ -25,7 +25,6 @@ namespace TradeMaster6000.Server.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<TradeOrder>().Ignore(e => e.Instrument);
-            modelBuilder.Entity<Zone>().Ignore(e => e.EndIndex);
             modelBuilder.Entity<OrderUpdate>().Property(x => x.OrderId).ValueGeneratedNever();
         }
     }
