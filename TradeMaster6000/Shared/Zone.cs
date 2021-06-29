@@ -12,8 +12,9 @@ namespace TradeMaster6000.Shared
         public decimal Bottom { get; set; }
         public ZoneType ZoneType { get; set; }
         public StayAway StayAway { get; set; }
-        public bool Tested { get; set; }
-        public bool Tradeable { get; set; }
+        public SupplyDemand SupplyDemand { get; set; }
+        public bool Tested { get; set; } = false;
+        public int Tradeable { get; set; } = 0;
         public DateTime From { get; set; }
         public DateTime To { get; set; }
     }
@@ -28,5 +29,10 @@ namespace TradeMaster6000.Shared
     {
         Bad,
         Good
+    }
+    public enum SupplyDemand
+    {
+        Supply,
+        Demand
     }
 }

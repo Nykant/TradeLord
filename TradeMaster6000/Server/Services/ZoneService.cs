@@ -134,10 +134,10 @@ namespace TradeMaster6000.Server.Services
                 }
                 time = time.AddMinutes(1);
 
-                if(time.Hour == 15 && time.Minute == 45)
-                {
-                    time = new DateTime(time.Year, time.Month, time.Day + 1, 9, 0, 0);
-                }
+                //if(time.Hour == 15 && time.Minute == 45)
+                //{
+                //    time = time.AddHours(17);
+                //}
             }
 
             return newCandles.OrderBy(x => x.Timestamp).ToList();
@@ -172,16 +172,40 @@ namespace TradeMaster6000.Server.Services
                     zoneCandles.Add(baseCandles[y]);
                 }
 
-                Parallel.Invoke(
-                    async () => baseZones = await MakeZones(baseCandles, instrument.TradingSymbol),
-                    async () => candles15Zones = await MakeZones(candles15, instrument.TradingSymbol),
-                    async () => candles45Zones = await MakeZones(candles45, instrument.TradingSymbol),
-                    async () => candles60Zones = await MakeZones(candles60, instrument.TradingSymbol)
-                    );
+                baseZones = await MakeZones(baseCandles, instrument.TradingSymbol);
+                candles15Zones = await MakeZones(candles15, instrument.TradingSymbol);
+                candles45Zones = await MakeZones(candles45, instrument.TradingSymbol);
+                candles60Zones = await MakeZones(candles60, instrument.TradingSymbol);
 
-                foreach(var zone in baseZones)
+                try
                 {
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles15Zones, baseZones[k]))
+                        {
+                            baseZones[k].Tradeable++;
+                        }
+                    }
 
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles45Zones, baseZones[k]))
+                        {
+                            baseZones[k].Tradeable++;
+                        }
+                    }
+
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles60Zones, baseZones[k]))
+                        {
+                            baseZones[k].Tradeable++;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    logger.LogInformation(e.Message);
                 }
 
                 await zoneHelper.Add(baseZones);
@@ -196,13 +220,58 @@ namespace TradeMaster6000.Server.Services
 
         private bool IsTradeable(List<Zone> zones, Zone zone)
         {
-            foreach(var zony in zones)
+            // for each higher timeframe zone
+            for(int i = 0, n = zones.Count; i < n; i++)
             {
-                if(DateTime.Compare(zony.From, zone.From) < 0 && DateTime.Compare(zony.To, zone.From) > 0)
+                // check if the from(timestamp) of lower timeframe zone is later or same time as higher timeframe from
+                // and check if to(timestamp) of lower timeframe zone is earlier or same time as higher timeframe to
+                if(DateTime.Compare(zones[i].From, zone.From) <= 0 && DateTime.Compare(zones[i].To, zone.To) >= 0)
                 {
-
+                    // motherzone found!
+                    try
+                    {
+                        // checking all higher timeframe zones backward
+                        for (int k = i - 1; k >= 0; k--)
+                        {
+                            // if motherzone is opposite to earlier zone
+                            if (zones[i].SupplyDemand != zones[k].SupplyDemand)
+                            {
+                                // if motherzone is a demand zone
+                                if (zones[i].SupplyDemand == SupplyDemand.Demand)
+                                {
+                                    // if motherzone top is higher than earlier zone top
+                                    if (zones[i].Top > zones[k].Top)
+                                    {
+                                        return true;
+                                    }
+                                    else
+                                    {
+                                        return false;
+                                    }
+                                }
+                                // else if motherzone is a supply zone
+                                else
+                                {
+                                    // if motherzone bottom is lower than earlier zone bottom
+                                    if (zones[i].Bottom < zones[k].Bottom)
+                                    {
+                                        return true;
+                                    }
+                                    else
+                                    {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogInformation(e.Message);
+                    }
                 }
             }
+            return false;
         }
 
         private async Task<List<Zone>> MakeZones(List<Candle> candles, string symbol)
@@ -427,7 +496,7 @@ namespace TradeMaster6000.Server.Services
                     }
 
                     zone.Tested = RallyForwardTest(candles, forward.ExplosiveCandle.Index, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10));
-
+                    zone.SupplyDemand = SupplyDemand.Demand;
                     zone.ZoneType = ZoneType.RBR;
                 }
                 else
@@ -453,7 +522,7 @@ namespace TradeMaster6000.Server.Services
                     }
 
                     zone.Tested = DropForwardTest(candles, forward.ExplosiveCandle.Index, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10));
-
+                    zone.SupplyDemand = SupplyDemand.Supply;
                     zone.ZoneType = ZoneType.RBD;
                 }
             }
@@ -481,7 +550,7 @@ namespace TradeMaster6000.Server.Services
                     }
 
                     zone.Tested = RallyForwardTest(candles, forward.ExplosiveCandle.Index, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10));
-
+                    zone.SupplyDemand = SupplyDemand.Demand;
                     zone.ZoneType = ZoneType.DBR;
                 }
                 else
@@ -506,7 +575,7 @@ namespace TradeMaster6000.Server.Services
                     }
 
                     zone.Tested = DropForwardTest(candles, forward.ExplosiveCandle.Index, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10));
-
+                    zone.SupplyDemand = SupplyDemand.Supply;
                     zone.ZoneType = ZoneType.DBD;
                 }
             }
