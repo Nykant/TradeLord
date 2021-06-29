@@ -146,13 +146,13 @@ namespace TradeMaster6000.Server.Services
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
             List<Candle> baseCandles = new List<Candle>();
-            List<Candle> candles15 = new List<Candle>();
-            List<Candle> candles45 = new List<Candle>();
-            List<Candle> candles60 = new List<Candle>();
+            //List<Candle> candles15 = new List<Candle>();
+            //List<Candle> candles45 = new List<Candle>();
+            //List<Candle> candles60 = new List<Candle>();
             List<Zone> baseZones = new List<Zone>();
-            List<Zone> candles15Zones = new List<Zone>();
-            List<Zone> candles45Zones = new List<Zone>();
-            List<Zone> candles60Zones = new List<Zone>();
+            //List<Zone> candles15Zones = new List<Zone>();
+            //List<Zone> candles45Zones = new List<Zone>();
+            //List<Zone> candles60Zones = new List<Zone>();
             try
             {
                 List<Candle> candles = await candleHelper.GetCandles(instrument.Token);
@@ -163,9 +163,9 @@ namespace TradeMaster6000.Server.Services
                 }
 
                 baseCandles = TransformCandles(candles, timeFrame);
-                candles15 = TransformCandles(candles, 15);
-                candles45 = TransformCandles(candles, 45);
-                candles60 = TransformCandles(candles, 60);
+                //candles15 = TransformCandles(candles, 15);
+                //candles45 = TransformCandles(candles, 45);
+                //candles60 = TransformCandles(candles, 60);
 
                 for (int y = baseCandles.Count - 1; y >= 0; y--)
                 {
@@ -173,40 +173,40 @@ namespace TradeMaster6000.Server.Services
                 }
 
                 baseZones = await MakeZones(baseCandles, instrument.TradingSymbol);
-                candles15Zones = await MakeZones(candles15, instrument.TradingSymbol);
-                candles45Zones = await MakeZones(candles45, instrument.TradingSymbol);
-                candles60Zones = await MakeZones(candles60, instrument.TradingSymbol);
+                //candles15Zones = await MakeZones(candles15, instrument.TradingSymbol);
+                //candles45Zones = await MakeZones(candles45, instrument.TradingSymbol);
+                //candles60Zones = await MakeZones(candles60, instrument.TradingSymbol);
 
-                try
-                {
-                    for (int k = 0, n = baseZones.Count; k < n; k++)
-                    {
-                        if (IsTradeable(candles15Zones, baseZones[k]))
-                        {
-                            baseZones[k].Tradeable++;
-                        }
-                    }
+                //try
+                //{
+                //    for (int k = 0, n = baseZones.Count; k < n; k++)
+                //    {
+                //        if (IsTradeable(candles15Zones, baseZones[k]))
+                //        {
+                //            baseZones[k].Tradeable++;
+                //        }
+                //    }
 
-                    for (int k = 0, n = baseZones.Count; k < n; k++)
-                    {
-                        if (IsTradeable(candles45Zones, baseZones[k]))
-                        {
-                            baseZones[k].Tradeable++;
-                        }
-                    }
+                //    for (int k = 0, n = baseZones.Count; k < n; k++)
+                //    {
+                //        if (IsTradeable(candles45Zones, baseZones[k]))
+                //        {
+                //            baseZones[k].Tradeable++;
+                //        }
+                //    }
 
-                    for (int k = 0, n = baseZones.Count; k < n; k++)
-                    {
-                        if (IsTradeable(candles60Zones, baseZones[k]))
-                        {
-                            baseZones[k].Tradeable++;
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    logger.LogInformation(e.Message);
-                }
+                //    for (int k = 0, n = baseZones.Count; k < n; k++)
+                //    {
+                //        if (IsTradeable(candles60Zones, baseZones[k]))
+                //        {
+                //            baseZones[k].Tradeable++;
+                //        }
+                //    }
+                //}
+                //catch (Exception e)
+                //{
+                //    logger.LogInformation(e.Message);
+                //}
 
                 await zoneHelper.Add(baseZones);
 
@@ -339,14 +339,14 @@ namespace TradeMaster6000.Server.Services
             decimal low = zoneLow;
             for (int i = explosiveIndex; i >= 0; i--)
             {
-                if (low > candles[i].Low)
-                {
-                    low = candles[i].Low;
-                }
-
                 if (IsFitty(candles[i]))
                 {
                     return Math.Abs(low - zoneLow);
+                }
+
+                if (low > candles[i].Low)
+                {
+                    low = candles[i].Low;
                 }
             }
 
@@ -358,14 +358,14 @@ namespace TradeMaster6000.Server.Services
             decimal high = zoneHigh;
             for (int i = explosiveIndex; i >= 0; i--)
             {
-                if (high < candles[i].High)
-                {
-                    high = candles[i].High;
-                }
-
                 if (IsFitty(candles[i]))
                 {
                     return Math.Abs(high - zoneHigh);
+                }
+
+                if (high < candles[i].High)
+                {
+                    high = candles[i].High;
                 }
             }
 
@@ -377,14 +377,14 @@ namespace TradeMaster6000.Server.Services
             decimal high = zoneHigh;
             for (int i = explosiveIndex, n = candles.Count; i < n; i++)
             {
-                if (high < candles[i].High)
-                {
-                    high = candles[i].High;
-                }
-
                 if (IsFitty(candles[i]))
                 {
                     return Math.Abs(high - zoneHigh);
+                }
+
+                if (high < candles[i].High)
+                {
+                    high = candles[i].High;
                 }
             }
 
@@ -395,14 +395,14 @@ namespace TradeMaster6000.Server.Services
             decimal low = zoneLow;
             for (int i = explosiveIndex, n = candles.Count; i < n; i++)
             {
-                if (low > candles[i].Low)
-                {
-                    low = candles[i].Low;
-                }
-
                 if (IsFitty(candles[i]))
                 {
                     return Math.Abs(low - zoneLow);
+                }
+
+                if (low > candles[i].Low)
+                {
+                    low = candles[i].Low;
                 }
             }
 
@@ -492,7 +492,7 @@ namespace TradeMaster6000.Server.Services
                     }
                     else
                     {
-                        zone.StayAway = StayAway.Bad;
+                        return default;
                     }
 
                     zone.Tested = RallyForwardTest(candles, forward.ExplosiveCandle.Index, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10));
@@ -518,7 +518,7 @@ namespace TradeMaster6000.Server.Services
                     }
                     else
                     {
-                        zone.StayAway = StayAway.Bad;
+                        return default;
                     }
 
                     zone.Tested = DropForwardTest(candles, forward.ExplosiveCandle.Index, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10));
@@ -546,7 +546,7 @@ namespace TradeMaster6000.Server.Services
                     }
                     else
                     {
-                        zone.StayAway = StayAway.Bad;
+                        return default;
                     }
 
                     zone.Tested = RallyForwardTest(candles, forward.ExplosiveCandle.Index, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10));
@@ -571,7 +571,7 @@ namespace TradeMaster6000.Server.Services
                     }
                     else
                     {
-                        zone.StayAway = StayAway.Bad;
+                        return default;
                     }
 
                     zone.Tested = DropForwardTest(candles, forward.ExplosiveCandle.Index, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10));

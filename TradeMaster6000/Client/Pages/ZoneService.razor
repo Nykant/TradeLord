@@ -21,12 +21,14 @@
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Top" Title="Top" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Bottom" Title="Bottom" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="ZoneType" Title="Zone type" />
+                @*<RadzenDataGridColumn Width="100px" TItem="Zone" Property="Tested" Title="Tested" />*@
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="SupplyDemand" Title="Supply Or Demand" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="From" Title="From" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="To" Title="To" />
             </Columns>
         </RadzenDataGrid>
 
-        <hr />
+        @*<hr />
 
         <RadzenDataGrid Style="z-index:0;" @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                         Data="@candles" TItem="Candle">
@@ -39,7 +41,7 @@
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
                 <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
             </Columns>
-        </RadzenDataGrid>
+        </RadzenDataGrid>*@
     }
     else
     {
@@ -52,9 +54,9 @@
 @code {
     private HubConnection hubConnection;
     RadzenDataGrid<Zone> zonesGrid;
-    RadzenDataGrid<Candle> candlesGrid;
+    //RadzenDataGrid<Candle> candlesGrid;
     private List<Zone> zones = new List<Zone>();
-    private List<Candle> candles = new List<Candle>();
+    //private List<Candle> candles = new List<Candle>();
     protected override async Task OnInitializedAsync()
     {
         hubConnection = new HubConnectionBuilder()
@@ -68,17 +70,17 @@
             StateHasChanged();
         });
 
-        hubConnection.On<List<Candle>>("ReceiveZoneCandles", (list) =>
-        {
-            candles = list;
-            candles.Reverse();
-            StateHasChanged();
-        });
+        //hubConnection.On<List<Candle>>("ReceiveZoneCandles", (list) =>
+        //{
+        //    candles = list;
+        //    candles.Reverse();
+        //    StateHasChanged();
+        //});
 
         await hubConnection.StartAsync();
 
         await GetZones();
-        await GetZoneCandles();
+        //await GetZoneCandles();
     }
 
     public async Task GetZones()
