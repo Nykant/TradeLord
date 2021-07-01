@@ -28,7 +28,6 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IInstrumentHelper instrumentHelper;
         private readonly ITradeLogHelper tradeLogHelper;
         private readonly ITickerService tickerService;
-        //private readonly IRunningOrderService running;
         private readonly IOrderManagerService orderManagerService;
         private readonly IBackgroundJobClient backgroundJob;
         private readonly ICandleDbHelper candleDbHelper;
@@ -36,7 +35,7 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IZoneDbHelper zoneDbHelper;
         private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider/*, IRunningOrderService runningOrderService*/, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper)
         {
             this.zoneDbHelper = zoneDbHelper;
             this.tickerService = tickerService;
@@ -82,10 +81,10 @@ namespace TradeMaster6000.Server.Hubs
 
         public void StartCandleMagic()
         {
-            tickerService.Start();
+            
             if (!tickerService.IsCandlesRunning())
             {
-                tickerService.RunCandles();
+                
             }
         }
 
@@ -96,8 +95,16 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StartZoneService()
         {
-            List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
-            backgroundJob.Enqueue(() => zoneService.Start(instruments, 5));
+            await zoneService.StartZoneService();
+        }
+
+        public async Task StartTrader()
+        {
+            if(!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
+            {
+                await tickerService.RunCandles();
+                await zoneService.StartZoneService();
+            }
         }
 
         public async Task GetZones()
@@ -149,7 +156,6 @@ namespace TradeMaster6000.Server.Hubs
         public async Task Update()
         {
             await Clients.Caller.SendAsync("ReceiveOrders", await tradeOrderHelper.GetRunningTradeOrders());
-            //await Clients.Caller.SendAsync("ReceiveRunningLogs", running.GetLogs());
         }
 
         public async Task GetLogs(int orderId)

@@ -1,0 +1,74 @@
+﻿@page "/trader"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.SignalR.Client
+@using TradeMaster6000.Shared
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+@implements IAsyncDisposable
+@attribute [Authorize]
+
+@{
+    if (IsConnected)
+    {
+        if (apiLoggedIn)
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" />
+        }
+        else
+        {
+            <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" Disabled="true" />
+        }
+    }
+    else
+    {
+        <h3>Connecting...</h3>
+    }
+
+    <hr />
+}
+
+@code {
+    private HubConnection hubConnection;
+    private bool apiLoggedIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl(NavigationManager.ToAbsoluteUri("/orderhub"))
+        .Build();
+
+        await hubConnection.StartAsync();
+
+        await IsLoggedIn();
+    }
+
+    private async Task IsLoggedIn()
+    {
+        var response = await Http.GetAsync("ApiLogin/IsLoggedOn");
+        var booly = await response.Content.ReadAsStringAsync();
+        if (booly == "true")
+        {
+            apiLoggedIn = true;
+            StateHasChanged();
+        }
+        else
+        {
+            apiLoggedIn = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task StartTrader()
+    {
+        await hubConnection.SendAsync("StartTrader");
+    }
+
+    public bool IsConnected =>
+hubConnection.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        await hubConnection.DisposeAsync();
+    }
+}

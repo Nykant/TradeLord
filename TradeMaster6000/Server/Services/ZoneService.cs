@@ -17,15 +17,21 @@ namespace TradeMaster6000.Server.Services
         private readonly ICandleDbHelper candleHelper;
         private readonly IZoneDbHelper zoneHelper;
         private readonly ITimeHelper timeHelper;
+        private readonly IInstrumentHelper instrumentHelper;
         private readonly ILogger<ZoneService> logger;
+        private readonly IBackgroundJobClient backgroundJobClient;
         private static SemaphoreSlim semaphoreSlim;
+        private static readonly CancellationGod ZoneServiceCancel = new CancellationGod();
+        private static bool zoneServiceRunning = false;
 
         private static readonly List<Candle> zoneCandles = new List<Candle>();
 
-        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<ZoneService> logger)
+        public ZoneService(ICandleDbHelper candleDbHelper, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<ZoneService> logger, IInstrumentHelper instrumentHelper, IBackgroundJobClient backgroundJobClient)
         {
             this.timeHelper = timeHelper;
             this.logger = logger;
+            this.backgroundJobClient = backgroundJobClient;
+            this.instrumentHelper = instrumentHelper;
             candleHelper = candleDbHelper;
             zoneHelper = zoneDbHelper;
             semaphoreSlim = new SemaphoreSlim(1, 1);
@@ -37,22 +43,43 @@ namespace TradeMaster6000.Server.Services
         }
 
         [AutomaticRetry(Attempts = 0)]
-        public async Task Start(List<TradeInstrument> instruments, int timeFrame)
+        public async Task Start(List<TradeInstrument> instruments, int timeFrame, CancellationToken token)
         {
+            zoneServiceRunning = true;
             logger.LogInformation($"zone service starting");
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
-            List<Task> tasks = new List<Task>();
-            for(int i = 0; i < instruments.Count; i++)
+            while (!token.IsCancellationRequested)
             {
-                if(instruments[i].Token == 5633)
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                List<Task> tasks = new List<Task>();
+                for (int i = 0; i < instruments.Count; i++)
                 {
                     tasks.Add(ZoneFinder(instruments[i], timeFrame));
                 }
+                await Task.WhenAll(tasks);
+                logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
+                stopwatch.Stop();
+                await Task.Delay(60000);
             }
-            await Task.WhenAll(tasks);
-            logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
-            stopwatch.Stop();
+            zoneServiceRunning = false;
+        }
+
+        public bool IsZoneServiceRunning()
+        {
+            return zoneServiceRunning;
+        }
+
+        public async Task StartZoneService()
+        {
+            ZoneServiceCancel.Source = new CancellationTokenSource();
+            List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
+            ZoneServiceCancel.HangfireId = backgroundJobClient.Enqueue(() => Start(instruments, 5, ZoneServiceCancel.Source.Token));
+        }
+
+        public void CancelToken()
+        {
+            ZoneServiceCancel.Source.Cancel();
+            backgroundJobClient.Delete(ZoneServiceCancel.HangfireId);   
         }
 
         private List<Candle> TransformCandles(List<Candle> candles, int timeframe)
@@ -208,7 +235,11 @@ namespace TradeMaster6000.Server.Services
                 //    logger.LogInformation(e.Message);
                 //}
 
-                await zoneHelper.Add(baseZones);
+                if(baseZones.Count > 0)
+                {
+                    await zoneHelper.Add(baseZones);
+                    await candleHelper.MarkCandlesUsed(zoneHelper.LastZoneEndTime(baseZones));
+                }
 
                 Ending:;
             }
@@ -744,7 +775,10 @@ namespace TradeMaster6000.Server.Services
     }
     public interface IZoneService
     {
-        Task Start(List<TradeInstrument> instruments, int timeFrame);
+        Task Start(List<TradeInstrument> instruments, int timeFrame, CancellationToken token);
         List<Candle> GetZoneCandles();
+        void CancelToken();
+        Task StartZoneService();
+        bool IsZoneServiceRunning();
     }
 }

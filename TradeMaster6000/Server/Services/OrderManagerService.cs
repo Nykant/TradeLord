@@ -85,7 +85,10 @@ namespace TradeMaster6000.Server.Services
             var tradeorder = await tradeOrderHelper.AddTradeOrder(order);
             order.Id = tradeorder.Id;
 
-            tickerService.Start();
+            if (!tickerService.IsTheTickerRunning())
+            {
+                tickerService.Start();
+            }
 
             if (!taskManagerRunning)
             {
@@ -144,7 +147,10 @@ namespace TradeMaster6000.Server.Services
                 orders[i].Id = tradeorder.Id;
             }
 
-            tickerService.Start();
+            if (!tickerService.IsTheTickerRunning())
+            {
+                tickerService.Start();
+            }
 
             if (!taskManagerRunning)
             {

@@ -20,16 +20,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = ContextFactory.CreateDbContext())
             {
-                return await context.Zones.ToListAsync();
-            }
-        }
-
-        public async Task Add(Zone zone)
-        {
-            using (var context = ContextFactory.CreateDbContext())
-            {
-                await context.AddAsync(zone);
-                await context.SaveChangesAsync();
+                return await context.Zones.Where(x => x.Tested == false).ToListAsync();
             }
         }
 
@@ -45,12 +36,17 @@ namespace TradeMaster6000.Server.DataHelpers
                 await context.SaveChangesAsync();
             }
         }
+
+        public DateTime LastZoneEndTime(List<Zone> zones)
+        {
+            zones = zones.OrderBy(x => x.To).ToList();
+            return zones[^1].To;
+        }
     }
     public interface IZoneDbHelper
     {
-
-        Task Add(Zone zone);
         Task<List<Zone>> GetZones();
         Task Add(List<Zone> zones);
+        DateTime LastZoneEndTime(List<Zone> zones);
     }
 }

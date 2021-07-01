@@ -18,5 +18,6 @@ namespace TradeMaster6000.Shared
         public int Timeframe { get; set; }
         public DateTime Timestamp { get; set; }
         public DateTime Kill { get; set; }
+        public bool Used { get; set; }
     }
 }

@@ -32,6 +32,7 @@ namespace TradeMaster6000.Server.Services
         private readonly IBackgroundJobClient backgroundJob;
         private readonly IContextExtension contextExtension;
         private readonly ITradeOrderHelper tradeOrderHelper;
+        private readonly IZoneService zoneService;
 
         private static Ticker Ticker { get; set; }
         private static readonly ConcurrentQueue<SomeLog> TickerLogs = new ConcurrentQueue<SomeLog>();
@@ -50,8 +51,9 @@ namespace TradeMaster6000.Server.Services
         private static bool CandleManagerOn { get; set; }
         private static bool CandlesRunning { get; set; }
         private static bool OrderUpdatesOn { get; set; }
+        private static bool IsTickerRunning = false;
 
-        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger , ITradeOrderHelper tradeOrderHelper)
+        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger , ITradeOrderHelper tradeOrderHelper, IZoneService zoneService)
         {
             this.kiteService = kiteService;
             Configuration = configuration;
@@ -64,32 +66,31 @@ namespace TradeMaster6000.Server.Services
             this.contextExtension = contextExtension;
             this.logger = logger;
             this.tradeOrderHelper = tradeOrderHelper;
+            this.zoneService = zoneService;
         }
 
         public void Start()
         {
-            if (Ticker == null)
-            {
-                var accessToken = kiteService.GetAccessToken();
-                Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
+            IsTickerRunning = true;
+            var accessToken = kiteService.GetAccessToken();
+            Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
 
-                Ticker.OnTick += OnTick;
-                Ticker.OnOrderUpdate += OnOrderUpdate;
-                Ticker.OnNoReconnect += OnNoReconnect;
-                Ticker.OnError += OnError;
-                Ticker.OnReconnect += OnReconnect;
-                Ticker.OnClose += OnClose;
-                Ticker.OnConnect += OnConnect;
+            Ticker.OnTick += OnTick;
+            Ticker.OnOrderUpdate += OnOrderUpdate;
+            Ticker.OnNoReconnect += OnNoReconnect;
+            Ticker.OnError += OnError;
+            Ticker.OnReconnect += OnReconnect;
+            Ticker.OnClose += OnClose;
+            Ticker.OnConnect += OnConnect;
 
-                Ticker.EnableReconnect(Interval: 5, Retries: 50);
-                Ticker.Connect();
+            Ticker.EnableReconnect(Interval: 5, Retries: 50);
+            Ticker.Connect();
 
-                TickManagerCancel.Source = new CancellationTokenSource();
-                FlushingCancel.Source = new CancellationTokenSource();
+            TickManagerCancel.Source = new CancellationTokenSource();
+            FlushingCancel.Source = new CancellationTokenSource();
 
-                TickManagerCancel.HangfireId = backgroundJob.Enqueue(() => TickManager(TickManagerCancel.Source.Token));
-                FlushingCancel.HangfireId = backgroundJob.Enqueue(() => StartFlushing(FlushingCancel.Source.Token));
-            }
+            TickManagerCancel.HangfireId = backgroundJob.Enqueue(() => TickManager(TickManagerCancel.Source.Token));
+            FlushingCancel.HangfireId = backgroundJob.Enqueue(() => StartFlushing(FlushingCancel.Source.Token));
         }
 
         [AutomaticRetry(Attempts = 0)]
@@ -127,6 +128,11 @@ namespace TradeMaster6000.Server.Services
             OrderUpdatesCancel.HangfireId = backgroundJob.Enqueue(() => OrderUpdatesManager(OrderUpdatesCancel.Source.Token));
         }
 
+        public bool IsTheTickerRunning()
+        {
+            return IsTickerRunning;
+        }
+
         public void StopOrderUpdatesManager()
         {
             OrderUpdatesCancel.Source.Cancel();
@@ -157,7 +163,7 @@ namespace TradeMaster6000.Server.Services
                     break;
                 }
 
-                await Task.Delay(2000, CancellationToken.None);
+                await Task.Delay(2000);
             }
             OrderUpdatesOn = false;
         }
@@ -186,7 +192,7 @@ namespace TradeMaster6000.Server.Services
                     break;
                 }
 
-                await Task.Delay(75000, CancellationToken.None);
+                await Task.Delay(60000);
             }
             CandleManagerOn = false;
         }
@@ -204,7 +210,7 @@ namespace TradeMaster6000.Server.Services
                     break;
                 }
 
-                await Task.Delay(10000, CancellationToken.None);
+                await Task.Delay(60000);
             }
             Flushing = false;
         }
@@ -246,7 +252,7 @@ namespace TradeMaster6000.Server.Services
             CandleManagerCancel.Source = new CancellationTokenSource();
 
             CandleManagerCancel.HangfireId = backgroundJob.Enqueue(() => CandleManager(CandleManagerCancel.Source.Token));
-            backgroundJob.Enqueue(() => AnalyzeCandles());
+            backgroundJob.Enqueue(() => AnalyzeCandles()); // HUSK LIGE DET MED at analyzecandles ikke har cancellation token med i backgroundJob, men det virker med at cancel token. det gør det ikke med de andre.
         }
 
         [AutomaticRetry(Attempts = 0)]
@@ -254,19 +260,24 @@ namespace TradeMaster6000.Server.Services
         {
             CandleCancel.Source = new CancellationTokenSource();
 
-            //while (!timeHelper.IsPreMarketOpen() && !CandleSource.Token.IsCancellationRequested)
-            //{
-            //    await Task.Delay(10000, CandleSource.Token);
-            //}
+            while (!timeHelper.IsPreMarketOpen() && !CandleCancel.Source.IsCancellationRequested)
+            {
+                await Task.Delay(10000, CandleCancel.Source.Token);
+            }
 
-            //while (!timeHelper.IsMarketOpen() && !CandleSource.Token.IsCancellationRequested)
-            //{
-            //    await Task.Delay(1000, CandleSource.Token);
-            //}
+            while (!timeHelper.IsMarketOpen() && !CandleCancel.Source.IsCancellationRequested)
+            {
+                await Task.Delay(1000, CandleCancel.Source.Token);
+            }
+
+            if (!IsTickerRunning)
+            {
+                Start();
+            }
 
             var instruments = await instrumentHelper.GetTradeInstruments();
             List<Task> tasks = new List<Task>();
-            for (int i = 0; i < 30; i++)
+            for (int i = 0, n = instruments.Count; i < n; i++)
             {
                 Subscribe(instruments[i].Token);
                 tasks.Add(Analyze(instruments[i], CandleCancel.Source.Token));
@@ -326,7 +337,7 @@ namespace TradeMaster6000.Server.Services
 
             try
             {
-                while (/*!timeHelper.IsMarketEnded() && */true)
+                while (!timeHelper.IsMarketEnded() && true)
                 {
                     current = timeHelper.CurrentTime();
                     duration = timeHelper.GetDuration(waittime, current).Add(TimeSpan.FromSeconds(11));
@@ -432,6 +443,7 @@ namespace TradeMaster6000.Server.Services
 
         public void Stop()
         {
+            IsTickerRunning = false;
             Ticker.DisableReconnect();
             Ticker.Close();
             Ticker = null;
@@ -441,6 +453,7 @@ namespace TradeMaster6000.Server.Services
             TickManagerCancel.Source.Cancel();
             backgroundJob.Delete(TickManagerCancel.HangfireId);
             //TickManagerSource.Dispose();
+            zoneService.CancelToken();
         }
 
         public void Subscribe(uint token)
@@ -541,5 +554,6 @@ namespace TradeMaster6000.Server.Services
         Task OrderUpdatesManager(CancellationToken token);
         void StopOrderUpdatesManager();
         void StartOrderUpdatesManager();
+        bool IsTheTickerRunning();
     }
 }

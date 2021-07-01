@@ -19,6 +19,23 @@ namespace TradeMaster6000.Server.DataHelpers
             this.contextFactory = contextFactory;
         }
 
+        public async Task MarkCandlesUsed(DateTime To)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                var candles = context.Candles;
+                foreach(var candle in candles)
+                {
+                    if(candle.Timestamp < To)
+                    {
+                        candle.Used = true;
+                        context.Candles.Update(candle);
+                    }
+                }
+                await context.SaveChangesAsync();
+            }
+        }
+
         public void LoadExcelCandles()
         {
             FileInfo existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\ACC-a-lot.xlsx");
@@ -90,7 +107,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.Where(x=>x.InstrumentToken == instrumentToken).ToListAsync();
+                return await context.Candles.Where(x=>x.InstrumentToken == instrumentToken && !x.Used).ToListAsync();
             }
         }
 
@@ -149,5 +166,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task Flush();
         Task Add(List<Candle> candles);
         void LoadExcelCandles();
+        Task MarkCandlesUsed(DateTime To);
     }
 }
