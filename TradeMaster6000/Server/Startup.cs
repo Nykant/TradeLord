@@ -110,7 +110,7 @@ namespace TradeMaster6000.Server
                     DashboardJobListLimit = 50000,
                     TransactionTimeout = TimeSpan.FromMinutes(1),
                     TablesPrefix = "HF",
-                    InvisibilityTimeout = TimeSpan.FromHours(23)
+                    InvisibilityTimeout = TimeSpan.FromDays(30)
                 })));
 
             services.AddHangfireServer(options => 

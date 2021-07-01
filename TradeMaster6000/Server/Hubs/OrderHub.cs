@@ -82,12 +82,12 @@ namespace TradeMaster6000.Server.Hubs
             await orderManagerService.AutoOrders(20).ConfigureAwait(false);
         }
 
-        public void StartCandleMagic()
+        public async Task StartCandleMagic()
         {
             
             if (!tickerService.IsCandlesRunning())
             {
-                
+                await tickerService.RunCandles();
             }
         }
 

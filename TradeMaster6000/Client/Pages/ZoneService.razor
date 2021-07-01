@@ -14,6 +14,10 @@
 
         <hr />
 
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />
+
+        <hr />
+
         <RadzenDataGrid Style="z-index:0;" @ref="zonesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
                         Data="@zones" TItem="Zone">
             <Columns>
@@ -30,18 +34,18 @@
 
         @*<hr />
 
-        <RadzenDataGrid Style="z-index:0;" @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
-                        Data="@candles" TItem="Candle">
-            <Columns>
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Timestamp" Title="Timestamp" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
-                <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
-            </Columns>
-        </RadzenDataGrid>*@
+            <RadzenDataGrid Style="z-index:0;" @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
+                            Data="@candles" TItem="Candle">
+                <Columns>
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Timestamp" Title="Timestamp" />
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
+                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
+                </Columns>
+            </RadzenDataGrid>*@
     }
     else
     {
@@ -56,6 +60,7 @@
     RadzenDataGrid<Zone> zonesGrid;
     //RadzenDataGrid<Candle> candlesGrid;
     private List<Zone> zones = new List<Zone>();
+    private bool IsUpdateLocked = false;
     //private List<Candle> candles = new List<Candle>();
     protected override async Task OnInitializedAsync()
     {
@@ -91,6 +96,16 @@
     public async Task GetZoneCandles()
     {
         await hubConnection.SendAsync("GetZoneCandles");
+    }
+
+    private async Task Update()
+    {
+        IsUpdateLocked = true;
+        StateHasChanged();
+        await hubConnection.SendAsync("GetZones");
+        await Task.Delay(2000);
+        IsUpdateLocked = false;
+        StateHasChanged();
     }
 
     private async Task StartZoneService()
