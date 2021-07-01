@@ -248,7 +248,7 @@ namespace TradeMaster6000.Server.Services
         public async Task RunCandles()
         {
             CandlesRunning = true;
-            //await candleHelper.Flush();
+            await candleHelper.Flush();
             CandleManagerCancel.Source = new CancellationTokenSource();
 
             CandleManagerCancel.HangfireId = backgroundJob.Enqueue(() => CandleManager(CandleManagerCancel.Source.Token));
@@ -302,13 +302,14 @@ namespace TradeMaster6000.Server.Services
             TimeSpan duration = new TimeSpan();
             List<MyTick> ticks = new List<MyTick>();
             Candle previousCandle = new Candle();
+            Candle candle = new Candle();
 
             if (DateTime.Compare(waittime, current) < 0)
             {
                 int hour = current.Hour;
                 int minute = current.Minute;
                 int second = current.Second;
-                if(minute == 59)
+                if (minute == 59)
                 {
                     hour++;
                     minute = 0;
@@ -325,19 +326,9 @@ namespace TradeMaster6000.Server.Services
                 waittime = new DateTime(current.Year, current.Month, current.Day, hour, minute, 00);
             }
 
-            while (!await tickDbHelper.Any(instrument.Token))
-            {
-                if (token.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                await Task.Delay(1000, CancellationToken.None);
-            }
-
             try
             {
-                while (!timeHelper.IsMarketEnded() && true)
+                while (!timeHelper.IsMarketEnded())
                 {
                     current = timeHelper.CurrentTime();
                     duration = timeHelper.GetDuration(waittime, current).Add(TimeSpan.FromSeconds(11));
@@ -345,44 +336,46 @@ namespace TradeMaster6000.Server.Services
                     candleTime = new DateTime(candleTime.Year, candleTime.Month, candleTime.Day, candleTime.Hour, candleTime.Minute, 00);
 
                     await Task.Delay(duration, CancellationToken.None);
-
                     ticks = await tickDbHelper.Get(instrument.Token, candleTime);
-                    Candle candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(2), TicksCount = ticks.Count };
-                    if (ticks.Count > 0)
+                    await Task.Run(() =>
                     {
-                        candle.Low = ticks[0].LTP;
-                        candle.High = ticks[0].LTP;
-                        for (int i = 0; i < ticks.Count; i++)
+                        candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(5), TicksCount = ticks.Count };
+                        if (ticks.Count > 0)
                         {
-                            if (candle.Low < ticks[i].LTP)
+                            candle.Low = ticks[0].LTP;
+                            candle.High = ticks[0].LTP;
+                            for (int i = 0; i < ticks.Count; i++)
                             {
-                                candle.Low = ticks[i].LTP;
+                                if (candle.Low < ticks[i].LTP)
+                                {
+                                    candle.Low = ticks[i].LTP;
+                                }
+                                if (candle.High > ticks[i].LTP)
+                                {
+                                    candle.High = ticks[i].LTP;
+                                }
                             }
-                            if (candle.High > ticks[i].LTP)
-                            {
-                                candle.High = ticks[i].LTP;
-                            }
+                            candle.Open = ticks[0].LTP;
+                            candle.Close = ticks[^1].LTP;
                         }
-                        candle.Open = ticks[0].LTP;
-                        candle.Close = ticks[^1].LTP;
-                    }
-                    else
-                    {
-                        candle.Low = previousCandle.Close;
-                        candle.High = previousCandle.Close;
-                        candle.Open = previousCandle.Close;
-                        candle.Close = previousCandle.Close;
-                    }
+                        else
+                        {
+                            candle.Low = previousCandle.Close;
+                            candle.High = previousCandle.Close;
+                            candle.Open = previousCandle.Close;
+                            candle.Close = previousCandle.Close;
+                        }
 
-                    Candles.Enqueue(candle);
+                        Candles.Enqueue(candle);
+
+                        previousCandle = candle;
+                        waittime = waittime.AddMinutes(1);
+                    });
 
                     if (token.IsCancellationRequested)
                     {
                         break;
                     }
-
-                    previousCandle = candle;
-                    waittime = waittime.AddMinutes(1);
                 }
 
                 UnSubscribe(instrument.Token);

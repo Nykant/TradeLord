@@ -11,14 +11,7 @@
 @{
     if (IsConnected)
     {
-        if (apiLoggedIn)
-        {
-            <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" />
-        }
-        else
-        {
-            <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" Disabled="true" />
-        }
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" Disabled="@disabled" />
     }
     else
     {
@@ -30,7 +23,7 @@
 
 @code {
     private HubConnection hubConnection;
-    private bool apiLoggedIn = false;
+    private bool disabled = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -49,19 +42,24 @@
         var booly = await response.Content.ReadAsStringAsync();
         if (booly == "true")
         {
-            apiLoggedIn = true;
+            disabled = false;
             StateHasChanged();
         }
         else
         {
-            apiLoggedIn = false;
+            disabled = true;
             StateHasChanged();
         }
     }
 
     private async Task StartTrader()
     {
+        disabled = true;
+        StateHasChanged();
         await hubConnection.SendAsync("StartTrader");
+        await Task.Delay(5000);
+        disabled = false;
+        StateHasChanged();
     }
 
     public bool IsConnected =>

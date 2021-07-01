@@ -45,6 +45,8 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task Start(List<TradeInstrument> instruments, int timeFrame, CancellationToken token)
         {
+
+
             zoneServiceRunning = true;
             logger.LogInformation($"zone service starting");
             while (!token.IsCancellationRequested)
@@ -189,17 +191,17 @@ namespace TradeMaster6000.Server.Services
                     goto Ending;
                 }
 
-                baseCandles = TransformCandles(candles, timeFrame);
+                baseCandles = await Task.Run(() => TransformCandles(candles, timeFrame));
                 //candles15 = TransformCandles(candles, 15);
                 //candles45 = TransformCandles(candles, 45);
                 //candles60 = TransformCandles(candles, 60);
 
-                for (int y = baseCandles.Count - 1; y >= 0; y--)
-                {
-                    zoneCandles.Add(baseCandles[y]);
-                }
+                //for (int y = baseCandles.Count - 1; y >= 0; y--)
+                //{
+                //    zoneCandles.Add(baseCandles[y]);
+                //}
 
-                baseZones = await MakeZones(baseCandles, instrument.TradingSymbol);
+                baseZones = await Task.Run(() => MakeZones(baseCandles, instrument.TradingSymbol));
                 //candles15Zones = await MakeZones(candles15, instrument.TradingSymbol);
                 //candles45Zones = await MakeZones(candles45, instrument.TradingSymbol);
                 //candles60Zones = await MakeZones(candles60, instrument.TradingSymbol);
@@ -305,7 +307,7 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        private async Task<List<Zone>> MakeZones(List<Candle> candles, string symbol)
+        private List<Zone> MakeZones(List<Candle> candles, string symbol)
         {
             List<Zone> zones = new List<Zone>();
             int startIndex = 0;
@@ -317,14 +319,14 @@ namespace TradeMaster6000.Server.Services
                 goto Ending;
             }
 
-            FittyCandle fittyCandle = await Task.Run(() => FittyFinder(candles, startIndex));
+            FittyCandle fittyCandle = FittyFinder(candles, startIndex);
             if (fittyCandle == default)
             {
                 goto Ending;
             }
             startIndex = fittyCandle.Index + 1;
 
-            Zone zone = await Task.Run(() => FindZone(candles, fittyCandle, symbol));
+            Zone zone = FindZone(candles, fittyCandle, symbol);
             if (zone == default)
             {
                 goto Repeat;

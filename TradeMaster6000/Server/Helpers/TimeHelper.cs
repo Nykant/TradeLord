@@ -10,12 +10,37 @@ namespace TradeMaster6000.Server.Helpers
 {
     public class TimeHelper : ITimeHelper
     {
-        private ITradeLogHelper LogHelper { get; set; }
         private IWebHostEnvironment Env { get; set; }
-        public TimeHelper(ITradeLogHelper tradeLogHelper, IWebHostEnvironment env)
+        public TimeHelper(IWebHostEnvironment env)
         {
-            LogHelper = tradeLogHelper;
             Env = env;
+        }
+
+        public DateTime GetWaittime(DateTime current)
+        {
+            DateTime waittime = OpeningTime();
+            if (DateTime.Compare(waittime, current) < 0)
+            {
+                int hour = current.Hour;
+                int minute = current.Minute;
+                int second = current.Second;
+                if (minute == 59)
+                {
+                    hour++;
+                    minute = 0;
+                }
+                else
+                {
+                    minute++;
+                }
+
+                if (second > 50)
+                {
+                    minute++;
+                }
+                waittime = new DateTime(current.Year, current.Month, current.Day, hour, minute, 00);
+            }
+            return waittime;
         }
 
         public async Task<bool> IsPreMarketOpen(int orderId)
@@ -32,7 +57,6 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     if (DateTime.Compare(IST, closing) < 0)
                     {
-                        await LogHelper.AddLog(orderId, $"pre market is opening...").ConfigureAwait(false);
                         return true;
                     }
                 }
@@ -50,7 +74,6 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     if (DateTime.Compare(IST, closing) < 0)
                     {
-                        await LogHelper.AddLog(orderId, $"pre market is opening...").ConfigureAwait(false);
                         return true;
                     }
                 }
@@ -154,7 +177,11 @@ namespace TradeMaster6000.Server.Helpers
 
         public DateTime OpeningTime()
         {
-            DateTime now = DateTime.Now;
+            DateTime now = CurrentTime();
+            if(now.Hour >= 16)
+            {
+                now = now.AddDays(1);
+            }
             return new DateTime(now.Year, now.Month, now.Day, 09, 15, 00);
         }
 
@@ -230,7 +257,6 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     if (DateTime.Compare(IST, closing) < 0)
                     {
-                        await LogHelper.AddLog(orderId, $"market is open...").ConfigureAwait(false);
                         return true;
                     }
                 }
@@ -246,7 +272,6 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     if (DateTime.Compare(IST, closing) < 0)
                     {
-                        await LogHelper.AddLog(orderId, $"market is open...").ConfigureAwait(false);
                         return true;
                     }
                 }
@@ -325,6 +350,7 @@ namespace TradeMaster6000.Server.Helpers
         DateTime CurrentTime();
         DateTime OpeningTime();
         TimeSpan GetDuration(DateTime end, DateTime start);
+        DateTime GetWaittime(DateTime current);
 
     }
 }

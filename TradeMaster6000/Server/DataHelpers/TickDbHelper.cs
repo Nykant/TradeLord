@@ -46,7 +46,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Ticks.Where(x => x.InstrumentToken == token && x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute).ToListAsync();
+                return await context.Ticks.Where(x => x.InstrumentToken == token && x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute).OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
         public async Task<MyTick> GetLast(uint token)

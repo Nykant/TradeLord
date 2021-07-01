@@ -18,6 +18,7 @@ using TradeMaster6000.Server.Services;
 using TradeMaster6000.Server.Tasks;
 using TradeMaster6000.Shared;
 using System.Collections.Concurrent;
+using TradeMaster6000.Server.Helpers;
 
 namespace TradeMaster6000.Server.Hubs
 {
@@ -33,9 +34,10 @@ namespace TradeMaster6000.Server.Hubs
         private readonly ICandleDbHelper candleDbHelper;
         private readonly IZoneService zoneService;
         private readonly IZoneDbHelper zoneDbHelper;
+        private readonly ITimeHelper timeHelper;
         private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper)
         {
             this.zoneDbHelper = zoneDbHelper;
             this.tickerService = tickerService;
@@ -43,6 +45,7 @@ namespace TradeMaster6000.Server.Hubs
             this.backgroundJob = backgroundJob;
             this.candleDbHelper = candleDbHelper;
             this.zoneService = zoneService;
+            this.timeHelper = timeHelper;
             KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
@@ -98,9 +101,18 @@ namespace TradeMaster6000.Server.Hubs
             await zoneService.StartZoneService();
         }
 
-        public async Task StartTrader()
+        public void StartTrader()
         {
-            if(!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
+            DateTime current = timeHelper.CurrentTime();
+            DateTime opening = timeHelper.OpeningTime();
+            TimeSpan duration = timeHelper.GetDuration(opening, current);
+
+            backgroundJob.Schedule(() => RunTrader(), duration);
+        }
+
+        public async Task RunTrader()
+        {
+            if (!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
             {
                 await tickerService.RunCandles();
                 await zoneService.StartZoneService();

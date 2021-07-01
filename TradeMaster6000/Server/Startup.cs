@@ -121,6 +121,7 @@ namespace TradeMaster6000.Server
 
             services.TryAddTransient<IContextExtension, ContextExtension>();
             //-------------------
+            services.TryAddSingleton<ITimeHelper, TimeHelper>();
             services.TryAddSingleton<IProtectionService, ProtectionService>();
             services.TryAddSingleton<IZoneDbHelper, ZoneDbHelper>();
             services.TryAddSingleton<ITradeLogHelper, TradeLogHelper>();
@@ -133,7 +134,6 @@ namespace TradeMaster6000.Server
             //-------------------
             services.TryAddSingleton<IInstrumentHelper, InstrumentHelper>();
             services.TryAddSingleton<ITradeHelper, TradeHelper>();
-            services.TryAddSingleton<ITimeHelper, TimeHelper>();
             services.TryAddSingleton<ITargetHelper, TargetHelper>();
             //-------------------
             services.TryAddSingleton<IZoneService, ZoneService>();
