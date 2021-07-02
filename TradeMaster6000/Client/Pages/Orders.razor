@@ -13,9 +13,6 @@
 
     if (IsConnected)
     {
-        <RadzenButton Style="margin-bottom:5px;" ButtonStyle="ButtonStyle.Primary" Click=@(() => NewOrder()) Text="New Order" />
-        @*<RadzenButton ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoUltraOrders()) Text="@AutoUltraText" />*@
-        <RadzenButton Style="margin-bottom:5px;" ButtonStyle="ButtonStyle.Primary" Disabled="@IsAutoLocked" Click=@(() => AutoOrders()) Text="@AutoText" />
         <hr />
         <RadzenButton ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />        
         <hr />

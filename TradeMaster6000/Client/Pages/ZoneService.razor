@@ -10,7 +10,6 @@
 @{
     if (IsConnected)
     {
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartZoneService" Text="Start zone service" />
 
         <hr />
 
@@ -25,27 +24,12 @@
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Top" Title="Top" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Bottom" Title="Bottom" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="ZoneType" Title="Zone type" />
-                @*<RadzenDataGridColumn Width="100px" TItem="Zone" Property="Tested" Title="Tested" />*@
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="SupplyDemand" Title="Supply Or Demand" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="From" Title="From" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="To" Title="To" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Created" Title="Created" />
             </Columns>
         </RadzenDataGrid>
-
-        @*<hr />
-
-            <RadzenDataGrid Style="z-index:0;" @ref="candlesGrid" AllowFiltering="true" AllowPaging="true" PageSize="10" AllowSorting="true"
-                            Data="@candles" TItem="Candle">
-                <Columns>
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Open" Title="Open" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="High" Title="High" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Low" Title="Low" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Close" Title="Close" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Timestamp" Title="Timestamp" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="TicksCount" Title="Ticks Count" />
-                    <RadzenDataGridColumn Width="100px" TItem="Candle" Property="Kill" Title="Kill" />
-                </Columns>
-            </RadzenDataGrid>*@
     }
     else
     {

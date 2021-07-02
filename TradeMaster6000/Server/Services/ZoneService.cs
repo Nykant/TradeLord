@@ -61,7 +61,7 @@ namespace TradeMaster6000.Server.Services
                 await Task.WhenAll(tasks);
                 logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
                 stopwatch.Stop();
-                await Task.Delay(60000);
+                await Task.Delay(300000);
             }
             zoneServiceRunning = false;
         }
@@ -483,7 +483,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol };
+            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, Created = timeHelper.CurrentTime() };
 
             if(forward.Top > backward.Top)
             {

@@ -2,15 +2,17 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TradeMaster6000.Server.Data;
 
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    partial class TradeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20210702051620_Thenewone")]
+    partial class Thenewone
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -249,9 +251,6 @@ namespace TradeMaster6000.Server.data.migrations.trade
 
                     b.Property<decimal>("Bottom")
                         .HasColumnType("decimal(65,30)");
-
-                    b.Property<DateTime>("Created")
-                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime>("From")
                         .HasColumnType("datetime(6)");
