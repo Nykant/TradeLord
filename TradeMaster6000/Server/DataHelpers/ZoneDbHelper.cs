@@ -37,6 +37,19 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
+        public async Task Update(List<Zone> zones)
+        {
+            using (var context = ContextFactory.CreateDbContext())
+            {
+                foreach (var zone in zones)
+                {
+                    context.Zones.Update(zone);
+                }
+
+                await context.SaveChangesAsync();
+            }
+        }
+
         public DateTime LastZoneEndTime(List<Zone> zones)
         {
             zones = zones.OrderBy(x => x.To).ToList();
@@ -48,5 +61,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task<List<Zone>> GetZones();
         Task Add(List<Zone> zones);
         DateTime LastZoneEndTime(List<Zone> zones);
+        Task Update(List<Zone> zones);
     }
 }

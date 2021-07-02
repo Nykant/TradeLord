@@ -59,17 +59,25 @@ namespace TradeMaster6000.Server.Services
                 await Task.WhenAll(tasks);
 
                 List<Zone> zones = await zoneHelper.GetZones();
+                List<Zone> updatedZones = new List<Zone>();
                 foreach(var zone in zones)
                 {
                     List<Candle> candles = await candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
                     if(zone.SupplyDemand == SupplyDemand.Demand)
                     {
                         zone.Tested = await Task.Run(()=>RallyForwardTest(candles, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10)));
+                        updatedZones.Add(zone);
                     }
                     else
                     {
                         zone.Tested = await Task.Run(()=>DropForwardTest(candles, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10)));
+                        updatedZones.Add(zone);
                     }
+                }
+
+                if(updatedZones.Count > 0)
+                {
+                    await zoneHelper.Update(updatedZones);
                 }
 
                 logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
@@ -457,9 +465,13 @@ namespace TradeMaster6000.Server.Services
 
         private bool IsFitty(Candle candle)
         {
-            if (Math.Abs(candle.Open - candle.Close) <= (Math.Abs(candle.Low - candle.High) * (decimal)0.5))
+            var hl = Math.Abs(candle.Low - candle.High);
+            if(hl > 0)
             {
-                return true;
+                if (Math.Abs(candle.Open - candle.Close) <= (hl * (decimal)0.5))
+                {
+                    return true;
+                }
             }
             return false;
         }
