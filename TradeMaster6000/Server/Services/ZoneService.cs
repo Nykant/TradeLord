@@ -45,8 +45,6 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task Start(List<TradeInstrument> instruments, int timeFrame, CancellationToken token)
         {
-
-
             zoneServiceRunning = true;
             logger.LogInformation($"zone service starting");
             while (!token.IsCancellationRequested)
@@ -59,6 +57,21 @@ namespace TradeMaster6000.Server.Services
                     tasks.Add(ZoneFinder(instruments[i], timeFrame));
                 }
                 await Task.WhenAll(tasks);
+
+                List<Zone> zones = await zoneHelper.GetZones();
+                foreach(var zone in zones)
+                {
+                    List<Candle> candles = await candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
+                    if(zone.SupplyDemand == SupplyDemand.Demand)
+                    {
+                        zone.Tested = await Task.Run(()=>RallyForwardTest(candles, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10)));
+                    }
+                    else
+                    {
+                        zone.Tested = await Task.Run(()=>DropForwardTest(candles, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10)));
+                    }
+                }
+
                 logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
                 stopwatch.Stop();
                 await Task.Delay(300000);
@@ -201,7 +214,7 @@ namespace TradeMaster6000.Server.Services
                 //    zoneCandles.Add(baseCandles[y]);
                 //}
 
-                baseZones = await Task.Run(() => MakeZones(baseCandles, instrument.TradingSymbol));
+                baseZones = await Task.Run(() => MakeZones(baseCandles, instrument.TradingSymbol, instrument.Token));
                 //candles15Zones = await MakeZones(candles15, instrument.TradingSymbol);
                 //candles45Zones = await MakeZones(candles45, instrument.TradingSymbol);
                 //candles60Zones = await MakeZones(candles60, instrument.TradingSymbol);
@@ -240,7 +253,7 @@ namespace TradeMaster6000.Server.Services
                 if(baseZones.Count > 0)
                 {
                     await zoneHelper.Add(baseZones);
-                    await candleHelper.MarkCandlesUsed(zoneHelper.LastZoneEndTime(baseZones));
+                    await candleHelper.MarkCandlesUsed(zoneHelper.LastZoneEndTime(baseZones), instrument.Token);
                 }
 
                 Ending:;
@@ -307,7 +320,7 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        private List<Zone> MakeZones(List<Candle> candles, string symbol)
+        private List<Zone> MakeZones(List<Candle> candles, string symbol, uint token)
         {
             List<Zone> zones = new List<Zone>();
             int startIndex = 0;
@@ -326,7 +339,7 @@ namespace TradeMaster6000.Server.Services
             }
             startIndex = fittyCandle.Index + 1;
 
-            Zone zone = FindZone(candles, fittyCandle, symbol);
+            Zone zone = FindZone(candles, fittyCandle, symbol, token);
             if (zone == default)
             {
                 goto Repeat;
@@ -343,9 +356,9 @@ namespace TradeMaster6000.Server.Services
             return zones;
         }
 
-        private bool RallyForwardTest(List<Candle> candles, int explosiveIndex, decimal theLine)
+        private bool RallyForwardTest(List<Candle> candles, decimal theLine)
         {
-            for (int i = explosiveIndex + 1, n = candles.Count; i < n; i++)
+            for (int i = 0, n = candles.Count; i < n; i++)
             {
                 if (theLine >= candles[i].Low)
                 {
@@ -355,9 +368,9 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        private bool DropForwardTest(List<Candle> candles, int explosiveIndex, decimal theLine)
+        private bool DropForwardTest(List<Candle> candles, decimal theLine)
         {
-            for (int i = explosiveIndex + 1, n = candles.Count; i < n; i++)
+            for (int i = 0, n = candles.Count; i < n; i++)
             {
                 if (theLine <= candles[i].High)
                 {
@@ -451,7 +464,7 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol)
+        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol, uint token)
         {
             HalfZone forward = FindForward(candles, fittyCandle);
 
@@ -483,7 +496,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, Created = timeHelper.CurrentTime() };
+            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, InstrumentToken = token, Created = timeHelper.CurrentTime(), ExplosiveEndTime = forward.ExplosiveCandle.Candle.Timestamp };
 
             if(forward.Top > backward.Top)
             {
@@ -528,7 +541,6 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    zone.Tested = RallyForwardTest(candles, forward.ExplosiveCandle.Index, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10));
                     zone.SupplyDemand = SupplyDemand.Demand;
                     zone.ZoneType = ZoneType.RBR;
                 }
@@ -554,7 +566,6 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    zone.Tested = DropForwardTest(candles, forward.ExplosiveCandle.Index, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10));
                     zone.SupplyDemand = SupplyDemand.Supply;
                     zone.ZoneType = ZoneType.RBD;
                 }
@@ -582,7 +593,6 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    zone.Tested = RallyForwardTest(candles, forward.ExplosiveCandle.Index, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10));
                     zone.SupplyDemand = SupplyDemand.Demand;
                     zone.ZoneType = ZoneType.DBR;
                 }
@@ -607,7 +617,6 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    zone.Tested = DropForwardTest(candles, forward.ExplosiveCandle.Index, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10));
                     zone.SupplyDemand = SupplyDemand.Supply;
                     zone.ZoneType = ZoneType.DBD;
                 }
@@ -744,7 +753,7 @@ namespace TradeMaster6000.Server.Services
 
                 SKIP:;
 
-                if (halfZone.BiggestBaseDiff < candleDiff && candleDiff != default)
+                if (halfZone.BiggestBaseDiff < candleDiff)
                 {
                     halfZone.BiggestBaseDiff = candleDiff;
                 }

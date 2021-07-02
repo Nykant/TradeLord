@@ -337,6 +337,7 @@ namespace TradeMaster6000.Server.Services
 
                     await Task.Delay(duration, CancellationToken.None);
                     ticks = await tickDbHelper.Get(instrument.Token, candleTime);
+                    ticks = ticks.OrderBy(x => x.Timestamp).ToList();
                     await Task.Run(() =>
                     {
                         candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(5), TicksCount = ticks.Count };
@@ -346,11 +347,11 @@ namespace TradeMaster6000.Server.Services
                             candle.High = ticks[0].LTP;
                             for (int i = 0; i < ticks.Count; i++)
                             {
-                                if (candle.Low < ticks[i].LTP)
+                                if (candle.Low > ticks[i].LTP)
                                 {
                                     candle.Low = ticks[i].LTP;
                                 }
-                                if (candle.High > ticks[i].LTP)
+                                if (candle.High < ticks[i].LTP)
                                 {
                                     candle.High = ticks[i].LTP;
                                 }

@@ -19,11 +19,11 @@ namespace TradeMaster6000.Server.DataHelpers
             this.contextFactory = contextFactory;
         }
 
-        public async Task MarkCandlesUsed(DateTime To)
+        public async Task MarkCandlesUsed(DateTime To, uint token)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var candles = context.Candles;
+                var candles = context.Candles.Where(x => x.InstrumentToken == token && x.Used == false);
                 foreach(var candle in candles)
                 {
                     if(candle.Timestamp < To)
@@ -111,6 +111,14 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
+        public async Task<List<Candle>> GetCandles(uint instrumentToken, DateTime time)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.Candles.Where(x => x.InstrumentToken == instrumentToken && x.Timestamp > time).ToListAsync();
+            }
+        }
+
         public async Task<Candle> GetCandle(DateTime time)
         {
             using (var context = contextFactory.CreateDbContext())
@@ -163,9 +171,10 @@ namespace TradeMaster6000.Server.DataHelpers
         Task<Candle> AddCandle(Candle candle);
         Task<List<Candle>> GetCandles();
         Task<List<Candle>> GetCandles(uint instrumentToken);
+        Task<List<Candle>> GetCandles(uint instrumentToken, DateTime time);
         Task Flush();
         Task Add(List<Candle> candles);
         void LoadExcelCandles();
-        Task MarkCandlesUsed(DateTime To);
+        Task MarkCandlesUsed(DateTime To, uint token);
     }
 }

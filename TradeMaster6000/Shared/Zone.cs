@@ -8,6 +8,7 @@ namespace TradeMaster6000.Shared
     {
         public int Id { get; set; }
         public string InstrumentSymbol { get; set; }
+        public uint InstrumentToken { get; set; }
         public decimal Top { get; set; }
         public decimal Bottom { get; set; }
         public ZoneType ZoneType { get; set; }
@@ -19,6 +20,7 @@ namespace TradeMaster6000.Shared
         public int Tradeable { get; set; } = 0;
         public DateTime From { get; set; }
         public DateTime To { get; set; }
+        public DateTime ExplosiveEndTime { get; set; }
     }
     public enum ZoneType
     {
