@@ -28,7 +28,7 @@ namespace TradeMaster6000.Server.DataHelpers
                     var order = await context.OrderUpdates.FindAsync(update.OrderId);
                     if(order == null)
                     {
-                        await context.AddAsync(update);
+                        await context.OrderUpdates.AddAsync(update);
                     }
                     else
                     {

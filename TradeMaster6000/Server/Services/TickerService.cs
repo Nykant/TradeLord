@@ -96,7 +96,7 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task TickManager(CancellationToken token)
         {
-            List<MyTick> myTicks = new List<MyTick>();
+            List<MyTick> myTicks;
             TickManagerOn = true;
             while (true)
             {
@@ -117,7 +117,7 @@ namespace TradeMaster6000.Server.Services
                     break;
                 }
 
-                await Task.Delay(2000, CancellationToken.None);
+                await Task.Delay(1000, CancellationToken.None);
             }
             TickManagerOn = false;
         }
@@ -142,7 +142,7 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task OrderUpdatesManager(CancellationToken token)
         {
-            List<OrderUpdate> orderUpdates = new List<OrderUpdate>();
+            List<OrderUpdate> orderUpdates;
             OrderUpdatesOn = true;
             while (true)
             {
@@ -163,7 +163,7 @@ namespace TradeMaster6000.Server.Services
                     break;
                 }
 
-                await Task.Delay(2000);
+                await Task.Delay(1000);
             }
             OrderUpdatesOn = false;
         }
@@ -260,16 +260,6 @@ namespace TradeMaster6000.Server.Services
         {
             CandleCancel.Source = new CancellationTokenSource();
 
-            while (!timeHelper.IsPreMarketOpen() && !CandleCancel.Source.IsCancellationRequested)
-            {
-                await Task.Delay(10000, CandleCancel.Source.Token);
-            }
-
-            while (!timeHelper.IsMarketOpen() && !CandleCancel.Source.IsCancellationRequested)
-            {
-                await Task.Delay(1000, CandleCancel.Source.Token);
-            }
-
             if (!IsTickerRunning)
             {
                 Start();
@@ -296,35 +286,13 @@ namespace TradeMaster6000.Server.Services
 
         public async Task Analyze(TradeInstrument instrument, CancellationToken token)
         {
-            DateTime waittime = timeHelper.OpeningTime();
             DateTime current = timeHelper.CurrentTime();
+            DateTime waittime = timeHelper.GetWaittime(current);
             DateTime candleTime = new DateTime();
             TimeSpan duration = new TimeSpan();
             List<MyTick> ticks = new List<MyTick>();
             Candle previousCandle = new Candle();
             Candle candle = new Candle();
-
-            if (DateTime.Compare(waittime, current) < 0)
-            {
-                int hour = current.Hour;
-                int minute = current.Minute;
-                int second = current.Second;
-                if (minute == 59)
-                {
-                    hour++;
-                    minute = 0;
-                }
-                else
-                {
-                    minute++;
-                }
-
-                if (second > 50)
-                {
-                    minute++;
-                }
-                waittime = new DateTime(current.Year, current.Month, current.Day, hour, minute, 00);
-            }
 
             try
             {
@@ -337,7 +305,6 @@ namespace TradeMaster6000.Server.Services
 
                     await Task.Delay(duration, CancellationToken.None);
                     ticks = await tickDbHelper.Get(instrument.Token, candleTime);
-                    ticks = ticks.OrderBy(x => x.Timestamp).ToList();
                     await Task.Run(() =>
                     {
                         candle = new Candle() { InstrumentToken = instrument.Token, Timestamp = candleTime, Kill = waittime.AddDays(5), TicksCount = ticks.Count };
@@ -485,7 +452,7 @@ namespace TradeMaster6000.Server.Services
             });
         }
 
-        private void OnOrderUpdate(Order orderData)
+        private void OnOrderUpdate(Order orderData) // check orderdata timestamp
         {
             OrderUpdates.Enqueue(new OrderUpdate
             {

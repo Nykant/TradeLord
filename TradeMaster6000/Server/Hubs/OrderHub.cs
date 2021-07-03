@@ -182,7 +182,7 @@ namespace TradeMaster6000.Server.Hubs
             {
                 if(instrument.TradingSymbol == tradingSymbol)
                 {
-                    await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles(instrument.Token));
+                    await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetAllCandles(instrument.Token));
                     break;
                 }
             }

@@ -17,10 +17,12 @@ namespace TradeMaster6000.Server.Controllers
     {
         private readonly ITickerService tickerService;
         private readonly IBackgroundJobClient backgroundJob;
-        public StatusController(ITickerService tickerService, IBackgroundJobClient backgroundJob)
+        private readonly IZoneService zoneService;
+        public StatusController(ITickerService tickerService, IBackgroundJobClient backgroundJob, IZoneService zoneService)
         {
             this.backgroundJob = backgroundJob;
             this.tickerService = tickerService;
+            this.zoneService = zoneService;
         }
 
         [HttpGet]
@@ -46,6 +48,18 @@ namespace TradeMaster6000.Server.Controllers
         public string IsCandleManagerOn()
         {
             return tickerService.IsCandleManagerOn().ToString();
+        }
+
+        [HttpGet]
+        public string IsTickerOn()
+        {
+            return tickerService.IsTheTickerRunning().ToString();
+        }
+
+        [HttpGet]
+        public string IsZoneServiceOn()
+        {
+            return zoneService.IsZoneServiceRunning().ToString();
         }
     }
 }

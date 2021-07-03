@@ -95,19 +95,19 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public async Task<List<Candle>> GetCandles()
+        public async Task<List<Candle>> GetAllCandles(uint instrumentToken)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.ToListAsync();
+                return await context.Candles.Where(x => x.InstrumentToken == instrumentToken).OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
 
-        public async Task<List<Candle>> GetCandles(uint instrumentToken)
+        public async Task<List<Candle>> GetUnusedCandles(uint instrumentToken)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.Where(x=>x.InstrumentToken == instrumentToken && !x.Used).ToListAsync();
+                return await context.Candles.Where(x=>x.InstrumentToken == instrumentToken && !x.Used).OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
 
@@ -124,6 +124,15 @@ namespace TradeMaster6000.Server.DataHelpers
             using (var context = contextFactory.CreateDbContext())
             {
                 return await context.Candles.FirstOrDefaultAsync(x => x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute);
+            }
+        }
+
+        public async Task<Candle> GetLastCandle()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                var candles = await context.Candles.OrderBy(x => x.Timestamp).ToListAsync(); // debug det her!
+                return candles[^1];
             }
         }
 
@@ -169,12 +178,14 @@ namespace TradeMaster6000.Server.DataHelpers
     public interface ICandleDbHelper
     {
         Task<Candle> AddCandle(Candle candle);
-        Task<List<Candle>> GetCandles();
-        Task<List<Candle>> GetCandles(uint instrumentToken);
+        Task<List<Candle>> GetAllCandles(uint instrumentToken);
+        Task<List<Candle>> GetUnusedCandles(uint instrumentToken);
         Task<List<Candle>> GetCandles(uint instrumentToken, DateTime time);
+        Task<Candle> GetCandle(DateTime time);
         Task Flush();
         Task Add(List<Candle> candles);
         void LoadExcelCandles();
         Task MarkCandlesUsed(DateTime To, uint token);
+        Task<Candle> GetLastCandle();
     }
 }

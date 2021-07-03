@@ -13,7 +13,7 @@
 
         <hr />
 
-        <RadzenButton ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => Update()) Text="Refresh" />
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Disabled="@IsUpdateLocked" Click=@(() => GetZones()) Text="Refresh" />
 
         <hr />
 
@@ -72,17 +72,12 @@
         //await GetZoneCandles();
     }
 
-    public async Task GetZones()
-    {
-        await hubConnection.SendAsync("GetZones");
-    }
-
     public async Task GetZoneCandles()
     {
         await hubConnection.SendAsync("GetZoneCandles");
     }
 
-    private async Task Update()
+    private async Task GetZones()
     {
         IsUpdateLocked = true;
         StateHasChanged();

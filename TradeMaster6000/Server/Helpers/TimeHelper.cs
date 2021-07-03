@@ -146,7 +146,7 @@ namespace TradeMaster6000.Server.Helpers
             if (Env.IsDevelopment())
             {
                 DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                if (IST.Hour >= 15 && IST.Minute >= 31)
+                if (IST.Hour >= 15 && IST.Minute >= 30)
                 {
                     return true;
                 }
@@ -155,7 +155,7 @@ namespace TradeMaster6000.Server.Helpers
             else
             {
                 DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                if (IST.Hour >= 15 && IST.Minute >= 31)
+                if (IST.Hour >= 15 && IST.Minute >= 30)
                 {
                     return true;
                 }
@@ -245,40 +245,6 @@ namespace TradeMaster6000.Server.Helpers
 
         }
 
-        public async Task<bool> IsMarketOpen(int orderId)
-        {
-            if (Env.IsDevelopment())
-            {
-                DateTime GMT = DateTime.Now;
-                DateTime IST = GMT.AddHours(3).AddMinutes(30);
-                DateTime opening = new (IST.Year, IST.Month, IST.Day, 9, 15, 00);
-                DateTime closing = opening.AddHours(6).AddMinutes(15);
-                if (DateTime.Compare(IST, opening) >= 0)
-                {
-                    if (DateTime.Compare(IST, closing) < 0)
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-            else
-            {
-                DateTime GMT = DateTime.Now;
-                DateTime IST = GMT.AddHours(5).AddMinutes(30);
-                DateTime opening = new (IST.Year, IST.Month, IST.Day, 9, 15, 00);
-                DateTime closing = opening.AddHours(6).AddMinutes(15);
-                if (DateTime.Compare(IST, opening) >= 0)
-                {
-                    if (DateTime.Compare(IST, closing) < 0)
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-        }
         public bool IsMarketOpen()
         {
             if (Env.IsDevelopment())
@@ -313,6 +279,17 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
+        public bool IsMarketOpening()
+        {
+            DateTime current = CurrentTime();
+
+            if (current.Hour == 9 && current.Minute == 14)
+            {
+                 return true;
+            }
+            return false;
+        }
+
         public bool IsRefreshTime()
         {
 
@@ -340,7 +317,6 @@ namespace TradeMaster6000.Server.Helpers
     public interface ITimeHelper
     {
         Task<bool> IsPreMarketOpen(int orderId);
-        Task<bool> IsMarketOpen(int orderId);
         bool IsPreMarketOpen();
         bool IsMarketOpen();
         string GetCurrentVariety();
@@ -351,6 +327,7 @@ namespace TradeMaster6000.Server.Helpers
         DateTime OpeningTime();
         TimeSpan GetDuration(DateTime end, DateTime start);
         DateTime GetWaittime(DateTime current);
+        bool IsMarketOpening();
 
     }
 }

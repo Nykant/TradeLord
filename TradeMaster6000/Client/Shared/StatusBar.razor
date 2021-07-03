@@ -101,8 +101,42 @@
                     off
                 </div>
             }
+        }
+    </div>
 
+    <div class="status-box">
+        <p>Ticker</p>
+        @{
+            if (tickerOn)
+            {
+                <div class="on">
+                    on
+                </div>
+            }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+            }
+        }
+    </div>
 
+    <div class="status-box">
+        <p>Zone Service</p>
+        @{
+            if (zoneServiceOn)
+            {
+                <div class="on">
+                    on
+                </div>
+            }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+            }
         }
     </div>
 </div>
@@ -111,9 +145,11 @@
         bool show = true;
         bool candlesOn = false;
         bool flusherOn = false;
+        bool tickerOn = false;
         bool candleManagerOn = false;
         bool tickManagerOn = false;
         bool apiLoggedIn = false;
+        bool zoneServiceOn = false;
         string buttontext = "hide";
         private bool collapse = false;
         string buttonclass = "toggle-button";
@@ -136,6 +172,31 @@
 
         protected override async Task OnInitializedAsync()
         {
+            await IsFlushing().ConfigureAwait(false);
+            await IsCandlesOn().ConfigureAwait(false);
+            await IsCandleManagerOn().ConfigureAwait(false);
+            await IsTickerOn().ConfigureAwait(false);
+            await IsTickManagerOn().ConfigureAwait(false);
+            await IsLoggedIn().ConfigureAwait(false);
+        }
+
+        private async Task IsZoneServiceOn()
+        {
+            var response = await Http.GetAsync("Status/IsZoneServiceOn");
+            var strin = await response.Content.ReadAsStringAsync();
+            if (strin == "False")
+            {
+                zoneServiceOn = false;
+            }
+            else
+            {
+                zoneServiceOn = true;
+            }
+            StateHasChanged();
+        }
+
+        private async Task IsFlushing()
+        {
             var response = await Http.GetAsync("Status/IsFlushing");
             var strin = await response.Content.ReadAsStringAsync();
             if (strin == "False")
@@ -146,7 +207,11 @@
             {
                 flusherOn = true;
             }
+            StateHasChanged();
+        }
 
+        private async Task IsCandlesOn()
+        {
             var response1 = await Http.GetAsync("Status/IsCandlesOn");
             var strin1 = await response1.Content.ReadAsStringAsync();
             if (strin1 == "False")
@@ -157,7 +222,41 @@
             {
                 candlesOn = true;
             }
+            StateHasChanged();
+        }
 
+        private async Task IsTickerOn()
+        {
+            var response = await Http.GetAsync("Status/IsTickerOn");
+            var strin = await response.Content.ReadAsStringAsync();
+            if (strin == "False")
+            {
+                tickerOn = false;
+            }
+            else
+            {
+                tickerOn = true;
+            }
+            StateHasChanged();
+        }
+
+        private async Task IsCandleManagerOn()
+        {
+            var response = await Http.GetAsync("Status/IsCandleManagerOn");
+            var strin = await response.Content.ReadAsStringAsync();
+            if (strin == "False")
+            {
+                candleManagerOn = false;
+            }
+            else
+            {
+                candleManagerOn = true;
+            }
+            StateHasChanged();
+        }
+
+        private async Task IsTickManagerOn()
+        {
             var response2 = await Http.GetAsync("Status/IsTickManagerOn");
             var strin2 = await response2.Content.ReadAsStringAsync();
             if (strin2 == "False")
@@ -168,21 +267,6 @@
             {
                 tickManagerOn = true;
             }
-
-
-            var response3 = await Http.GetAsync("Status/IsCandleManagerOn");
-            var strin3 = await response3.Content.ReadAsStringAsync();
-            if (strin3 == "False")
-            {
-                candleManagerOn = false;
-            }
-            else
-            {
-                candleManagerOn = true;
-            }
-
-            await IsLoggedIn();
-
             StateHasChanged();
         }
 
@@ -200,6 +284,7 @@
                 apiLoggedIn = false;
                 StateHasChanged();
             }
+            StateHasChanged();
         }
 
         private async Task Logout(MouseEventArgs args)
