@@ -16,11 +16,27 @@ namespace TradeMaster6000.Server.DataHelpers
             this.ContextFactory = ContextFactory;
         }
 
-        public async Task<List<Zone>> GetZones()
+        public async Task<List<Zone>> GetUntestedZones()
         {
             using (var context = ContextFactory.CreateDbContext())
             {
                 return await context.Zones.Where(x => x.Tested == false).ToListAsync();
+            }
+        }
+
+        public async Task<List<Zone>> GetUnbrokenZones()
+        {
+            using (var context = ContextFactory.CreateDbContext())
+            {
+                return await context.Zones.Where(x => x.Broken == false).ToListAsync();
+            }
+        }
+
+        public async Task<List<Zone>> GetZones(int timeframe, uint token)
+        {
+            using (var context = ContextFactory.CreateDbContext())
+            {
+                return await context.Zones.Where(x => x.Timeframe == timeframe && x.InstrumentToken == token).OrderBy(x => x.From).ToListAsync();
             }
         }
 
@@ -58,9 +74,11 @@ namespace TradeMaster6000.Server.DataHelpers
     }
     public interface IZoneDbHelper
     {
-        Task<List<Zone>> GetZones();
+        Task<List<Zone>> GetUntestedZones();
         Task Add(List<Zone> zones);
         DateTime LastZoneEndTime(List<Zone> zones);
         Task Update(List<Zone> zones);
+        Task<List<Zone>> GetZones(int timeframe, uint token);
+        Task<List<Zone>> GetUnbrokenZones();
     }
 }

@@ -58,11 +58,11 @@ namespace TradeMaster6000.Server.Services
                 }
                 await Task.WhenAll(tasks);
 
-                List<Zone> zones = await zoneHelper.GetZones();
+                List<Zone> zones = await zoneHelper.GetUntestedZones();
                 List<Zone> updatedZones = new List<Zone>();
                 foreach(var zone in zones)
                 {
-                    List<Candle> candles = await candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
+                    List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
                     if(zone.SupplyDemand == SupplyDemand.Demand)
                     {
                         zone.Tested = await Task.Run(()=>RallyForwardTest(candles, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10)));
@@ -75,9 +75,31 @@ namespace TradeMaster6000.Server.Services
                     }
                 }
 
-                if(updatedZones.Count > 0)
+                if (updatedZones.Count > 0)
                 {
                     await zoneHelper.Update(updatedZones);
+                }
+
+                List<Zone> brokenzones = await zoneHelper.GetUnbrokenZones();
+                List<Zone> updatedBrokenZones = new List<Zone>();
+                foreach (var zone in brokenzones)
+                {
+                    List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
+                    if (zone.SupplyDemand == SupplyDemand.Demand)
+                    {
+                        zone.Tested = await Task.Run(() => RallyForwardBroken(candles, zone.Bottom));
+                        updatedBrokenZones.Add(zone);
+                    }
+                    else
+                    {
+                        zone.Tested = await Task.Run(() => DropForwardBroken(candles, zone.Top));
+                        updatedBrokenZones.Add(zone);
+                    }
+                }
+
+                if(updatedBrokenZones.Count > 0)
+                {
+                    await zoneHelper.Update(updatedBrokenZones);
                 }
 
                 logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
@@ -181,11 +203,6 @@ namespace TradeMaster6000.Server.Services
                     }
                 }
                 time = time.AddMinutes(1);
-
-                //if(time.Hour == 15 && time.Minute == 45)
-                //{
-                //    time = time.AddHours(17);
-                //}
             }
 
             return newCandles.OrderBy(x => x.Timestamp).ToList();
@@ -194,13 +211,15 @@ namespace TradeMaster6000.Server.Services
         private async Task ZoneFinder(TradeInstrument instrument, int timeFrame)
         {
             List<Candle> baseCandles = new List<Candle>();
-            //List<Candle> candles15 = new List<Candle>();
-            //List<Candle> candles45 = new List<Candle>();
-            //List<Candle> candles60 = new List<Candle>();
+            List<Candle> candles15 = new List<Candle>();
+            List<Candle> candles30 = new List<Candle>();
+            List<Candle> candles45 = new List<Candle>();
+            List<Candle> candles60 = new List<Candle>();
             List<Zone> baseZones = new List<Zone>();
-            //List<Zone> candles15Zones = new List<Zone>();
-            //List<Zone> candles45Zones = new List<Zone>();
-            //List<Zone> candles60Zones = new List<Zone>();
+            List<Zone> candles15Zones = new List<Zone>();
+            List<Zone> candles30Zones = new List<Zone>();
+            List<Zone> candles45Zones = new List<Zone>();
+            List<Zone> candles60Zones = new List<Zone>();
             try
             {
                 List<Candle> candles = await candleHelper.GetUnusedCandles(instrument.Token);
@@ -209,56 +228,90 @@ namespace TradeMaster6000.Server.Services
                     goto Ending;
                 }
 
-                baseCandles = await Task.Run(() => TransformCandles(candles, timeFrame));
-                //candles15 = TransformCandles(candles, 15);
-                //candles45 = TransformCandles(candles, 45);
-                //candles60 = TransformCandles(candles, 60);
+                try
+                {
 
-                //for (int y = baseCandles.Count - 1; y >= 0; y--)
-                //{
-                //    zoneCandles.Add(baseCandles[y]);
-                //}
+                    baseCandles = await Task.Run(() => TransformCandles(candles, timeFrame));
+                    baseZones = await Task.Run(() => MakeZones(baseCandles, instrument.TradingSymbol, instrument.Token, timeFrame));
 
-                baseZones = await Task.Run(() => MakeZones(baseCandles, instrument.TradingSymbol, instrument.Token));
-                //candles15Zones = await MakeZones(candles15, instrument.TradingSymbol);
-                //candles45Zones = await MakeZones(candles45, instrument.TradingSymbol);
-                //candles60Zones = await MakeZones(candles60, instrument.TradingSymbol);
+                    candles15 = await Task.Run(() => TransformCandles(candles, 15));
+                    candles15Zones = await Task.Run(() => MakeZones(candles15, instrument.TradingSymbol, instrument.Token, 15));
+                    List<Zone> previous15Zones = await zoneHelper.GetZones(15, instrument.Token);
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles15Zones, baseZones[k], previous15Zones))
+                        {
+                            baseZones[k].Tradeable = true;
+                            goto SKIP;
+                        }
+                    }
 
-                //try
-                //{
-                //    for (int k = 0, n = baseZones.Count; k < n; k++)
-                //    {
-                //        if (IsTradeable(candles15Zones, baseZones[k]))
-                //        {
-                //            baseZones[k].Tradeable++;
-                //        }
-                //    }
+                    candles30 = await Task.Run(() => TransformCandles(candles, 30));
+                    candles30Zones = await Task.Run(() => MakeZones(candles30, instrument.TradingSymbol, instrument.Token, 30));
+                    List<Zone> previous30Zones = await zoneHelper.GetZones(30, instrument.Token);
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles30Zones, baseZones[k], previous30Zones))
+                        {
+                            baseZones[k].Tradeable = true;
+                            goto SKIP;
+                        }
+                    }
 
-                //    for (int k = 0, n = baseZones.Count; k < n; k++)
-                //    {
-                //        if (IsTradeable(candles45Zones, baseZones[k]))
-                //        {
-                //            baseZones[k].Tradeable++;
-                //        }
-                //    }
+                    candles45 = await Task.Run(() => TransformCandles(candles, 45));
+                    candles45Zones = await Task.Run(() => MakeZones(candles45, instrument.TradingSymbol, instrument.Token, 45));
+                    List<Zone> previous45Zones = await zoneHelper.GetZones(45, instrument.Token);
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles45Zones, baseZones[k], previous45Zones))
+                        {
+                            baseZones[k].Tradeable = true;
+                            goto SKIP;
+                        }
+                    }
 
-                //    for (int k = 0, n = baseZones.Count; k < n; k++)
-                //    {
-                //        if (IsTradeable(candles60Zones, baseZones[k]))
-                //        {
-                //            baseZones[k].Tradeable++;
-                //        }
-                //    }
-                //}
-                //catch (Exception e)
-                //{
-                //    logger.LogInformation(e.Message);
-                //}
+                    candles60 = await Task.Run(() => TransformCandles(candles, 60));
+                    candles60Zones = await Task.Run(() => MakeZones(candles60, instrument.TradingSymbol, instrument.Token, 60));
+                    List<Zone> previous60Zones = await zoneHelper.GetZones(60, instrument.Token);
+                    for (int k = 0, n = baseZones.Count; k < n; k++)
+                    {
+                        if (IsTradeable(candles60Zones, baseZones[k], previous60Zones))
+                        {
+                            baseZones[k].Tradeable = true;
+                        }
+                    }
 
-                if(baseZones.Count > 0)
+                    SKIP:;
+                }
+                catch (Exception e)
+                {
+                    logger.LogInformation(e.Message);
+                }
+
+                if (baseZones.Count > 0)
                 {
                     await zoneHelper.Add(baseZones);
                     await candleHelper.MarkCandlesUsed(zoneHelper.LastZoneEndTime(baseZones), instrument.Token);
+                }
+
+                if(candles15Zones.Count > 0)
+                {
+                    await zoneHelper.Add(candles15Zones);
+                }
+
+                if (candles30Zones.Count > 0)
+                {
+                    await zoneHelper.Add(candles15Zones);
+                }
+
+                if (candles45Zones.Count > 0)
+                {
+                    await zoneHelper.Add(candles45Zones);
+                }
+
+                if (candles60Zones.Count > 0)
+                {
+                    await zoneHelper.Add(candles60Zones);
                 }
 
                 Ending:;
@@ -269,50 +322,76 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        private bool IsTradeable(List<Zone> zones, Zone zone)
+        private bool IsTradeable(List<Zone> htfZones, Zone zone, List<Zone> prevHtfZones)
         {
             // for each higher timeframe zone
-            for(int i = 0, n = zones.Count; i < n; i++)
+            for(int i = 0, n = htfZones.Count; i < n; i++)
             {
                 // check if the from(timestamp) of lower timeframe zone is later or same time as higher timeframe from
                 // and check if to(timestamp) of lower timeframe zone is earlier or same time as higher timeframe to
-                if(DateTime.Compare(zones[i].From, zone.From) <= 0 && DateTime.Compare(zones[i].To, zone.To) >= 0)
+                if(DateTime.Compare(htfZones[i].From, zone.From) <= 0 && DateTime.Compare(htfZones[i].To, zone.To) >= 0)
                 {
+                    Zone motherZone = htfZones[i];
                     // motherzone found!
                     try
                     {
                         // checking all higher timeframe zones backward
-                        for (int k = i - 1; k >= 0; k--)
+                        for (int k = prevHtfZones.Count - 1; k >= 0; k--)
                         {
-                            // if motherzone is opposite to earlier zone
-                            if (zones[i].SupplyDemand != zones[k].SupplyDemand)
+                            // if motherzone is opposite to prev zone
+                            if (prevHtfZones[k].SupplyDemand != motherZone.SupplyDemand)
                             {
+                                Zone opposite = prevHtfZones[k];
+                                List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, opposite.To);
+                                int count = candles.Count;
+                                int z = 0;
                                 // if motherzone is a demand zone
-                                if (zones[i].SupplyDemand == SupplyDemand.Demand)
+                                if (motherZone.SupplyDemand == SupplyDemand.Demand)
                                 {
-                                    // if motherzone top is higher than earlier zone top
-                                    if (zones[i].Top > zones[k].Top)
+
+                                    while (DateTime.Compare(candles[z].Timestamp, motherZone.From) < 0)
                                     {
-                                        return true;
+                                        if (candles[z].High > opposite.Top)
+                                        {
+                                            return false;
+                                        }
+
+                                        z++;
                                     }
-                                    else
+
+                                    while (z < count)
                                     {
-                                        return false;
+                                        if (candles[z].High > opposite.Top)
+                                        {
+                                            return true;
+                                        }
+                                        z++;
                                     }
                                 }
                                 // else if motherzone is a supply zone
                                 else
                                 {
-                                    // if motherzone bottom is lower than earlier zone bottom
-                                    if (zones[i].Bottom < zones[k].Bottom)
+
+                                    while (DateTime.Compare(candles[z].Timestamp, motherZone.From) < 0)
                                     {
-                                        return true;
+                                        if (candles[z].Low < opposite.Bottom)
+                                        {
+                                            return false;
+                                        }
+
+                                        z++;
                                     }
-                                    else
+
+                                    while (z < count)
                                     {
-                                        return false;
+                                        if (candles[z].Low < opposite.Bottom)
+                                        {
+                                            return true;
+                                        }
+                                        z++;
                                     }
                                 }
+                                return false;
                             }
                         }
                     }
@@ -325,7 +404,7 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        private List<Zone> MakeZones(List<Candle> candles, string symbol, uint token)
+        private List<Zone> MakeZones(List<Candle> candles, string symbol, uint token, int timeframe)
         {
             List<Zone> zones = new List<Zone>();
             int startIndex = 0;
@@ -344,7 +423,7 @@ namespace TradeMaster6000.Server.Services
             }
             startIndex = fittyCandle.Index + 1;
 
-            Zone zone = FindZone(candles, fittyCandle, symbol, token);
+            Zone zone = FindZone(candles, fittyCandle, symbol, token, timeframe);
             if (zone == default)
             {
                 goto Repeat;
@@ -378,6 +457,30 @@ namespace TradeMaster6000.Server.Services
             for (int i = 0, n = candles.Count; i < n; i++)
             {
                 if (theLine <= candles[i].High)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool DropForwardBroken(List<Candle> candles, decimal theLine)
+        {
+            for (int i = 0, n = candles.Count; i < n; i++)
+            {
+                if (theLine < candles[i].High)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool RallyForwardBroken(List<Candle> candles, decimal theLine)
+        {
+            for (int i = 0, n = candles.Count; i < n; i++)
+            {
+                if (theLine > candles[i].Low)
                 {
                     return true;
                 }
@@ -473,7 +576,7 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol, uint token)
+        private Zone FindZone(List<Candle> candles, FittyCandle fittyCandle, string symbol, uint token, int timeframe)
         {
             HalfZone forward = FindForward(candles, fittyCandle);
 
@@ -505,7 +608,7 @@ namespace TradeMaster6000.Server.Services
                 return default;
             }
 
-            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, InstrumentToken = token, Created = timeHelper.CurrentTime(), ExplosiveEndTime = forward.ExplosiveCandle.Candle.Timestamp };
+            Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, InstrumentToken = token, Created = timeHelper.CurrentTime(), ExplosiveEndTime = forward.ExplosiveCandle.Candle.Timestamp, Timeframe = timeframe };
 
             if(forward.Top > backward.Top)
             {

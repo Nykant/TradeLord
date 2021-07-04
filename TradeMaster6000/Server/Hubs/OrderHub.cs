@@ -121,7 +121,7 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task GetZones()
         {
-            await Clients.Caller.SendAsync("ReceiveZones", await zoneDbHelper.GetZones());
+            await Clients.Caller.SendAsync("ReceiveZones", await zoneDbHelper.GetUntestedZones());
         }
 
         public async Task GetTick(string symbol)

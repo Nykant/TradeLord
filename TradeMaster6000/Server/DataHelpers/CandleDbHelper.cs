@@ -111,11 +111,11 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public async Task<List<Candle>> GetCandles(uint instrumentToken, DateTime time)
+        public List<Candle> GetCandles(uint instrumentToken, DateTime time)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.Where(x => x.InstrumentToken == instrumentToken && x.Timestamp > time).ToListAsync();
+                return context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0).OrderBy(x => x.Timestamp).ToList();
             }
         }
 
@@ -180,7 +180,7 @@ namespace TradeMaster6000.Server.DataHelpers
         Task<Candle> AddCandle(Candle candle);
         Task<List<Candle>> GetAllCandles(uint instrumentToken);
         Task<List<Candle>> GetUnusedCandles(uint instrumentToken);
-        Task<List<Candle>> GetCandles(uint instrumentToken, DateTime time);
+        List<Candle> GetCandles(uint instrumentToken, DateTime time);
         Task<Candle> GetCandle(DateTime time);
         Task Flush();
         Task Add(List<Candle> candles);
