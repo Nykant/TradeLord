@@ -178,6 +178,7 @@
             await IsTickerOn().ConfigureAwait(false);
             await IsTickManagerOn().ConfigureAwait(false);
             await IsLoggedIn().ConfigureAwait(false);
+            await IsZoneServiceOn().ConfigureAwait(false);
         }
 
         private async Task IsZoneServiceOn()

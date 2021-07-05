@@ -15,9 +15,9 @@ namespace TradeMaster6000.Shared
         public decimal High { get; set; }
         public decimal Close { get; set; }
         public int TicksCount { get; set; }
-        public int Timeframe { get; set; }
+        public int Timeframe { get; set; } = 1;
         public DateTime Timestamp { get; set; }
         public DateTime Kill { get; set; }
-        public bool Used { get; set; }
+        public bool Used { get; set; } = false;
     }
 }

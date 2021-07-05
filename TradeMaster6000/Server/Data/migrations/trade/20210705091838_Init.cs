@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace TradeMaster6000.Server.data.migrations.trade
 {
-    public partial class Another : Migration
+    public partial class Init : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -19,12 +19,14 @@ namespace TradeMaster6000.Server.data.migrations.trade
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     InstrumentToken = table.Column<uint>(type: "int unsigned", nullable: false),
                     Open = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
-                    High = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Low = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    High = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Close = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     TicksCount = table.Column<int>(type: "int", nullable: false),
+                    Timeframe = table.Column<int>(type: "int", nullable: false),
                     Timestamp = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    Kill = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    Kill = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Used = table.Column<bool>(type: "tinyint(1)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -126,9 +128,7 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     RegularSlmPlaced = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     TargetHit = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     TargetPlaced = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                    SquaredOff = table.Column<bool>(type: "tinyint(1)", nullable: false),
-                    JobId = table.Column<string>(type: "longtext", nullable: true)
-                        .Annotation("MySql:CharSet", "utf8mb4")
+                    SquaredOff = table.Column<bool>(type: "tinyint(1)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -144,10 +144,21 @@ namespace TradeMaster6000.Server.data.migrations.trade
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     InstrumentSymbol = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
+                    InstrumentToken = table.Column<uint>(type: "int unsigned", nullable: false),
                     Top = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
                     Bottom = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    ZoneType = table.Column<int>(type: "int", nullable: false),
+                    StayAway = table.Column<int>(type: "int", nullable: false),
+                    SupplyDemand = table.Column<int>(type: "int", nullable: false),
+                    Timeframe = table.Column<int>(type: "int", nullable: false),
+                    Created = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    Traded = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Tested = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Broken = table.Column<bool>(type: "tinyint(1)", nullable: false),
+                    Tradeable = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     From = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    To = table.Column<DateTime>(type: "datetime(6)", nullable: false)
+                    To = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    ExplosiveEndTime = table.Column<DateTime>(type: "datetime(6)", nullable: false)
                 },
                 constraints: table =>
                 {

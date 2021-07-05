@@ -9,8 +9,8 @@ using TradeMaster6000.Server.Data;
 namespace TradeMaster6000.Server.data.migrations.trade
 {
     [DbContext(typeof(TradeDbContext))]
-    [Migration("20210629081220_DaTne")]
-    partial class DaTne
+    [Migration("20210705091838_Init")]
+    partial class Init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -51,6 +51,9 @@ namespace TradeMaster6000.Server.data.migrations.trade
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("Used")
+                        .HasColumnType("tinyint(1)");
 
                     b.HasKey("Id");
 
@@ -249,11 +252,23 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<decimal>("Bottom")
                         .HasColumnType("decimal(65,30)");
 
+                    b.Property<bool>("Broken")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<DateTime>("Created")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("ExplosiveEndTime")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<DateTime>("From")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("InstrumentSymbol")
                         .HasColumnType("longtext");
+
+                    b.Property<uint>("InstrumentToken")
+                        .HasColumnType("int unsigned");
 
                     b.Property<int>("StayAway")
                         .HasColumnType("int");
@@ -264,14 +279,20 @@ namespace TradeMaster6000.Server.data.migrations.trade
                     b.Property<bool>("Tested")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int>("Timeframe")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("To")
                         .HasColumnType("datetime(6)");
 
                     b.Property<decimal>("Top")
                         .HasColumnType("decimal(65,30)");
 
-                    b.Property<int>("Tradeable")
-                        .HasColumnType("int");
+                    b.Property<bool>("Tradeable")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool>("Traded")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("ZoneType")
                         .HasColumnType("int");

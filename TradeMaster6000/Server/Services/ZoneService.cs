@@ -22,7 +22,7 @@ namespace TradeMaster6000.Server.Services
         private readonly IBackgroundJobClient backgroundJobClient;
         private static SemaphoreSlim semaphoreSlim;
         private static readonly CancellationGod ZoneServiceCancel = new CancellationGod();
-        private static bool zoneServiceRunning = false;
+        private static bool zoneServiceRunning { get; set; } = false;
 
         private static readonly List<Candle> zoneCandles = new List<Candle>();
 
@@ -45,68 +45,76 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task Start(List<TradeInstrument> instruments, int timeFrame, CancellationToken token)
         {
-            zoneServiceRunning = true;
-            logger.LogInformation($"zone service starting");
-            while (!token.IsCancellationRequested)
+            try
             {
-                Stopwatch stopwatch = new Stopwatch();
-                stopwatch.Start();
-                List<Task> tasks = new List<Task>();
-                for (int i = 0; i < instruments.Count; i++)
+                zoneServiceRunning = true;
+                logger.LogInformation($"zone service starting");
+                while (!token.IsCancellationRequested)
                 {
-                    tasks.Add(ZoneFinder(instruments[i], timeFrame));
-                }
-                await Task.WhenAll(tasks);
-
-                List<Zone> zones = await zoneHelper.GetUntestedZones();
-                List<Zone> updatedZones = new List<Zone>();
-                foreach(var zone in zones)
-                {
-                    List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
-                    if(zone.SupplyDemand == SupplyDemand.Demand)
+                    Stopwatch stopwatch = new Stopwatch();
+                    stopwatch.Start();
+                    List<Task> tasks = new List<Task>();
+                    for (int i = 0; i < instruments.Count; i++)
                     {
-                        zone.Tested = await Task.Run(()=>RallyForwardTest(candles, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10)));
-                        updatedZones.Add(zone);
+                        tasks.Add(ZoneFinder(instruments[i], timeFrame));
                     }
-                    else
+                    await Task.WhenAll(tasks);
+
+                    List<Zone> zones = await zoneHelper.GetUntestedZones();
+                    List<Zone> updatedZones = new List<Zone>();
+                    foreach (var zone in zones)
                     {
-                        zone.Tested = await Task.Run(()=>DropForwardTest(candles, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10)));
-                        updatedZones.Add(zone);
+                        List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
+                        if (zone.SupplyDemand == SupplyDemand.Demand)
+                        {
+                            zone.Tested = await Task.Run(() => RallyForwardTest(candles, zone.Top + (Math.Abs(zone.Top - zone.Bottom) / 10)));
+                            updatedZones.Add(zone);
+                        }
+                        else
+                        {
+                            zone.Tested = await Task.Run(() => DropForwardTest(candles, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) / 10)));
+                            updatedZones.Add(zone);
+                        }
                     }
-                }
 
-                if (updatedZones.Count > 0)
-                {
-                    await zoneHelper.Update(updatedZones);
-                }
-
-                List<Zone> brokenzones = await zoneHelper.GetUnbrokenZones();
-                List<Zone> updatedBrokenZones = new List<Zone>();
-                foreach (var zone in brokenzones)
-                {
-                    List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
-                    if (zone.SupplyDemand == SupplyDemand.Demand)
+                    if (updatedZones.Count > 0)
                     {
-                        zone.Tested = await Task.Run(() => RallyForwardBroken(candles, zone.Bottom));
-                        updatedBrokenZones.Add(zone);
+                        await zoneHelper.Update(updatedZones);
                     }
-                    else
+
+                    List<Zone> brokenzones = await zoneHelper.GetUnbrokenZones();
+                    List<Zone> updatedBrokenZones = new List<Zone>();
+                    foreach (var zone in brokenzones)
                     {
-                        zone.Tested = await Task.Run(() => DropForwardBroken(candles, zone.Top));
-                        updatedBrokenZones.Add(zone);
+                        List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, zone.ExplosiveEndTime);
+                        if (zone.SupplyDemand == SupplyDemand.Demand)
+                        {
+                            zone.Broken = await Task.Run(() => RallyForwardBroken(candles, zone.Bottom));
+                            updatedBrokenZones.Add(zone);
+                        } 
+                        else
+                        {
+                            zone.Broken = await Task.Run(() => DropForwardBroken(candles, zone.Top));
+                            updatedBrokenZones.Add(zone);
+                        }
                     }
-                }
 
-                if(updatedBrokenZones.Count > 0)
-                {
-                    await zoneHelper.Update(updatedBrokenZones);
-                }
+                    if (updatedBrokenZones.Count > 0)
+                    {
+                        await zoneHelper.Update(updatedBrokenZones);
+                    }
 
-                logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
-                stopwatch.Stop();
-                await Task.Delay(300000);
+                    logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
+                    stopwatch.Stop();
+                    await Task.Delay(300000);
+                }
+                zoneServiceRunning = false;
             }
-            zoneServiceRunning = false;
+            catch (Exception e)
+            {
+                logger.LogInformation(e.Message);
+            }
+            
         }
 
         public bool IsZoneServiceRunning()
@@ -150,17 +158,19 @@ namespace TradeMaster6000.Server.Services
                 {
                     candleCounter++;
 
-                    if (temp == default)
+                    if (temp.High == 0)
                     {
                         temp.Open = candles[i].Open;
                         temp.Timestamp = candles[i].Timestamp;
+                        temp.Low = candles[i].Low;
+                        temp.High = candles[i].High;
                     }
 
-                    if (temp.Low > candles[i].Low || temp.Low == default)
+                    if (temp.Low > candles[i].Low)
                     {
                         temp.Low = candles[i].Low;
                     }
-                    if (temp.High < candles[i].High || temp.High == default)
+                    if (temp.High < candles[i].High)
                     {
                         temp.High = candles[i].High;
                     }
@@ -301,7 +311,7 @@ namespace TradeMaster6000.Server.Services
 
                 if (candles30Zones.Count > 0)
                 {
-                    await zoneHelper.Add(candles15Zones);
+                    await zoneHelper.Add(candles30Zones);
                 }
 
                 if (candles45Zones.Count > 0)
@@ -342,7 +352,7 @@ namespace TradeMaster6000.Server.Services
                             if (prevHtfZones[k].SupplyDemand != motherZone.SupplyDemand)
                             {
                                 Zone opposite = prevHtfZones[k];
-                                List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, opposite.To);
+                                List<Candle> candles = candleHelper.GetCandles(zone.InstrumentToken, opposite.ExplosiveEndTime);
                                 int count = candles.Count;
                                 int z = 0;
                                 // if motherzone is a demand zone

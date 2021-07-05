@@ -7,15 +7,17 @@ using TradeMaster6000.Server.Data;
 using TradeMaster6000.Shared;
 using OfficeOpenXml;
 using System.IO;
+using Microsoft.Extensions.Logging;
 
 namespace TradeMaster6000.Server.DataHelpers
 {
     public class CandleDbHelper : ICandleDbHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
-
-        public CandleDbHelper(IDbContextFactory<TradeDbContext> contextFactory)
+        private readonly ILogger<CandleDbHelper> logger;
+        public CandleDbHelper(IDbContextFactory<TradeDbContext> contextFactory, ILogger<CandleDbHelper> logger)
         {
+            this.logger = logger;
             this.contextFactory = contextFactory;
         }
 
@@ -113,10 +115,18 @@ namespace TradeMaster6000.Server.DataHelpers
 
         public List<Candle> GetCandles(uint instrumentToken, DateTime time)
         {
-            using (var context = contextFactory.CreateDbContext())
+            try
             {
-                return context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0).OrderBy(x => x.Timestamp).ToList();
+                using (var context = contextFactory.CreateDbContext())
+                {
+                    return context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0).OrderBy(x => x.Timestamp).ToList();
+                }
             }
+            catch (Exception e)
+            {
+                logger.LogInformation(e.Message);
+            }
+            return default;
         }
 
         public async Task<Candle> GetCandle(DateTime time)
