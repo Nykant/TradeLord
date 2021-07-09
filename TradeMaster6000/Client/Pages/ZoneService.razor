@@ -4,13 +4,14 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using TradeMaster6000.Shared
 @inject NavigationManager NavigationManager
+@inject HttpClient Http
 @implements IAsyncDisposable
 @attribute [Authorize]
 
 @{
     if (IsConnected)
     {
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => StartZoneService()) Text="Start" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => StartZoneService()) Disabled="disabled" Text="Start" />
 
         <hr />
 
@@ -50,6 +51,7 @@
     //RadzenDataGrid<Candle> candlesGrid;
     private List<Zone> zones = new List<Zone>();
     private bool IsUpdateLocked = false;
+    private bool disabled = true;
     //private List<Candle> candles = new List<Candle>();
     protected override async Task OnInitializedAsync()
     {
@@ -74,8 +76,25 @@
         await hubConnection.StartAsync();
 
         await GetZones();
+        await GetEnvironment();
         //await GetZoneCandles();
     }
+
+    private async Task GetEnvironment()
+    {
+        var response = await Http.GetAsync("Status/GetEnvironment");
+        var str = await response.Content.ReadAsStringAsync();
+        if (str == "Development")
+        {
+            disabled = false;
+        }
+        else
+        {
+            disabled = true;
+        }
+        StateHasChanged();
+    }
+
 
     public async Task GetZoneCandles()
     {

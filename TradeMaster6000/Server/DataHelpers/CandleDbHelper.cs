@@ -8,6 +8,7 @@ using TradeMaster6000.Shared;
 using OfficeOpenXml;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace TradeMaster6000.Server.DataHelpers
 {
@@ -21,19 +22,39 @@ namespace TradeMaster6000.Server.DataHelpers
             this.contextFactory = contextFactory;
         }
 
-        public async Task MarkCandlesUsed(DateTime To, uint token)
+        public async Task DeleteCandles(List<Candle> candles)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var candles = context.Candles.Where(x => x.InstrumentToken == token && x.Used == false);
-                foreach(var candle in candles)
-                {
-                    if(candle.Timestamp < To)
-                    {
-                        candle.Used = true;
-                        context.Candles.Update(candle);
-                    }
-                }
+                context.Candles.RemoveRange(candles);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        //public async Task MarkCandlesTransformed(List<Candle> candles)
+        //{
+        //    for(int i = 0, n = candles.Count; i < n; i++)
+        //    {
+        //        candles[i].Transformed = true;
+        //    }
+
+        //    using (var context = contextFactory.CreateDbContext())
+        //    {
+        //        context.Candles.UpdateRange(candles);
+        //        await context.SaveChangesAsync();
+        //    }
+        //}
+
+        public async Task MarkCandlesUsed(List<Candle> candles)
+        {
+            for (int i = 0, n = candles.Count; i < n; i++)
+            {
+                candles[i].Used = true;
+            }
+
+            using (var context = contextFactory.CreateDbContext())
+            {
+                context.Candles.UpdateRange(candles);
                 await context.SaveChangesAsync();
             }
         }
@@ -97,52 +118,83 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public async Task<List<Candle>> GetAllCandles(uint instrumentToken)
+        public async Task<List<Candle>> GetCandles(int timeframe)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.Where(x => x.InstrumentToken == instrumentToken).OrderBy(x => x.Timestamp).ToListAsync();
+                IQueryable<Candle> candles = context.Candles.Where(x => x.Timeframe == timeframe);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
 
-        public async Task<List<Candle>> GetUnusedCandles(uint instrumentToken)
+        public async Task<List<Candle>> GetCandles(uint instrumentToken)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.Where(x=>x.InstrumentToken == instrumentToken && !x.Used).OrderBy(x => x.Timestamp).ToListAsync();
+                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
 
-        public List<Candle> GetCandles(uint instrumentToken, DateTime time)
-        {
-            try
-            {
-                using (var context = contextFactory.CreateDbContext())
-                {
-                    return context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0).OrderBy(x => x.Timestamp).ToList();
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogInformation(e.Message);
-            }
-            return default;
-        }
-
-        public async Task<Candle> GetCandle(DateTime time)
+        public async Task<List<Candle>> GetAll5minCandles()
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.FirstOrDefaultAsync(x => x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute);
+                IQueryable<Candle> candles = context.Candles.Where(x => x.Timeframe == 5);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
 
-        public async Task<Candle> GetLastCandle()
+        public async Task<List<Candle>> GetUnusedCandles(uint instrumentToken, int timeframe)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var candles = await context.Candles.OrderBy(x => x.Timestamp).ToListAsync(); // debug det her!
-                return candles[^1];
+                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken && x.Used == false && x.Timeframe == timeframe);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
+            }
+        }
+        public async Task<List<Candle>> GetUnusedNonBaseCandles()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                IQueryable<Candle> candles = context.Candles.Where(x => x.Used == false && x.Timeframe != 1);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
+            }
+        }
+        public async Task<List<Candle>> GetCandlesBefore(uint instrumentToken, DateTime time, int timeframe)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) < 0 && x.Timeframe == timeframe);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
+            }
+        }
+
+
+        public async Task<List<Candle>> GetCandlesAfter(uint instrumentToken, DateTime time, int timeframe)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0 && x.Timeframe == timeframe);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
+            }
+        }
+
+        public async Task<Candle> GetCandle(DateTime time, int timeframe)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.Candles.FirstOrDefaultAsync(x => x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute && x.Timeframe == timeframe);
+            }
+        }
+
+        public async Task<Candle> GetLastCandle(int timeframe)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                IQueryable<Candle> candles = context.Candles;
+                var candleslist = await candles.Where(x => x.Timeframe == timeframe).OrderBy(x => x.Timestamp).ToListAsync();
+                return candleslist[^1];
             }
         }
 
@@ -150,21 +202,19 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var added = await context.Candles.AddAsync(candle);
+                EntityEntry<Candle> entry = await context.Candles.AddAsync(candle);
                 await context.SaveChangesAsync();
-                return added.Entity;
+                return entry.Entity;
             }
+
         }
 
         public async Task Add(List<Candle> candles)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                foreach(var candle in candles)
-                {
-                    await context.Candles.AddAsync(candle);
-                }
-                
+                context.Candles.AddRange(candles);
+
                 await context.SaveChangesAsync();
             }
         }
@@ -173,29 +223,73 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                var candles = context.Candles;
-                foreach (var candle in candles)
-                {
-                    if (DateTime.Compare(candle.Kill, DateTime.Now) < 0)
-                    {
-                        context.Remove(candle);
-                    }
-                }
+                context.Candles.RemoveRange(context.Candles.Where(x => DateTime.Compare(x.Kill, DateTime.Now) < 0));
                 await context.SaveChangesAsync();
             }
         }
+
+        public async Task MarkAllCandlesUnused()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                List<Candle> candles = context.Candles.Where(x => x.Used == true).ToList();
+
+                for(int i = 0, n = candles.Count; i < n; i++)
+                {
+                    candles[i].Used = false;
+                }
+                context.Candles.UpdateRange(candles);
+
+                await context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<List<Candle>> GetUnusedCandles(int timeframe)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                return await context.Candles.Where(x => x.Timeframe == timeframe && !x.Used).ToListAsync();
+            }
+        }
+
+        //public async Task<List<Candle>> GetUntransformedCandles(int timeframe)
+        //{
+        //    using (var context = contextFactory.CreateDbContext())
+        //    {
+        //        return await context.Candles.Where(x => x.Timeframe == timeframe && !x.Transformed).ToListAsync();
+        //    }
+        //}
+
+        public async Task Update(List<Candle> candles)
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                context.Candles.UpdateRange(candles);
+                await context.SaveChangesAsync();
+            }
+        }
+
     }
     public interface ICandleDbHelper
     {
+        Task Update(List<Candle> candles);
+        Task MarkAllCandlesUnused();
         Task<Candle> AddCandle(Candle candle);
-        Task<List<Candle>> GetAllCandles(uint instrumentToken);
-        Task<List<Candle>> GetUnusedCandles(uint instrumentToken);
-        List<Candle> GetCandles(uint instrumentToken, DateTime time);
-        Task<Candle> GetCandle(DateTime time);
+        Task<List<Candle>> GetCandles(uint instrumentToken);
+        Task<List<Candle>> GetCandles(int timeframe);
+        Task<List<Candle>> GetAll5minCandles();
+        Task<List<Candle>> GetUnusedCandles(uint instrumentToken, int timeframe);
+        Task<List<Candle>> GetUnusedCandles(int timeframe);
+        Task<List<Candle>> GetCandlesBefore(uint instrumentToken, DateTime time, int timeframe);
+        Task<List<Candle>> GetCandlesAfter(uint instrumentToken, DateTime time, int timeframe);
+        Task<Candle> GetCandle(DateTime time, int timeframe);
         Task Flush();
         Task Add(List<Candle> candles);
         void LoadExcelCandles();
-        Task MarkCandlesUsed(DateTime To, uint token);
-        Task<Candle> GetLastCandle();
+        Task MarkCandlesUsed(List<Candle> candles);
+        Task<Candle> GetLastCandle(int timeframe);
+        Task DeleteCandles(List<Candle> candles);
+        //Task MarkCandlesTransformed(List<Candle> candles);
+        Task<List<Candle>> GetUnusedNonBaseCandles();
     }
 }

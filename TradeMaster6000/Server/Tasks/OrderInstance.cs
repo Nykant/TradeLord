@@ -325,11 +325,11 @@ namespace TradeMaster6000.Server.Tasks
                     await Task.Delay(duration);
                     DateTime time = waittime.Subtract(TimeSpan.FromSeconds(30));
                     DateTime candleTime = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 00);
-                    candle = await candleDbHelper.GetCandle(candleTime);
+                    candle = await candleDbHelper.GetCandle(candleTime, 1);
                 }
                 else
                 {
-                    candle = await candleDbHelper.GetLastCandle();
+                    candle = await candleDbHelper.GetLastCandle(1);
                 }
 
                 await semaphore.WaitAsync();

@@ -35,9 +35,11 @@ namespace TradeMaster6000.Server.Hubs
         private readonly IZoneService zoneService;
         private readonly IZoneDbHelper zoneDbHelper;
         private readonly ITimeHelper timeHelper;
+        private readonly ITradeabilityService tradeabilityService;
+        private readonly ILogger<OrderHub> logger;
         private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<OrderHub> logger, ITradeabilityService tradeabilityService)
         {
             this.zoneDbHelper = zoneDbHelper;
             this.tickerService = tickerService;
@@ -46,6 +48,8 @@ namespace TradeMaster6000.Server.Hubs
             this.candleDbHelper = candleDbHelper;
             this.zoneService = zoneService;
             this.timeHelper = timeHelper;
+            this.logger = logger;
+            this.tradeabilityService = tradeabilityService;
             KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
@@ -98,7 +102,8 @@ namespace TradeMaster6000.Server.Hubs
 
         public async Task StartZoneService()
         {
-            await zoneService.StartZoneService();
+            await zoneService.StartZoneServiceOnce();
+            await tradeabilityService.Start();
         }
 
         public void StartTrader()
@@ -110,12 +115,18 @@ namespace TradeMaster6000.Server.Hubs
             backgroundJob.Schedule(() => RunTrader(), duration);
         }
 
+        public async Task MarkCandlesUnused()
+        {
+            await candleDbHelper.MarkAllCandlesUnused();
+            logger.LogInformation("done marking candles as unused");
+        }
+
         public async Task RunTrader()
         {
             if (!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
             {
                 await tickerService.RunCandles();
-                await zoneService.StartZoneService();
+                //await zoneService.StartZoneService();
             }
         }
 
@@ -182,7 +193,7 @@ namespace TradeMaster6000.Server.Hubs
             {
                 if(instrument.TradingSymbol == tradingSymbol)
                 {
-                    await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetAllCandles(instrument.Token));
+                    await Clients.Caller.SendAsync("ReceiveCandles", await candleDbHelper.GetCandles(instrument.Token));
                     break;
                 }
             }

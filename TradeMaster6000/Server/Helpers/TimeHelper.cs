@@ -40,6 +40,10 @@ namespace TradeMaster6000.Server.Helpers
                 }
                 waittime = new DateTime(current.Year, current.Month, current.Day, hour, minute, 00);
             }
+            else
+            {
+                waittime = waittime.AddMinutes(1);
+            }
             return waittime;
         }
 

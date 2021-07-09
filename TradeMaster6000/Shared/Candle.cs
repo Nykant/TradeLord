@@ -16,8 +16,13 @@ namespace TradeMaster6000.Shared
         public decimal Close { get; set; }
         public int TicksCount { get; set; }
         public int Timeframe { get; set; } = 1;
+        public bool Used { get; set; } = false;
+        public bool UsedBy5 { get; set; } = false;
+        public bool UsedBy15 { get; set; } = false;
+        public bool UsedBy30 { get; set; } = false;
+        public bool UsedBy45 { get; set; } = false;
+        public bool UsedBy60 { get; set; } = false;
         public DateTime Timestamp { get; set; }
         public DateTime Kill { get; set; }
-        public bool Used { get; set; } = false;
     }
 }

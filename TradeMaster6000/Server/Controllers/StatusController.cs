@@ -1,5 +1,6 @@
 ﻿using Hangfire;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -18,11 +19,13 @@ namespace TradeMaster6000.Server.Controllers
         private readonly ITickerService tickerService;
         private readonly IBackgroundJobClient backgroundJob;
         private readonly IZoneService zoneService;
-        public StatusController(ITickerService tickerService, IBackgroundJobClient backgroundJob, IZoneService zoneService)
+        private readonly IWebHostEnvironment env;
+        public StatusController(ITickerService tickerService, IBackgroundJobClient backgroundJob, IZoneService zoneService, IWebHostEnvironment env)
         {
             this.backgroundJob = backgroundJob;
             this.tickerService = tickerService;
             this.zoneService = zoneService;
+            this.env = env;
         }
 
         [HttpGet]
@@ -60,6 +63,12 @@ namespace TradeMaster6000.Server.Controllers
         public string IsZoneServiceOn()
         {
             return zoneService.IsZoneServiceRunning().ToString();
+        }
+
+        [HttpGet]
+        public string GetEnvironment()
+        {
+            return env.EnvironmentName;
         }
     }
 }

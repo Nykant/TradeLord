@@ -136,6 +136,7 @@ namespace TradeMaster6000.Server
             services.TryAddSingleton<ITradeHelper, TradeHelper>();
             services.TryAddSingleton<ITargetHelper, TargetHelper>();
             //-------------------
+            services.TryAddSingleton<ITradeabilityService, TradeabilityService>();
             services.TryAddSingleton<IZoneService, ZoneService>();
             services.TryAddSingleton<ITickerService, TickerService>();
             services.TryAddSingleton<ISLMHelper, SLMHelper>();
