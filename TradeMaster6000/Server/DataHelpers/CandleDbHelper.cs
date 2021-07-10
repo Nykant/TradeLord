@@ -206,14 +206,17 @@ namespace TradeMaster6000.Server.DataHelpers
                 await context.SaveChangesAsync();
                 return entry.Entity;
             }
-
         }
 
         public async Task Add(List<Candle> candles)
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                context.Candles.AddRange(candles);
+                foreach(var candle in candles)
+                {
+                    await context.AddAsync(candle);
+                }
+                //context.Candles.AddRange(candles);
 
                 await context.SaveChangesAsync();
             }
