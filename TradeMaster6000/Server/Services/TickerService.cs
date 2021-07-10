@@ -248,6 +248,10 @@ namespace TradeMaster6000.Server.Services
         public async Task RunCandles()
         {
             CandlesRunning = true;
+            if (!IsTickerRunning)
+            {
+                Start();
+            }
             await candleHelper.Flush();
             CandleManagerCancel.Source = new CancellationTokenSource();
 
@@ -259,11 +263,6 @@ namespace TradeMaster6000.Server.Services
         public async Task AnalyzeCandles()
         {
             CandleCancel.Source = new CancellationTokenSource();
-
-            if (!IsTickerRunning)
-            {
-                Start();
-            }
 
             var instruments = await instrumentHelper.GetTradeInstruments();
             List<Task> tasks = new List<Task>();
@@ -280,6 +279,7 @@ namespace TradeMaster6000.Server.Services
                 Stop();
             }
             CandlesRunning = false;
+
             CandleManagerCancel.Source.Cancel();
             backgroundJob.Delete(CandleManagerCancel.HangfireId);
         }
@@ -408,12 +408,13 @@ namespace TradeMaster6000.Server.Services
             Ticker.DisableReconnect();
             Ticker.Close();
             Ticker = null;
+
             FlushingCancel.Source.Cancel();
             backgroundJob.Delete(FlushingCancel.HangfireId);
-            //FlushingSource.Dispose();
+
             TickManagerCancel.Source.Cancel();
             backgroundJob.Delete(TickManagerCancel.HangfireId);
-            //TickManagerSource.Dispose();
+
             zoneService.CancelToken();
         }
 

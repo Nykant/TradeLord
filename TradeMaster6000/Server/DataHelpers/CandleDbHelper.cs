@@ -161,6 +161,14 @@ namespace TradeMaster6000.Server.DataHelpers
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
+        public async Task<List<Candle>> GetNonBaseCandles()
+        {
+            using (var context = contextFactory.CreateDbContext())
+            {
+                IQueryable<Candle> candles = context.Candles.Where(x => x.Timeframe != 1);
+                return await candles.OrderBy(x => x.Timestamp).ToListAsync();
+            }
+        }
         public async Task<List<Candle>> GetCandlesBefore(uint instrumentToken, DateTime time, int timeframe)
         {
             using (var context = contextFactory.CreateDbContext())
@@ -294,5 +302,6 @@ namespace TradeMaster6000.Server.DataHelpers
         Task DeleteCandles(List<Candle> candles);
         //Task MarkCandlesTransformed(List<Candle> candles);
         Task<List<Candle>> GetUnusedNonBaseCandles();
+        Task<List<Candle>> GetNonBaseCandles();
     }
 }

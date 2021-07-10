@@ -103,7 +103,7 @@ namespace TradeMaster6000.Server.Hubs
         public async Task StartZoneService()
         {
             await zoneService.StartZoneServiceOnce();
-            await tradeabilityService.Start();
+            tradeabilityService.Start();
         }
 
         public void StartTrader()
@@ -125,9 +125,17 @@ namespace TradeMaster6000.Server.Hubs
         {
             if (!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
             {
-                await tickerService.RunCandles();
-                //await zoneService.StartZoneService();
+                //await tickerService.RunCandles();
+                await zoneService.StartZoneService();
+                tradeabilityService.Start();
             }
+        }
+
+        public void StopTrader()
+        {
+            tradeabilityService.Stop();
+            //tickerService.StopCandles();
+            zoneService.CancelToken();
         }
 
         public async Task GetZones()
