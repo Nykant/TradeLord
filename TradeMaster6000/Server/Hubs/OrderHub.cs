@@ -61,9 +61,9 @@ namespace TradeMaster6000.Server.Hubs
             await Clients.Caller.SendAsync("ReceiveZoneCandles", zoneService.GetZoneCandles());
         }
 
-        public void LoadExcelCandles()
+        public async Task LoadExcelCandles()
         {
-            candleDbHelper.LoadExcelCandles();
+            await candleDbHelper.LoadExcelCandles();
         }
 
         public async Task NewOrder(TradeOrder order)

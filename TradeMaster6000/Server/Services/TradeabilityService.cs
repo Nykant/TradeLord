@@ -156,7 +156,7 @@ namespace TradeMaster6000.Server.Services
 
                 if (updatedZones.Count > 0)
                 {
-                    await zoneDbHelper.Add(updatedZones).ConfigureAwait(false);
+                    await zoneDbHelper.Add(updatedZones);
                 }
 
                 stopwatch.Stop();

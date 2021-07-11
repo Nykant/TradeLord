@@ -9,17 +9,20 @@ using OfficeOpenXml;
 using System.IO;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Diagnostics;
 
 namespace TradeMaster6000.Server.DataHelpers
 {
     public class CandleDbHelper : ICandleDbHelper
     {
         private readonly IDbContextFactory<TradeDbContext> contextFactory;
+        private readonly IInstrumentHelper instrumentHelper;
         private readonly ILogger<CandleDbHelper> logger;
-        public CandleDbHelper(IDbContextFactory<TradeDbContext> contextFactory, ILogger<CandleDbHelper> logger)
+        public CandleDbHelper(IDbContextFactory<TradeDbContext> contextFactory, ILogger<CandleDbHelper> logger, IInstrumentHelper instrumentHelper)
         {
             this.logger = logger;
             this.contextFactory = contextFactory;
+            this.instrumentHelper = instrumentHelper;
         }
 
         public async Task DeleteCandles(List<Candle> candles)
@@ -59,9 +62,12 @@ namespace TradeMaster6000.Server.DataHelpers
             }
         }
 
-        public void LoadExcelCandles()
+        public async Task LoadExcelCandles()
         {
-            FileInfo existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\ACC-a-lot.xlsx");
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
+            FileInfo existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\Sheet1.xlsx");
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             List<Candle> excelCandles = new List<Candle>();
             using (ExcelPackage package = new ExcelPackage(existingFile))
@@ -75,13 +81,17 @@ namespace TradeMaster6000.Server.DataHelpers
                     for (int col = 1; col <= colCount; col++)
                     {
                         var value = worksheet.Cells[row, col].Value;
-                        if(value != null)
+                        if (value != null)
                         {
                             switch (col)
                             {
                                 case 1:
-                                    UInt32.TryParse(value.ToString(), out uint result);
-                                    candle.InstrumentToken = result;
+                                    if (value.ToString() == "stockname")
+                                    {
+                                        goto Skip;
+                                    }
+                                    uint token = instruments.Find(x => x.TradingSymbol == value.ToString()).Token;
+                                    candle.InstrumentToken = token;
                                     break;
                                 case 2:
                                     Decimal.TryParse(value.ToString(), out decimal result1);
@@ -106,13 +116,69 @@ namespace TradeMaster6000.Server.DataHelpers
                         }
                     }
                     excelCandles.Add(candle);
-                }
-                using (var context = contextFactory.CreateDbContext())
-                {
-                    context.Candles.AddRange(excelCandles);
-                    context.SaveChanges();
+                    Skip:;
                 }
             }
+
+            existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\Sheet2.xlsx");
+            using (ExcelPackage package = new ExcelPackage(existingFile))
+            {
+                ExcelWorksheet worksheet = package.Workbook.Worksheets[0];
+                int colCount = worksheet.Dimension.End.Column;
+                int rowCount = worksheet.Dimension.End.Row;
+                for (int row = 2; row <= rowCount; row++)
+                {
+                    Candle candle = new Candle();
+                    for (int col = 1; col <= colCount; col++)
+                    {
+                        var value = worksheet.Cells[row, col].Value;
+                        if (value != null)
+                        {
+                            switch (col)
+                            {
+                                case 1:
+                                    if (value.ToString() == "stockname" || value.ToString() == "BANKNIFTY")
+                                    {
+                                        goto Skip;
+                                    }
+                                    uint token = instruments.Find(x => x.TradingSymbol == value.ToString()).Token;
+                                    candle.InstrumentToken = token;
+                                    break;
+                                case 2:
+                                    Decimal.TryParse(value.ToString(), out decimal result1);
+                                    candle.Open = result1;
+                                    break;
+                                case 3:
+                                    Decimal.TryParse(value.ToString(), out decimal result3);
+                                    candle.High = result3;
+                                    break;
+                                case 4:
+                                    Decimal.TryParse(value.ToString(), out decimal result2);
+                                    candle.Low = result2;
+                                    break;
+                                case 5:
+                                    Decimal.TryParse(value.ToString(), out decimal result4);
+                                    candle.Close = result4;
+                                    break;
+                                case 6:
+                                    candle.Timestamp = DateTime.FromOADate((double)value);
+                                    break;
+                            }
+                        }
+                    }
+                    excelCandles.Add(candle);
+                    Skip:;
+                }
+            }
+
+            using (var context = contextFactory.CreateDbContext())
+            {
+                await context.Candles.AddRangeAsync(excelCandles);
+                await context.SaveChangesAsync();
+            }
+
+            stopwatch.Stop();
+            logger.LogInformation($"excel candles loaded - elapsed time: {stopwatch.ElapsedMilliseconds}");
         }
 
         public async Task<List<Candle>> GetCandles(int timeframe)
@@ -288,7 +354,7 @@ namespace TradeMaster6000.Server.DataHelpers
         Task<Candle> GetCandle(DateTime time, int timeframe);
         Task Flush();
         Task Add(List<Candle> candles);
-        void LoadExcelCandles();
+        Task LoadExcelCandles();
         Task MarkCandlesUsed(List<Candle> candles);
         Task<Candle> GetLastCandle(int timeframe);
         Task DeleteCandles(List<Candle> candles);

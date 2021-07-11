@@ -126,7 +126,7 @@ namespace TradeMaster6000.Server.Services
 
                 if (updatedZones.Count > 0)
                 {
-                    await zoneHelper.Update(updatedZones).ConfigureAwait(false);
+                    await zoneHelper.Update(updatedZones);
                 }
 
                 logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
@@ -148,6 +148,8 @@ namespace TradeMaster6000.Server.Services
             {
                 try
                 {
+                    await StartTransform(TransformCancel.Source.Token);
+
                     zoneServiceRunning = true;
                     logger.LogInformation($"zone service starting");
 
@@ -214,7 +216,7 @@ namespace TradeMaster6000.Server.Services
 
                     if (updatedZones.Count > 0)
                     {
-                        await zoneHelper.Update(updatedZones).ConfigureAwait(false);
+                        await zoneHelper.Update(updatedZones);
                     }
 
                     logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
@@ -241,7 +243,6 @@ namespace TradeMaster6000.Server.Services
             List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
             ZoneServiceCancel.HangfireId = backgroundJobClient.Enqueue(() => Start(instruments, 5, ZoneServiceCancel.Source.Token));
             TransformCancel.Source = new CancellationTokenSource();
-            TransformCancel.HangfireId = backgroundJobClient.Enqueue(() => StartTransform(TransformCancel.Source.Token));
         }
 
         public async Task StartZoneServiceOnce()
@@ -345,8 +346,8 @@ namespace TradeMaster6000.Server.Services
 
         public async Task StartTransform(CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
-            {
+            //while (!token.IsCancellationRequested)
+            //{
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
                 TransformCancel.Source = new CancellationTokenSource();
@@ -360,8 +361,8 @@ namespace TradeMaster6000.Server.Services
                 await Task.WhenAll(tasks);
                 stopwatch.Stop();
                 logger.LogInformation($"transform done - estimated time: {stopwatch.ElapsedMilliseconds}");
-                await Task.Delay(60000);
-            }
+            //    await Task.Delay(60000);
+            //}
         }
 
         private async Task Transform(uint token, List<Candle> candles)
@@ -505,9 +506,9 @@ namespace TradeMaster6000.Server.Services
             {
                 if(baseCandles.Count > 0)
                 {
-                    await candleHelper.Add(baseCandles).ConfigureAwait(false);
+                    await candleHelper.Add(baseCandles);
                 }
-                await candleHelper.Update(candles).ConfigureAwait(false);
+                await candleHelper.Update(candles);
             }
             finally
             {
