@@ -212,6 +212,7 @@ namespace TradeMaster6000.Server.Services
                                     return false;
                                 }
                             }
+                            return true;
                         }
                         break;
                     }
@@ -236,6 +237,7 @@ namespace TradeMaster6000.Server.Services
                                     return false;
                                 }
                             }
+                            return true;
                         }
                     }
                 }
