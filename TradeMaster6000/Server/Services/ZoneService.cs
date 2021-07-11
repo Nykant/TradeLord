@@ -242,6 +242,7 @@ namespace TradeMaster6000.Server.Services
             int i = 0;
             int n = candles.Count;
             int candleCounter = 0;
+            int emptyCounter = 0;
             while (i < n)
             {
                 current = candles[i];
@@ -255,6 +256,8 @@ namespace TradeMaster6000.Server.Services
                         temp.Timestamp = current.Timestamp;
                         temp.Low = current.Low;
                         temp.High = current.High;
+                        temp.InstrumentToken = current.InstrumentToken;
+                        temp.Timeframe = timeframe;
                     }
 
                     if (temp.Low > current.Low)
@@ -268,12 +271,11 @@ namespace TradeMaster6000.Server.Services
 
                     temp.Close = current.Close;
 
-                    if (candleCounter == timeframe)
+                    if (candleCounter + emptyCounter == timeframe)
                     {
-                        temp.InstrumentToken = current.InstrumentToken;
-                        temp.Timeframe = timeframe;
                         newCandles.Add(temp);
                         candleCounter = 0;
+                        emptyCounter = 0;
                         temp = new();
                     }
 
@@ -281,14 +283,26 @@ namespace TradeMaster6000.Server.Services
                 }
                 else
                 {
-                    if(current.Timestamp.Hour == 9 && current.Timestamp.Minute == 15)
+                    emptyCounter++;
+
+                    if(emptyCounter + candleCounter == timeframe)
+                    {
+                        if(candleCounter > 0)
+                        {
+                            newCandles.Add(temp);
+                            candleCounter = 0;
+                            emptyCounter = 0;
+                            temp = new();
+                        }
+                    }
+
+                    if (current.Timestamp.Hour == 9 && current.Timestamp.Minute == 15)
                     {
                         time.AddDays(1);
                         time = new DateTime(time.Year, time.Month, time.Day, 9, 14, 00);
-                    }
-                    else
-                    {asdfasdf
-                        break; // literally dno! 45 min candles wtf? ehm candle problems? ehm am i high?
+                        candleCounter = 0;
+                        emptyCounter = 0;
+                        temp = new();
                     }
                 }
                 time = time.AddMinutes(1);

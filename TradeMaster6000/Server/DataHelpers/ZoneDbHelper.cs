@@ -70,7 +70,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = ContextFactory.CreateDbContext())
             {
-                context.Zones.AddRange(zones);
+                await context.Zones.AddRangeAsync(zones);
                 await context.SaveChangesAsync();
             }
         }

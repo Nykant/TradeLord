@@ -108,11 +108,8 @@ namespace TradeMaster6000.Server.DataHelpers
                     excelCandles.Add(candle);
                 }
                 using (var context = contextFactory.CreateDbContext())
-                { 
-                    foreach(var candle in excelCandles)
-                    {
-                        context.Candles.Add(candle);
-                    }
+                {
+                    context.Candles.AddRange(excelCandles);
                     context.SaveChanges();
                 }
             }
@@ -220,12 +217,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                foreach(var candle in candles)
-                {
-                    await context.AddAsync(candle);
-                }
-                //context.Candles.AddRange(candles);
-
+                await context.AddRangeAsync(candles);
                 await context.SaveChangesAsync();
             }
         }
