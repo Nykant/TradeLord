@@ -48,8 +48,8 @@ namespace TradeMaster6000.Server.Services
 
         private async Task TradeabilityCheck(CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
-            {
+            //while (!token.IsCancellationRequested)
+            //{
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
@@ -161,8 +161,8 @@ namespace TradeMaster6000.Server.Services
 
                 stopwatch.Stop();
                 logger.LogInformation($"Tradeability check done - elapsed miliseconds: {stopwatch.ElapsedMilliseconds}");
-                await Task.Delay(55000);
-            }
+            //    await Task.Delay(55000);
+            //}
         }
 
         private Zone FindOpposite(Zone motherZone, List<Zone> prevHtfZones)

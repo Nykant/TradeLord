@@ -125,7 +125,7 @@ namespace TradeMaster6000.Server.Hubs
         {
             if (!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
             {
-                //await tickerService.RunCandles();
+                await tickerService.RunCandles();
                 await zoneService.StartZoneService();
                 //tradeabilityService.Start();
             }
@@ -134,7 +134,7 @@ namespace TradeMaster6000.Server.Hubs
         public void StopTrader()
         {
             tradeabilityService.Stop();
-            //tickerService.StopCandles();
+            tickerService.StopCandles();
             zoneService.CancelToken();
         }
 
