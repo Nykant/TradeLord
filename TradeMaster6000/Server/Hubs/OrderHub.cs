@@ -127,7 +127,7 @@ namespace TradeMaster6000.Server.Hubs
             {
                 //await tickerService.RunCandles();
                 await zoneService.StartZoneService();
-                tradeabilityService.Start();
+                //tradeabilityService.Start();
             }
         }
 

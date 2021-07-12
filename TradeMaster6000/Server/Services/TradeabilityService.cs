@@ -31,7 +31,7 @@ namespace TradeMaster6000.Server.Services
 
         public void Start()
         {
-            tradeabilityServiceCancel.HangfireId = backgroundJobClient.Enqueue(() => StartTradeability());
+            //tradeabilityServiceCancel.HangfireId = backgroundJobClient.Enqueue(() => );
         }
 
         public async Task StartTradeability()
@@ -249,5 +249,6 @@ namespace TradeMaster6000.Server.Services
     {
         void Start();
         void Stop();
+        Task StartTradeability();
     }
 }
