@@ -150,7 +150,7 @@ namespace TradeMaster6000.Server.Helpers
             if (Env.IsDevelopment())
             {
                 DateTime IST = DateTime.Now.AddHours(3).AddMinutes(30);
-                if (IST.Hour >= 15 && IST.Minute >= 30)
+                if (IST.Hour >= 15 && IST.Minute > 30)
                 {
                     return true;
                 }
@@ -159,7 +159,7 @@ namespace TradeMaster6000.Server.Helpers
             else
             {
                 DateTime IST = DateTime.Now.AddHours(5).AddMinutes(30);
-                if (IST.Hour >= 15 && IST.Minute >= 30)
+                if (IST.Hour >= 15 && IST.Minute > 30)
                 {
                     return true;
                 }

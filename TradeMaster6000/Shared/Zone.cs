@@ -16,6 +16,7 @@ namespace TradeMaster6000.Shared
         public SupplyDemand SupplyDemand { get; set; }
         public int Timeframe { get; set; }
         public DateTime Created { get; set; }
+        public bool Entry { get; set; }
         public bool Traded { get; set; } = false;
         public bool Tested { get; set; } = false;
         public bool Broken { get; set; } = false;

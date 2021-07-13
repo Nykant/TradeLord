@@ -11,8 +11,8 @@
 @{
     if (IsConnected)
     {
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader"  />
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StopTrader" Text="Stop Trader"  />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" Disabled="disabled" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StopTrader" Text="Stop Trader" Disabled="disabledstop" />
     }
     else
     {
@@ -45,10 +45,12 @@
         if (booly == "true")
         {
             disabled = false;
+            disabledstop = false;
             StateHasChanged();
         }
         else
         {
+            disabledstop = true;
             disabled = true;
             StateHasChanged();
         }
@@ -63,6 +65,7 @@
         disabled = false;
         StateHasChanged();
     }
+
 
     private async Task StopTrader()
     {

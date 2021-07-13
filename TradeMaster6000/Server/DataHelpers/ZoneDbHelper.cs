@@ -62,7 +62,7 @@ namespace TradeMaster6000.Server.DataHelpers
             using (var context = ContextFactory.CreateDbContext())
             {
                 var zones = context.Zones;
-                return await zones.OrderBy(x => x.To).ToListAsync();
+                return await zones.OrderBy(x => x.InstrumentSymbol).ToListAsync();
             }
         }
 

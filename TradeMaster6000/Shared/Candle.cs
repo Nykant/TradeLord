@@ -17,11 +17,18 @@ namespace TradeMaster6000.Shared
         public int TicksCount { get; set; }
         public int Timeframe { get; set; } = 1;
         public bool Used { get; set; } = false;
+        public bool UsedForEntry { get; set; } = false;
+        public bool UsedForCurve { get; set; } = false;
+        public bool UsedByEntry { get; set; } = false;
+        public bool UsedByCurve { get; set; } = false;
         public bool UsedBy5 { get; set; } = false;
+        public bool UsedBy10 { get; set; } = false;
         public bool UsedBy15 { get; set; } = false;
         public bool UsedBy30 { get; set; } = false;
         public bool UsedBy45 { get; set; } = false;
         public bool UsedBy60 { get; set; } = false;
+        public bool UsedBy120 { get; set; } = false;
+        public bool UsedBy240 { get; set; } = false;
         public DateTime Timestamp { get; set; }
         public DateTime Kill { get; set; }
     }

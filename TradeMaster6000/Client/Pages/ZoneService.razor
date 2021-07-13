@@ -11,7 +11,7 @@
 @{
     if (IsConnected)
     {
-        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => StartZoneService()) Disabled="disabled" Text="Start" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click=@(() => StartZoneService()) Text="Start" />
 
         <hr />
 
@@ -26,14 +26,11 @@
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Top" Title="Top" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Bottom" Title="Bottom" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="ZoneType" Title="Zone type" />
-                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="SupplyDemand" Title="Supply Or Demand" />
+                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Entry" Title="Is Entry?" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Timeframe" Title="Timeframe" />
                 <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Tradeable" Title="Tradeable" />
-                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Tested" Title="Tested" />
-                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Broken" Title="Broken" />
-                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="From" Title="From" />
-                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="To" Title="To" />
-                <RadzenDataGridColumn Width="100px" TItem="Zone" Property="Created" Title="Created" />
+                <RadzenDataGridColumn Width="200px" TItem="Zone" Property="From" Title="From" />
+                <RadzenDataGridColumn Width="200px" TItem="Zone" Property="To" Title="To" />
             </Columns>
         </RadzenDataGrid>
     }
