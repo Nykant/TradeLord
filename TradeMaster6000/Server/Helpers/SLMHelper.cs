@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
+using TradeMaster6000.Server.Models;
 using TradeMaster6000.Server.Services;
 using TradeMaster6000.Shared;
 
@@ -38,12 +39,12 @@ namespace TradeMaster6000.Server.Helpers
             }
             return triggerPrice;
         }
-        public async Task<string> PlaceOrder(TradeOrder order)
+        public async Task<string> PlaceOrder(TradeOrder order, ApplicationUser user)
         {
             dynamic id;
             try
             {
-                var kite = kiteService.GetKite();
+                var kite = kiteService.GetKite(user);
                 Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
@@ -68,9 +69,9 @@ namespace TradeMaster6000.Server.Helpers
                 return null;
             }
         }
-        public async Task SquareOff(TradeOrder order)
+        public async Task SquareOff(TradeOrder order, ApplicationUser user)
         {
-            var kite = kiteService.GetKite();
+            var kite = kiteService.GetKite(user);
             kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
@@ -98,7 +99,7 @@ namespace TradeMaster6000.Server.Helpers
     public interface ISLMHelper
     {
         decimal GetTriggerPrice(TradeOrder order, Candle candle);
-        Task<string> PlaceOrder(TradeOrder order);
-        Task SquareOff(TradeOrder order);
+        Task<string> PlaceOrder(TradeOrder order, ApplicationUser user);
+        Task SquareOff(TradeOrder order, ApplicationUser user);
     }
 }

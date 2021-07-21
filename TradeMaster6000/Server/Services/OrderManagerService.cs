@@ -66,11 +66,6 @@ namespace TradeMaster6000.Server.Services
 
         public async Task StartOrder(TradeOrder order)
         {
-            if (!kiteService.IsKiteConnected())
-            {
-                goto Ending;
-            }
-
             var instruments = await instrumentHelper.GetTradeInstruments();
 
             foreach (var instrument in instruments)
@@ -98,77 +93,70 @@ namespace TradeMaster6000.Server.Services
             Tasks.Enqueue(MakeTask(order));
 
             await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
-
-            Ending:;
         }
 
-        public async Task AutoOrders(int k)
-        {
-            if (!kiteService.IsKiteConnected())
-            {
-                goto Ending;
-            }
+        //public async Task AutoOrders(int k)
+        //{
+        //    var kite = kiteService.GetKite();
+        //    var orders = new List<TradeOrder>();
+        //    var instruments = await instrumentHelper.GetTradeInstruments();
+        //    Random random = new ();
 
-            var kite = kiteService.GetKite();
-            var orders = new List<TradeOrder>();
-            var instruments = await instrumentHelper.GetTradeInstruments();
-            Random random = new ();
+        //    int z = 0;
+        //    int y = 0;
+        //    for (int i = 0; i < k; i++)
+        //    {
+        //        TradeOrder order = new();
+        //        int rng = random.Next(0, instruments.Count - 1);
+        //        order.Instrument = instruments[rng];
+        //        var dic = kite.GetLTP(new[] { order.Instrument.Token.ToString() });
+        //        var ltp = dic[order.Instrument.Token.ToString()].LastPrice;
+        //        order = MakeOrder(y, order, ltp);
+        //        orders.Add(order);
+        //        await Task.Delay(500);
 
-            int z = 0;
-            int y = 0;
-            for (int i = 0; i < k; i++)
-            {
-                TradeOrder order = new();
-                int rng = random.Next(0, instruments.Count - 1);
-                order.Instrument = instruments[rng];
-                var dic = kite.GetLTP(new[] { order.Instrument.Token.ToString() });
-                var ltp = dic[order.Instrument.Token.ToString()].LastPrice;
-                order = MakeOrder(y, order, ltp);
-                orders.Add(order);
-                await Task.Delay(500);
+        //        y++;
 
-                y++;
+        //        if (y == 5)
+        //        {
+        //            y = 0;
+        //            z++;
+        //        }
 
-                if (y == 5)
-                {
-                    y = 0;
-                    z++;
-                }
+        //        if (z == 4)
+        //        {
+        //            break;
+        //        }
+        //    }
 
-                if (z == 4)
-                {
-                    break;
-                }
-            }
+        //    for (int i = 0; i < orders.Count; i++)
+        //    {
+        //        var tradeorder = await tradeOrderHelper.AddTradeOrder(orders[i]);
+        //        orders[i].Id = tradeorder.Id;
+        //    }
 
-            for (int i = 0; i < orders.Count; i++)
-            {
-                var tradeorder = await tradeOrderHelper.AddTradeOrder(orders[i]);
-                orders[i].Id = tradeorder.Id;
-            }
+        //    if (!tickerService.IsTheTickerRunning())
+        //    {
+        //        tickerService.Start();
+        //    }
 
-            if (!tickerService.IsTheTickerRunning())
-            {
-                tickerService.Start();
-            }
+        //    if (!taskManagerRunning)
+        //    {
+        //        taskManagerSource = new CancellationTokenSource();
+        //        taskManagerJobId = backgroundJobs.Enqueue(() => OrderTaskManager(taskManagerSource.Token));
+        //    }
+        //    for (int i = 0; i < orders.Count; i++)
+        //    {
+        //        Tasks.Enqueue(MakeTask(orders[i]));
+        //    }
 
-            if (!taskManagerRunning)
-            {
-                taskManagerSource = new CancellationTokenSource();
-                taskManagerJobId = backgroundJobs.Enqueue(() => OrderTaskManager(taskManagerSource.Token));
-            }
-            for (int i = 0; i < orders.Count; i++)
-            {
-                Tasks.Enqueue(MakeTask(orders[i]));
-            }
+        //    foreach(var order in orders)
+        //    {
+        //        await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
+        //    }
 
-            foreach(var order in orders)
-            {
-                await tradeOrderHelper.UpdateTradeOrder(order).ConfigureAwait(false);
-            }
-
-            Ending:;
-        }
+        //    Ending:;
+        //}
 
         private Task MakeTask(TradeOrder order)
         {
@@ -250,7 +238,7 @@ namespace TradeMaster6000.Server.Services
     }
     public interface IOrderManagerService
     {
-        Task AutoOrders(int k);
+        //Task AutoOrders(int k);
         Task StartOrder(TradeOrder order);
         Task StopOrder(TradeOrder order);
         void CancelToken(int id);

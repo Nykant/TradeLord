@@ -19,46 +19,56 @@ namespace TradeMaster6000.Server.Controllers
     public class ApiLoginController : ControllerBase
     {
         private readonly IKiteService kiteService;
+        private readonly UserManager<ApplicationUser> _userManager;
         IConfiguration Configuration { get; set; }
+        private readonly IProtectionService protectionService;
 
-        public ApiLoginController(IConfiguration configuration, IKiteService _kiteService)
+
+        public ApiLoginController(IConfiguration configuration, IKiteService _kiteService, UserManager<ApplicationUser> _userManager, IProtectionService protectionService)
         {
+            this.protectionService = protectionService;
+            this._userManager = _userManager;
             Configuration = configuration;
             kiteService = _kiteService;
         }
 
         [HttpGet]
-        public Task<string> Login()
+        public async Task<string> Login()
         {
-            kiteService.Invalidate();
+            var user = await _userManager.GetUserAsync(User);
+            if(user == null || user.ApiKey == null || user.AppSecret == null)
+            {
+                return null;
+            }
 
-            var kite = new Kite(Configuration.GetValue<string>("APIKey"), Debug: true);
-            kiteService.SetKite(kite);
+            var kite = new Kite(protectionService.UnprotectApiKey(user.ApiKey), Debug: true);
+            kiteService.NewKiteInstance(kite, user);
 
-            return Task.Run(()=>kite.GetLoginURL());
+            return await Task.Run(()=>kite.GetLoginURL());
         }
 
         [HttpGet]
-        public Task Logout()
+        public async Task Logout()
         {
-            kiteService.Invalidate();
-            return Task.FromResult(0);
+            var user = await _userManager.GetUserAsync(User);
+            if (user != null)
+            {
+                kiteService.InvalidateOne(user);
+            }
         }
 
         [HttpGet]
         public async Task<string> IsLoggedOn()
         {
-            return await Task.Run(() =>
+            var user = await _userManager.GetUserAsync(User);
+            if (user != null)
             {
-                if (kiteService.GetKite() == null)
-                {
-                    return "false";
-                }
-                else
+                if (kiteService.IsKiteConnected(user))
                 {
                     return "true";
                 }
-            });
+            }
+            return "false";
         }
 
         //[AllowAnonymous]

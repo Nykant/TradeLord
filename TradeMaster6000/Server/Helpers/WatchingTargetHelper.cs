@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
+using TradeMaster6000.Server.Models;
 using TradeMaster6000.Server.Services;
 using TradeMaster6000.Shared;
 
@@ -19,10 +20,10 @@ namespace TradeMaster6000.Server.Helpers
             this.tradeLogHelper = tradeLogHelper;
         }
 
-        public async Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order)
+        public async Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order, ApplicationUser user)
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
-            var kite = kiteService.GetKite();
+            var kite = kiteService.GetKite(user);
             kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
@@ -40,6 +41,6 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface IWatchingTargetHelper
     {
-        Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order);
+        Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order, ApplicationUser user);
     }
 }

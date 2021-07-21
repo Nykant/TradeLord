@@ -252,7 +252,7 @@ namespace TradeMaster6000.Server
                 endpoints.MapFallbackToFile("index.html");
             });
 
-            recurringJobManager.AddOrUpdate("Kite-Manager",() => kiteService.KiteManager(), Cron.Daily());
+            recurringJobManager.AddOrUpdate("Invalidate-Kite",() => kiteService.InvalidateAll(), Cron.Daily());
             instrumentHelper.LoadInstruments(instrumentService.GetInstruments());
         }
     }

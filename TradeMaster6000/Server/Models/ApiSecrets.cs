@@ -1,15 +1,18 @@
-﻿using Microsoft.AspNetCore.Identity;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
 
 namespace TradeMaster6000.Server.Models
 {
-    public class ApplicationUser : IdentityUser
+    public class ApiSecrets
     {
+        [Required]
+        [Display(Name = "Api Key")]
         public string ApiKey { get; set; } = null;
+        [Required]
+        [Display(Name = "App Secret")]
         public string AppSecret { get; set; } = null;
     }
 }

@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Extensions;
 using TradeMaster6000.Server.Helpers;
+using TradeMaster6000.Server.Models;
 using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.Services
@@ -72,7 +73,7 @@ namespace TradeMaster6000.Server.Services
         public void Start()
         {
             IsTickerRunning = true;
-            var accessToken = kiteService.GetAccessToken();
+            var accessToken = kiteService.GetAccessToken("2def1171-322a-453e-90e7-c5b89e92fd74");
             Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
 
             Ticker.OnTick += OnTick;
@@ -354,7 +355,7 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        public async Task<OrderUpdate> GetOrder(string id)
+        public async Task<OrderUpdate> GetOrder(string id, ApplicationUser user)
         {
             var update = await updatesHelper.Get(id);
             if (update != null)
@@ -364,7 +365,7 @@ namespace TradeMaster6000.Server.Services
 
             try
             {
-                var order = kiteService.GetKite().GetOrderHistory(id)[^1];
+                var order = kiteService.GetKite(user).GetOrderHistory(id)[^1];
                 var newOrderUpdate = new OrderUpdate
                 {
                     AveragePrice = order.AveragePrice,
@@ -496,7 +497,7 @@ namespace TradeMaster6000.Server.Services
     }
     public interface ITickerService
     {
-        Task<OrderUpdate> GetOrder(string id);
+        Task<OrderUpdate> GetOrder(string id, ApplicationUser user);
         void Subscribe(uint token);
         void UnSubscribe(uint token);
         void Start();

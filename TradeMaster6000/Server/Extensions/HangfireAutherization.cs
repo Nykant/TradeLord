@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using TradeMaster6000.Server.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TradeMaster6000.Server.Extensions
 {
@@ -12,9 +15,9 @@ namespace TradeMaster6000.Server.Extensions
     {
         public bool Authorize(DashboardContext dashboardContext)
         {
-            //var httpcontext = dashboardContext.GetHttpContext();
-
-            // Allow all authenticated users to see the Dashboard (potentially dangerous).
+            var value = dashboardContext.GetHttpContext().User.Identity.IsAuthenticated;
+            //var user = await userManager.GetUserAsync(httpContextAccessor.HttpContext.User);
+            //if(user.)
             return true;
         }
     }

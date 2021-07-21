@@ -11,6 +11,7 @@ namespace TradeMaster6000.Shared
         
         [Key]
         public string OrderId { get; set; }
+        public string UserId { get; set; }
         public uint InstrumentToken { get; set; }
         public decimal AveragePrice { get; set; }
         public int FilledQuantity { get; set; }

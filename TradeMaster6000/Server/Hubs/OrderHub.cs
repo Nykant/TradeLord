@@ -71,20 +71,20 @@ namespace TradeMaster6000.Server.Hubs
             await orderManagerService.StartOrder(order);
         }
 
-        public async Task AutoOrders()
-        {
+        //public async Task AutoOrders()
+        //{
 
-            if (!tickerService.IsOrderUpdateOn())
-            {
-                tickerService.StartOrderUpdatesManager();
-            }
-            await orderManagerService.AutoOrders(5).ConfigureAwait(false);
-        }
+        //    if (!tickerService.IsOrderUpdateOn())
+        //    {
+        //        tickerService.StartOrderUpdatesManager();
+        //    }
+        //    await orderManagerService.AutoOrders(5).ConfigureAwait(false);
+        //}
 
-        public async Task AutoUltraOrders()
-        {
-            await orderManagerService.AutoOrders(20).ConfigureAwait(false);
-        }
+        //public async Task AutoUltraOrders()
+        //{
+        //    await orderManagerService.AutoOrders(20).ConfigureAwait(false);
+        //}
 
         public async Task StartCandleMagic()
         {
@@ -139,27 +139,6 @@ namespace TradeMaster6000.Server.Hubs
         public async Task GetZones()
         {
             await Clients.Caller.SendAsync("ReceiveZones", await zoneDbHelper.GetZones());
-        }
-
-        public async Task GetTick(string symbol)
-        {
-            var kite = KiteService.GetKite();
-            if(kite != null)
-            {
-                TradeInstrument tradeInstrument = new();
-                var instruments = await instrumentHelper.GetTradeInstruments();
-                foreach (var instrument in instruments)
-                {
-                    if (instrument.TradingSymbol == symbol)
-                    {
-                        tradeInstrument = instrument;
-                        break;
-                    }
-                }
-                var dick = kite.GetLTP(new[] { tradeInstrument.Token.ToString() });
-                dick.TryGetValue(tradeInstrument.Token.ToString(), out LTP value);
-                await Clients.Caller.SendAsync("ReceiveTick", value.LastPrice);
-            }
         }
 
         public async Task GetTickerLogs()

@@ -109,7 +109,6 @@ namespace TradeMaster6000.Server.Services
                 double testingfactor;
                 foreach (var zone in unbrokenzones)
                 {
-
                     if (zone.Entry)
                     {
                         testingfactor = entry.TestingFactor;

@@ -9,8 +9,9 @@ a.navbar-brand {
 
 /* Sticky footer styles
 -------------------------------------------------- */
-html {
+html, a {
   font-size: 14px;
+  color:black;
 }
 @media (min-width: 768px) {
   html {

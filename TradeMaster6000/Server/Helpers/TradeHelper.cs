@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
+using TradeMaster6000.Server.Models;
 using TradeMaster6000.Server.Services;
 using TradeMaster6000.Shared;
 
@@ -26,7 +27,7 @@ namespace TradeMaster6000.Server.Helpers
             TickDbHelper = tickDbHelper;
         }
 
-        public async Task CancelEntry(TradeOrder order)
+        public async Task CancelEntry(TradeOrder order, ApplicationUser user)
         {
             var variety = TimeHelper.GetCurrentVariety();
             OrderUpdate entry;
@@ -44,7 +45,7 @@ namespace TradeMaster6000.Server.Helpers
                 {
                     try
                     {
-                        var kite = kiteService.GetKite();
+                        var kite = kiteService.GetKite(user);
                         kite.CancelOrder(order.EntryId, variety);
                         await LogHelper.AddLog(order.Id, $"entry order cancelled...").ConfigureAwait(false);
                         break;
@@ -64,7 +65,7 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
-        public async Task CancelStopLoss(TradeOrder order)
+        public async Task CancelStopLoss(TradeOrder order, ApplicationUser user)
         {
             if (!order.PreSLMCancelled)
             {
@@ -84,7 +85,7 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         try
                         {
-                            var kite = kiteService.GetKite();
+                            var kite = kiteService.GetKite(user);
                             kite.CancelOrder(order.SLMId, variety);
                             await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
                             break;
@@ -121,7 +122,7 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         try
                         {
-                            var kite = kiteService.GetKite();
+                            var kite = kiteService.GetKite(user);
                             kite.CancelOrder(order.SLMId, variety);
                             await LogHelper.AddLog(order.Id, $"slm order cancelled...").ConfigureAwait(false);
                             break;
@@ -141,7 +142,7 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
-        public async Task CancelTarget(TradeOrder order)
+        public async Task CancelTarget(TradeOrder order, ApplicationUser user)
         {
             if (order.TargetPlaced)
             {
@@ -161,7 +162,7 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         try
                         {
-                            var kite = kiteService.GetKite();
+                            var kite = kiteService.GetKite(user);
                             kite.CancelOrder(order.TargetId, variety);
                             await LogHelper.AddLog(order.Id, $"target order cancelled...").ConfigureAwait(false);
                             break;
@@ -182,12 +183,12 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
-        public async Task SquareOff(TradeOrder order)
+        public async Task SquareOff(TradeOrder order, ApplicationUser user)
         {
             var entry = await TickService.GetOrder(order.EntryId);
             if (entry.FilledQuantity > 0)
             {
-                var kite = kiteService.GetKite();
+                var kite = kiteService.GetKite(user);
                 kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
@@ -203,14 +204,14 @@ namespace TradeMaster6000.Server.Helpers
             }
         }
 
-        public async Task<string> PlaceEntry(TradeOrder order)
+        public async Task<string> PlaceEntry(TradeOrder order, ApplicationUser user)
         {
             dynamic id;
             try
             {
                 var variety = TimeHelper.GetCurrentVariety();
 
-                var kite = kiteService.GetKite();
+                var kite = kiteService.GetKite(user);
                 // place entry limit order
                 Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
@@ -238,7 +239,7 @@ namespace TradeMaster6000.Server.Helpers
             return id;
         }
 
-        public async Task<string> PlacePreSLM(TradeOrder order)
+        public async Task<string> PlacePreSLM(TradeOrder order, ApplicationUser user)
         {
             var tick = await TickDbHelper.GetLast(order.Instrument.Token);
             var ltp = tick.LTP;
@@ -251,7 +252,7 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         var variety = TimeHelper.GetCurrentVariety();
                         // place slm order
-                        var kite = kiteService.GetKite();
+                        var kite = kiteService.GetKite(user);
                         Dictionary<string, dynamic> response = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
@@ -274,7 +275,7 @@ namespace TradeMaster6000.Server.Helpers
                     catch (KiteException e)
                     {
                         await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                        await Task.Run(async()=> await CancelEntry(order)).ConfigureAwait(false);
+                        await Task.Run(async()=> await CancelEntry(order, user)).ConfigureAwait(false);
                         return "cancelled";
                     }
                 }
@@ -295,7 +296,7 @@ namespace TradeMaster6000.Server.Helpers
                     {
                         var variety = TimeHelper.GetCurrentVariety();
                         // place slm order
-                        var kite = kiteService.GetKite();
+                        var kite = kiteService.GetKite(user);
                         Dictionary<string, dynamic> response = kite.PlaceOrder(
                              Exchange: order.Instrument.Exchange,
                              TradingSymbol: order.Instrument.TradingSymbol,
@@ -318,7 +319,7 @@ namespace TradeMaster6000.Server.Helpers
                     catch (KiteException e)
                     {
                         await LogHelper.AddLog(order.Id, $"kite error: {e.Message}...").ConfigureAwait(false);
-                        await Task.Run(async()=> await CancelEntry(order)).ConfigureAwait(false);
+                        await Task.Run(async()=> await CancelEntry(order, user)).ConfigureAwait(false);
                         return "cancelled";
                     }
                 }
@@ -333,11 +334,11 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface ITradeHelper
     {
-        Task<string> PlacePreSLM(TradeOrder order);
-        Task<string> PlaceEntry(TradeOrder order);
-        Task SquareOff(TradeOrder order);
-        Task CancelTarget(TradeOrder order);
-        Task CancelStopLoss(TradeOrder order);
-        Task CancelEntry(TradeOrder order);
+        Task<string> PlacePreSLM(TradeOrder order, ApplicationUser user);
+        Task<string> PlaceEntry(TradeOrder order, ApplicationUser user);
+        Task SquareOff(TradeOrder order, ApplicationUser user);
+        Task CancelTarget(TradeOrder order, ApplicationUser user);
+        Task CancelStopLoss(TradeOrder order, ApplicationUser user);
+        Task CancelEntry(TradeOrder order, ApplicationUser user);
     }
 }

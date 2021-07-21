@@ -11,6 +11,7 @@ namespace TradeMaster6000.Shared
     {
         [Key]
         public int Id { get; set; }
+        public string UserId { get; set; }
         [Required]
         [Range(1, 99999), ]
         public decimal StopLoss { get; set; }
