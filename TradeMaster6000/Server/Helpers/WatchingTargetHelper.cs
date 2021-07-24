@@ -20,10 +20,10 @@ namespace TradeMaster6000.Server.Helpers
             this.tradeLogHelper = tradeLogHelper;
         }
 
-        public async Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order, ApplicationUser user)
+        public async Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order)
         {
             var squareOffQuantity = entry.FilledQuantity - targetO.FilledQuantity;
-            var kite = kiteService.GetKite(user);
+            var kite = kiteService.GetKite(order.Username);
             kite.PlaceOrder(
                  Exchange: order.Instrument.Exchange,
                  TradingSymbol: order.Instrument.TradingSymbol,
@@ -41,6 +41,6 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface IWatchingTargetHelper
     {
-        Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order, ApplicationUser user);
+        Task SquareOff(OrderUpdate entry, OrderUpdate targetO, TradeOrder order);
     }
 }

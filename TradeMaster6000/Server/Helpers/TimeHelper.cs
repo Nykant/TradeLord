@@ -47,7 +47,7 @@ namespace TradeMaster6000.Server.Helpers
             return waittime;
         }
 
-        public async Task<bool> IsPreMarketOpen(int orderId)
+        public bool IsPreMarketOpen(int orderId)
         {
             if (Env.IsDevelopment())
             {
@@ -320,7 +320,7 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface ITimeHelper
     {
-        Task<bool> IsPreMarketOpen(int orderId);
+        bool IsPreMarketOpen(int orderId);
         bool IsPreMarketOpen();
         bool IsMarketOpen();
         string GetCurrentVariety();

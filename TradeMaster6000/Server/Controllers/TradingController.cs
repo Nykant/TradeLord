@@ -12,20 +12,23 @@ using TradeMaster6000.Server.Services;
 namespace TradeMaster6000.Server.Controllers
 {
     [Authorize]
-    [Route("api/[controller]")]
+    [Route("[controller]/[action]")]
     [ApiController]
-    public class TradeController : ControllerBase
+    public class TradingController : ControllerBase
     {
         private readonly IKiteService kiteService;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IProtectionService protectionService;
-        public TradeController(IProtectionService protectionService, UserManager<ApplicationUser> _userManager, IKiteService kiteService)
+        public TradingController(IProtectionService protectionService, UserManager<ApplicationUser> _userManager, IKiteService kiteService)
         {
             this.kiteService = kiteService;
             this._userManager = _userManager;
             this.protectionService = protectionService;
         }
 
-
+        public void QueueUser()
+        {
+            var username = _userManager.GetUserName(User);
+        }
     }
 }

@@ -37,9 +37,8 @@ namespace TradeMaster6000.Server.Hubs
         private readonly ITimeHelper timeHelper;
         private readonly ITradeabilityService tradeabilityService;
         private readonly ILogger<OrderHub> logger;
-        private IKiteService KiteService { get; set; }
 
-        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IKiteService kiteService, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<OrderHub> logger, ITradeabilityService tradeabilityService)
+        public OrderHub(ITickerService tickerService, IServiceProvider serviceProvider, IOrderManagerService orderManagerService, IBackgroundJobClient backgroundJob, ICandleDbHelper candleDbHelper, IZoneService zoneService, IZoneDbHelper zoneDbHelper, ITimeHelper timeHelper, ILogger<OrderHub> logger, ITradeabilityService tradeabilityService)
         {
             this.zoneDbHelper = zoneDbHelper;
             this.tickerService = tickerService;
@@ -50,7 +49,6 @@ namespace TradeMaster6000.Server.Hubs
             this.timeHelper = timeHelper;
             this.logger = logger;
             this.tradeabilityService = tradeabilityService;
-            KiteService = kiteService;
             tradeOrderHelper = serviceProvider.GetRequiredService<ITradeOrderHelper>();
             tradeLogHelper = serviceProvider.GetRequiredService<ITradeLogHelper>();
             instrumentHelper = serviceProvider.GetRequiredService<IInstrumentHelper>();
@@ -65,26 +63,6 @@ namespace TradeMaster6000.Server.Hubs
         {
             await candleDbHelper.LoadExcelCandles();
         }
-
-        public async Task NewOrder(TradeOrder order)
-        {
-            await orderManagerService.StartOrder(order);
-        }
-
-        //public async Task AutoOrders()
-        //{
-
-        //    if (!tickerService.IsOrderUpdateOn())
-        //    {
-        //        tickerService.StartOrderUpdatesManager();
-        //    }
-        //    await orderManagerService.AutoOrders(5).ConfigureAwait(false);
-        //}
-
-        //public async Task AutoUltraOrders()
-        //{
-        //    await orderManagerService.AutoOrders(20).ConfigureAwait(false);
-        //}
 
         public async Task StartCandleMagic()
         {

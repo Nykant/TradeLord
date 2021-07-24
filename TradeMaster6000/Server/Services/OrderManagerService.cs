@@ -187,7 +187,8 @@ namespace TradeMaster6000.Server.Services
             }
             await tradeLogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
         }
-        private static TradeOrder MakeOrder(int i, TradeOrder order, decimal ltp)
+
+        private static TradeOrder MakeRandomOrder(int i, TradeOrder order, decimal ltp)
         {
             switch (i)
             {

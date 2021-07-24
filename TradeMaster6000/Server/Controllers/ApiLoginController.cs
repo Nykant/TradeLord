@@ -35,35 +35,33 @@ namespace TradeMaster6000.Server.Controllers
         [HttpGet]
         public async Task<string> Login()
         {
-            var user = await _userManager.GetUserAsync(User);
+            var user = await _userManager.FindByNameAsync(User.Identity.Name);
             if(user == null || user.ApiKey == null || user.AppSecret == null)
             {
                 return null;
             }
-
-            var kite = new Kite(protectionService.UnprotectApiKey(user.ApiKey), Debug: true);
-            kiteService.NewKiteInstance(kite, user);
+            var apikey = protectionService.UnprotectApiKey(user.ApiKey);
+            var kite = new Kite(apikey, Debug: true);
+            kiteService.NewKiteInstance(kite, user.UserName);
 
             return await Task.Run(()=>kite.GetLoginURL());
         }
 
         [HttpGet]
-        public async Task Logout()
+        public void Logout()
         {
-            var user = await _userManager.GetUserAsync(User);
-            if (user != null)
+            if (User.Identity.Name != null)
             {
-                kiteService.InvalidateOne(user);
+                kiteService.InvalidateOne(User.Identity.Name);
             }
         }
 
         [HttpGet]
-        public async Task<string> IsLoggedOn()
+        public string IsLoggedOn()
         {
-            var user = await _userManager.GetUserAsync(User);
-            if (user != null)
+            if (User.Identity.Name != null)
             {
-                if (kiteService.IsKiteConnected(user))
+                if (kiteService.IsKiteConnected(User.Identity.Name))
                 {
                     return "true";
                 }

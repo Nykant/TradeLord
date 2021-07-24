@@ -355,7 +355,7 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        public async Task<OrderUpdate> GetOrder(string id, ApplicationUser user)
+        public async Task<OrderUpdate> GetOrder(string id, string username)
         {
             var update = await updatesHelper.Get(id);
             if (update != null)
@@ -365,7 +365,7 @@ namespace TradeMaster6000.Server.Services
 
             try
             {
-                var order = kiteService.GetKite(user).GetOrderHistory(id)[^1];
+                var order = kiteService.GetKite(username).GetOrderHistory(id)[^1];
                 var newOrderUpdate = new OrderUpdate
                 {
                     AveragePrice = order.AveragePrice,
@@ -497,7 +497,7 @@ namespace TradeMaster6000.Server.Services
     }
     public interface ITickerService
     {
-        Task<OrderUpdate> GetOrder(string id, ApplicationUser user);
+        Task<OrderUpdate> GetOrder(string id, string username);
         void Subscribe(uint token);
         void UnSubscribe(uint token);
         void Start();

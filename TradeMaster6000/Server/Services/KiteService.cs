@@ -18,13 +18,11 @@ namespace TradeMaster6000.Server.Services
     {
         readonly IProtectionService protectionService;
         private static readonly ConcurrentDictionary<string, KiteInstance> KiteInstances = new ConcurrentDictionary<string, KiteInstance>();
-        private readonly UserManager<ApplicationUser> usermanager;
         readonly ITimeHelper timeHelper;
         private readonly IContextExtension contextExtension;
-        public KiteService(IProtectionService protectionService, ITimeHelper timeHelper, UserManager<ApplicationUser> usermanager, IContextExtension contextExtension)
+        public KiteService(IProtectionService protectionService, ITimeHelper timeHelper, IContextExtension contextExtension)
         {
             this.contextExtension = contextExtension;
-            this.usermanager = usermanager;
             this.protectionService = protectionService;
             this.timeHelper = timeHelper;
         }
@@ -41,34 +39,36 @@ namespace TradeMaster6000.Server.Services
             }
         }
 
-        public void InvalidateOne(ApplicationUser user)
+        public void InvalidateOne(string username)
         {
-            var instance = GetKiteInstance(user.Id);
+            var instance = GetKiteInstance(username);
             var newinstance = instance;
             newinstance.AccessToken = null;
             newinstance.Kite = null;
-            KiteInstances.TryUpdate(user.Id, newinstance, instance);
+            KiteInstances.TryUpdate(username, newinstance, instance);
         }
 
-        public void SetAccessToken(string accessToken, ApplicationUser user)
+        public void SetAccessToken(string accessToken, string username)
         {
-            var instance = GetKiteInstance(user.Id);
+            var instance = GetKiteInstance(username);
             var newinstance = instance;
             newinstance.AccessToken = protectionService.ProtectToken(accessToken);
-            var result = KiteInstances.TryUpdate(user.Id, newinstance, instance);
+            var result = KiteInstances.TryUpdate(username, newinstance, instance);
         }
-        public string GetAccessToken(string userid)
+
+        public string GetAccessToken(string username)
         {
-            var instance = GetKiteInstance(userid);
+            var instance = GetKiteInstance(username);
             if (instance != null)
             {
                 return protectionService.UnprotectToken(instance.AccessToken);
             }
             return null;
         }
-        public bool IsKiteConnected(ApplicationUser user)
+
+        public bool IsKiteConnected(string username)
         {
-            var instance = GetKiteInstance(user.Id);
+            var instance = GetKiteInstance(username);
             if (instance != null)
             {
                 if (instance.AccessToken != null)
@@ -84,39 +84,44 @@ namespace TradeMaster6000.Server.Services
             return false;
         }
 
-        public void NewKiteInstance(Kite kite, ApplicationUser user)
+        public void NewKiteInstance(Kite kite, string username)
         {
-            KiteInstances.TryRemove(user.Id, out KiteInstance value);
+            if (KiteInstances.ContainsKey(username))
+            {
+                KiteInstances.TryRemove(username, out _);
+            }
             KiteInstance kiteInstance = new KiteInstance { Kite = kite };
-            KiteInstances.TryAdd(user.Id, kiteInstance);
+            KiteInstances.TryAdd(username, kiteInstance);
         }
 
-        public void UpdateKiteInstance(KiteInstance kite, KiteInstance compare, ApplicationUser user)
+        public void UpdateKiteInstance(KiteInstance kite, KiteInstance compare, string username)
         {
-            KiteInstances.TryUpdate(user.Id, kite, compare);
+            KiteInstances.TryUpdate(username, kite, compare);
         }
-        public KiteInstance GetKiteInstance(string userid)
+
+        public KiteInstance GetKiteInstance(string username)
         {
-            KiteInstances.TryGetValue(userid, out KiteInstance instance);
+            KiteInstances.TryGetValue(username, out KiteInstance instance);
             return instance;
         }
-        public Kite GetKite(ApplicationUser user)
+
+        public Kite GetKite(string username)
         {
-            KiteInstances.TryGetValue(user.Id, out KiteInstance instance);
+            KiteInstances.TryGetValue(username, out KiteInstance instance);
             return instance.Kite;
         }
     }
 
     public interface IKiteService
     {
-        Kite GetKite(ApplicationUser user);
-        void NewKiteInstance(Kite kite, ApplicationUser user);
-        void UpdateKiteInstance(KiteInstance kite, KiteInstance compare, ApplicationUser user);
-        KiteInstance GetKiteInstance(string userid);
-        void SetAccessToken(string accessToken, ApplicationUser user);
-        string GetAccessToken(string userid);
-        bool IsKiteConnected(ApplicationUser user);
+        Kite GetKite(string username);
+        void NewKiteInstance(Kite kite, string username);
+        void UpdateKiteInstance(KiteInstance kite, KiteInstance compare, string username);
+        KiteInstance GetKiteInstance(string username);
+        void SetAccessToken(string accessToken, string username);
+        string GetAccessToken(string username);
+        bool IsKiteConnected(string username);
         void InvalidateAll();
-        void InvalidateOne(ApplicationUser user);
+        void InvalidateOne(string username);
     }
 }

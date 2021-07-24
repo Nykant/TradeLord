@@ -27,10 +27,13 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<LoginModel> _logger;
+        private readonly RoleManager<IdentityRole> roleManager;
         public LoginModel(SignInManager<ApplicationUser> signInManager, 
             ILogger<LoginModel> logger,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            RoleManager<IdentityRole> roleManager)
         {
+            this.roleManager = roleManager;
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
@@ -61,8 +64,8 @@ namespace TradeMaster6000.Server.Areas.Identity.Pages.Account
 
         public async Task OnGetAsync(string returnUrl = null)
         {
-            var seedData = new SeedData(_userManager);
-            seedData.EnsureSeedData();
+            var seedData = new SeedData(_userManager, roleManager);
+            await seedData.EnsureSeedData();
 
             if (!string.IsNullOrEmpty(ErrorMessage))
             {

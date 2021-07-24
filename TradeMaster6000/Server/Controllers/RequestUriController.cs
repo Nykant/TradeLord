@@ -17,7 +17,7 @@ namespace TradeMaster6000.Server.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("[controller]")]
+    [Route("[controller]/[action]")]
     public class RequestUriController : ControllerBase
     {
         private readonly ILogger<RequestUriController> logger;
@@ -39,7 +39,7 @@ namespace TradeMaster6000.Server.Controllers
         [HttpPost]
         public async Task<IActionResult> Post(RequestUri requestUri)
         {
-            var user = await _userManager.GetUserAsync(User);
+            var user = await _userManager.FindByNameAsync(User.Identity.Name);
             if (user == null)
             {
                 return BadRequest();
@@ -54,13 +54,14 @@ namespace TradeMaster6000.Server.Controllers
                 try
                 {
                     logger.LogInformation("trying to connect kite");
-                    KiteInstance instance = kiteService.GetKiteInstance(user.Id);
+                    KiteInstance instance = kiteService.GetKiteInstance(user.UserName);
                     KiteInstance newinstance = instance;
-                    User kiteuser = newinstance.Kite.GenerateSession(requestUri.Request_token, protectionService.UnprotectAppSecret(user.AppSecret));
+                    var appsecret = protectionService.UnprotectAppSecret(user.AppSecret);
+                    User kiteuser = newinstance.Kite.GenerateSession(requestUri.Request_token, appsecret);
                     newinstance.Kite.SetAccessToken(kiteuser.AccessToken);
                     newinstance.AccessToken = kiteuser.AccessToken;
-                    newinstance.Kite.SetSessionExpiryHook(() => kiteService.InvalidateOne(user));
-                    kiteService.UpdateKiteInstance(newinstance, instance, user);
+                    newinstance.Kite.SetSessionExpiryHook(() => kiteService.InvalidateOne(user.UserName));
+                    kiteService.UpdateKiteInstance(newinstance, instance, user.UserName);
                 }
                 catch (Exception e)
                 {

@@ -15,18 +15,6 @@ namespace TradeMaster6000.Server.Services
     public class ZoneService : IZoneService
     {
 
-        // curve zone factors
-        private double curveExplosiveFactor = 0.8;
-        private double curvePreExplosiveFactor = 0.8;
-        private int curveNoOfCandles = 19;
-        private double curveZoneWidthFactor = 0.4;
-        private double curvePrebasewidthfactor = 0.2;
-        private double curveTestingfactor = -0.9;
-        private double curveSelfTestingFactor = -0.9;
-        private double curvePreBaseOvershootFactor = 0.0;
-
-        // -------------------------------------------
-
         private readonly ICandleDbHelper candleHelper;
         private readonly IZoneDbHelper zoneHelper;
         private readonly ITimeHelper timeHelper;
@@ -37,7 +25,7 @@ namespace TradeMaster6000.Server.Services
         private static SemaphoreSlim semaphoreSlim;
         private static readonly CancellationGod ZoneServiceCancel = new CancellationGod();
         private static readonly CancellationGod TransformCancel = new CancellationGod();
-        private static bool zoneServiceRunning { get; set; } = false;
+        private static bool ZoneServiceRunning { get; set; } = false;
 
         private static readonly List<Candle> zoneCandles = new List<Candle>();
         private static readonly ZoneFactors entry = new ZoneFactors
@@ -89,7 +77,7 @@ namespace TradeMaster6000.Server.Services
             {
                 await StartTransform(TransformCancel.Source.Token);
 
-                zoneServiceRunning = true;
+                ZoneServiceRunning = true;
                 logger.LogInformation($"zone service starting");
 
                 Stopwatch stopwatch = new Stopwatch();
@@ -162,7 +150,7 @@ namespace TradeMaster6000.Server.Services
 
                 await tradeabilityService.StartTradeability();
 
-                zoneServiceRunning = false;
+                ZoneServiceRunning = false;
             }
             catch (Exception e)
             {
@@ -179,7 +167,7 @@ namespace TradeMaster6000.Server.Services
                 {
                     await StartTransform(TransformCancel.Source.Token);
 
-                    zoneServiceRunning = true;
+                    ZoneServiceRunning = true;
                     logger.LogInformation($"zone service starting");
 
                     Stopwatch stopwatch = new Stopwatch();
@@ -260,12 +248,12 @@ namespace TradeMaster6000.Server.Services
                     logger.LogInformation(e.Message);
                 }
             }
-            zoneServiceRunning = false;
+            ZoneServiceRunning = false;
         }
 
         public bool IsZoneServiceRunning()
         {
-            return zoneServiceRunning;
+            return ZoneServiceRunning;
         }
 
         public async Task StartZoneService()

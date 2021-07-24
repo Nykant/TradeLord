@@ -7,7 +7,7 @@
 @inject NavigationManager NavigationManager
 @inject ILogger<Orders> Logger
 @implements IAsyncDisposable
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Follower")]
 
 @{
 

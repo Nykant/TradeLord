@@ -19,12 +19,12 @@ namespace TradeMaster6000.Server.Helpers
             this.kiteService = kiteService;
             LogHelper = logHelper;
         }
-        public async Task<string> PlaceOrder(TradeOrder order, ApplicationUser user)
+        public async Task<string> PlaceOrder(TradeOrder order)
         {
             dynamic id;
             try
             {
-                var kite = kiteService.GetKite(user);
+                var kite = kiteService.GetKite(order.Username);
                 Dictionary<string, dynamic> response = kite.PlaceOrder(
                      Exchange: order.Instrument.Exchange,
                      TradingSymbol: order.Instrument.TradingSymbol,
@@ -49,9 +49,9 @@ namespace TradeMaster6000.Server.Helpers
                 return null;
             }
         }
-        public async Task Update(TradeOrder order, OrderUpdate entry, ApplicationUser user)
+        public async Task Update(TradeOrder order, OrderUpdate entry)
         {
-            var kite = kiteService.GetKite(user);
+            var kite = kiteService.GetKite(order.Username);
             kite.ModifyOrder(
                 order.TargetId,
                 Quantity: entry.FilledQuantity.ToString()
@@ -62,7 +62,7 @@ namespace TradeMaster6000.Server.Helpers
     }
     public interface ITargetHelper
     {
-        Task<string> PlaceOrder(TradeOrder order, ApplicationUser user);
-        Task Update(TradeOrder order, OrderUpdate entryO, ApplicationUser user);
+        Task<string> PlaceOrder(TradeOrder order);
+        Task Update(TradeOrder order, OrderUpdate entryO);
     }
 }

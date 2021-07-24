@@ -62,7 +62,7 @@
             status = status_out;
         }
 
-        var response = await Http.PostAsJsonAsync<RequestUri>("RequestUri", new RequestUri { Request_token = request_token, Action = action, Status = status });
+        var response = await Http.PostAsJsonAsync<RequestUri>("RequestUri/Post", new RequestUri { Request_token = request_token, Action = action, Status = status });
         if (response.IsSuccessStatusCode)
         {
             LogInStatus = "Successfully logged in to api";
