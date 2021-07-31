@@ -62,7 +62,7 @@ namespace TradeMaster6000.Server.Services
             this.tradeabilityService = tradeabilityService;
             candleHelper = candleDbHelper;
             zoneHelper = zoneDbHelper;
-            semaphoreSlim = new SemaphoreSlim(30, 30);
+            semaphoreSlim = new SemaphoreSlim(50, 50);
         }
 
         public List<Candle> GetZoneCandles()
@@ -77,9 +77,6 @@ namespace TradeMaster6000.Server.Services
             {
                 await StartTransform(TransformCancel.Source.Token);
 
-                ZoneServiceRunning = true;
-                logger.LogInformation($"zone service starting");
-
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
                 List<Task> tasks = new List<Task>();
@@ -90,6 +87,10 @@ namespace TradeMaster6000.Server.Services
                 }
                 await Task.WhenAll(tasks);
 
+                stopwatch.Stop();
+                logger.LogInformation($"zone finder done - time elapsed: {stopwatch.ElapsedMilliseconds}");
+
+                stopwatch.Restart();
                 candles = await candleHelper.GetAll5minCandles();
                 List<Zone> unbrokenzones = await zoneHelper.GetUnbrokenZones();
                 List<Candle> dynamicCandles;
@@ -97,6 +98,7 @@ namespace TradeMaster6000.Server.Services
                 double testingfactor;
                 foreach (var zone in unbrokenzones)
                 {
+
                     if (zone.Entry)
                     {
                         testingfactor = entry.TestingFactor;
@@ -146,11 +148,11 @@ namespace TradeMaster6000.Server.Services
                 }
 
                 stopwatch.Stop();
-                logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
+                logger.LogInformation($"zone testing done - time elapsed: {stopwatch.ElapsedMilliseconds}");
 
                 await tradeabilityService.StartTradeability();
 
-                ZoneServiceRunning = false;
+                await Task.Delay(60000);
             }
             catch (Exception e)
             {
@@ -161,14 +163,12 @@ namespace TradeMaster6000.Server.Services
         [AutomaticRetry(Attempts = 0)]
         public async Task Start(List<TradeInstrument> instruments, CancellationToken token)
         {
+            ZoneServiceRunning = true;
             while (!token.IsCancellationRequested)
             {
                 try
                 {
                     await StartTransform(TransformCancel.Source.Token);
-
-                    ZoneServiceRunning = true;
-                    logger.LogInformation($"zone service starting");
 
                     Stopwatch stopwatch = new Stopwatch();
                     stopwatch.Start();
@@ -180,6 +180,10 @@ namespace TradeMaster6000.Server.Services
                     }
                     await Task.WhenAll(tasks);
 
+                    stopwatch.Stop();
+                    logger.LogInformation($"zone finder done - time elapsed: {stopwatch.ElapsedMilliseconds}");
+
+                    stopwatch.Restart();
                     candles = await candleHelper.GetAll5minCandles();
                     List<Zone> unbrokenzones = await zoneHelper.GetUnbrokenZones();
                     List<Candle> dynamicCandles;
@@ -237,7 +241,7 @@ namespace TradeMaster6000.Server.Services
                     }
 
                     stopwatch.Stop();
-                    logger.LogInformation($"zone service done - time elapsed: {stopwatch.ElapsedMilliseconds}");
+                    logger.LogInformation($"zone testing done - time elapsed: {stopwatch.ElapsedMilliseconds}");
 
                     await tradeabilityService.StartTradeability();
 
@@ -275,21 +279,16 @@ namespace TradeMaster6000.Server.Services
         public void CancelToken()
         {
             ZoneServiceCancel.Source.Cancel();
-            backgroundJobClient.Delete(ZoneServiceCancel.HangfireId);   
+            backgroundJobClient.Delete(ZoneServiceCancel.HangfireId);
         }
 
         private List<Candle> TransformCandles(List<Candle> candles, int timeframe)
         {
+
             List<Candle> newCandles = new List<Candle>();
-            DateTime time = timeHelper.OpeningTime();
-            while (true)
-            {
-                if (candles[0].Timestamp.Hour == time.Hour && candles[0].Timestamp.Minute == time.Minute)
-                {
-                    break;
-                }
-                time = time.AddMinutes(1);
-            }
+            DateTime time = new DateTime(candles[0].Timestamp.Year, candles[0].Timestamp.Month, candles[0].Timestamp.Day, 09, 00, 00);
+            time = time.AddMinutes(timeframe);
+
             Candle temp = new();
             Candle current = new();
             int i = 0;
@@ -298,7 +297,7 @@ namespace TradeMaster6000.Server.Services
             while (i < n)
             {
                 current = candles[i];
-                if (current.Timestamp.Hour == time.Hour && current.Timestamp.Minute == time.Minute)
+                if (DateTime.Compare(current.Timestamp, time) < 0)
                 {
                     candleCounter++;
 
@@ -353,42 +352,40 @@ namespace TradeMaster6000.Server.Services
 
                     temp.Close = current.Close;
 
-                    Math.DivRem(current.Timestamp.Minute + 1, timeframe, out int result);
-                    if (result == 0)
+                    if (DateTime.Compare(current.Timestamp.AddMinutes(1), time) == 0 || current.Timestamp.Hour == 15 && current.Timestamp.Minute == 29)
                     {
                         newCandles.Add(temp);
                         candleCounter = 0;
                         temp = new();
+
+                        if (current.Timestamp.Hour == 15 && current.Timestamp.Minute == 29)
+                        {
+                            time = time.AddDays(1);
+                            time = new DateTime(time.Year, time.Month, time.Day, 09, 00, 00);
+                        }
+
+                        time = time.AddMinutes(timeframe);
                     }
 
                     i++;
                 }
                 else
                 {
-                    Math.DivRem(current.Timestamp.Minute + 1, timeframe, out int result);
-                    if (result == 0)
+                    if (candleCounter > 0)
                     {
-                        if(candleCounter > 0)
-                        {
-                            newCandles.Add(temp);
-                            candleCounter = 0;
-                            temp = new();
-                        }
-                    }
-
-                    if (current.Timestamp.Hour == 9 && current.Timestamp.Minute == 15)
-                    {
-                        if(candleCounter > 0)
-                        {
-                            newCandles.Add(temp);
-                        }
-                        time.AddDays(1);
-                        time = new DateTime(time.Year, time.Month, time.Day, 9, 14, 00);
+                        newCandles.Add(temp);
                         candleCounter = 0;
                         temp = new();
                     }
+
+                    if (time.Day != current.Timestamp.Day)
+                    {
+                        time = time.AddDays(1);
+                        time = new DateTime(time.Year, time.Month, time.Day, 09, 00, 00);
+                    }
+
+                    time = time.AddMinutes(timeframe);
                 }
-                time = time.AddMinutes(1);
             }
 
             return newCandles.OrderBy(x => x.Timestamp).ToList();
@@ -398,29 +395,30 @@ namespace TradeMaster6000.Server.Services
         {
             //while (!token.IsCancellationRequested)
             //{
-                Stopwatch stopwatch = new Stopwatch();
-                stopwatch.Start();
-                TransformCancel.Source = new CancellationTokenSource();
-                List<Candle> candles = await candleHelper.GetUnusedCandles(1);
-                List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
-                List<Task> tasks = new List<Task>();
-                foreach (var instrument in instruments)
-                {
-                    tasks.Add(Transform(instrument.Token, candles.Where(x => x.InstrumentToken == instrument.Token).ToList()));
-                }
-                await Task.WhenAll(tasks);
-                stopwatch.Stop();
-                logger.LogInformation($"transform done - estimated time: {stopwatch.ElapsedMilliseconds}");
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            TransformCancel.Source = new CancellationTokenSource();
+            List<Candle> candles = await candleHelper.GetUnusedCandles(1);
+            List<TradeInstrument> instruments = await instrumentHelper.GetTradeInstruments();
+            List<Task> tasks = new List<Task>();
+            foreach (var instrument in instruments)
+            {
+                tasks.Add(Transform(instrument.Token, candles.Where(x => x.InstrumentToken == instrument.Token).OrderBy(x => x.Timestamp).ToList()));
+            }
+            await Task.WhenAll(tasks);
+            stopwatch.Stop();
+            logger.LogInformation($"transform done - estimated time: {stopwatch.ElapsedMilliseconds}");
             //    await Task.Delay(60000);
             //}
         }
 
         private async Task Transform(uint token, List<Candle> candles)
         {
-            if(candles.Count == 0)
+            if (candles.Count == 0)
             {
                 goto Ending;
             }
+            List<Candle> newCandles = new List<Candle>();
             List<Candle> updatedcandles = new List<Candle>();
             List<Candle> candles5 = new List<Candle>();
             List<Candle> candles10 = new List<Candle>();
@@ -430,142 +428,139 @@ namespace TradeMaster6000.Server.Services
             List<Candle> candles60 = new List<Candle>();
             List<Candle> candles120 = new List<Candle>();
             List<Candle> candles240 = new List<Candle>();
-            var list5 = candles.Where(x => x.UsedBy5 == false).OrderBy(x => x.Timestamp).ToList();
+            List<Candle> list5 = new List<Candle>();
+            List<Candle> list10 = new List<Candle>();
+            List<Candle> list15 = new List<Candle>();
+            List<Candle> list30 = new List<Candle>();
+            List<Candle> list45 = new List<Candle>();
+            List<Candle> list60 = new List<Candle>();
+            List<Candle> list120 = new List<Candle>();
+            List<Candle> list240 = new List<Candle>();
+
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            list5 = candles.Where(x => x.UsedBy5 == false).OrderBy(x => x.Timestamp).ToList();
             if (list5.Count > 4)
             {
-
-                    candles5 = await Task.Run(() => TransformCandles(list5, 5));
-                    if (candles5.Count > 0)
+                candles5 = TransformCandles(list5, 5);
+                if (candles5.Count > 0)
+                {
+                    for (int i = 0, n = candles.Count; i < n; i++)
                     {
-                        for (int i = 0, n = candles.Count; i < n; i++)
+                        if (DateTime.Compare(candles[i].Timestamp, candles5[^1].Timestamp.AddMinutes(5)) < 0)
                         {
-                            if (DateTime.Compare(candles[i].Timestamp, candles5[^1].Timestamp.AddMinutes(5)) < 0)
-                            {
-                                candles[i].UsedBy5 = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            candles[i].UsedBy5 = true;
                         }
                     }
-                
+                    newCandles.AddRange(candles5);
+                }
             }
-            var list10 = candles.Where(x => x.UsedBy10 == false).OrderBy(x => x.Timestamp).ToList();
+
+
+
+            list10 = candles.Where(x => x.UsedBy10 == false).OrderBy(x => x.Timestamp).ToList();
             if (list10.Count > 9)
             {
-
-                candles10 = await Task.Run(() => TransformCandles(list10, 10));
-                    if (candles10.Count > 0)
+                candles10 = TransformCandles(list10, 10);
+                if (candles10.Count > 0)
+                {
+                    for (int i = 0, n = candles.Count; i < n; i++)
                     {
-                        for (int i = 0, n = candles.Count; i < n; i++)
+                        if (DateTime.Compare(candles[i].Timestamp, candles10[^1].Timestamp.AddMinutes(10)) < 0)
                         {
-                            if (DateTime.Compare(candles[i].Timestamp, candles10[^1].Timestamp.AddMinutes(10)) < 0)
-                            {
-                                candles[i].UsedBy10 = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            candles[i].UsedBy10 = true;
                         }
-                        candles5.AddRange(candles10);
                     }
-                
+                    newCandles.AddRange(candles10);
+                }
             }
-            var list15 = candles.Where(x => x.UsedBy15 == false).OrderBy(x => x.Timestamp).ToList();
+
+
+
+            list15 = candles.Where(x => x.UsedBy15 == false).OrderBy(x => x.Timestamp).ToList();
             if (list15.Count > 14)
             {
-
-                    candles15 = await Task.Run(() => TransformCandles(list15, 15));
-                    if (candles15.Count > 0)
+                candles15 = TransformCandles(list15, 15);
+                if (candles15.Count > 0)
+                {
+                    for (int i = 0, n = candles.Count; i < n; i++)
                     {
-                        for (int i = 0, n = candles.Count; i < n; i++)
+                        if (DateTime.Compare(candles[i].Timestamp, candles15[^1].Timestamp.AddMinutes(15)) < 0)
                         {
-                            if (DateTime.Compare(candles[i].Timestamp, candles15[^1].Timestamp.AddMinutes(15)) < 0)
-                            {
-                                candles[i].UsedBy15 = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            candles[i].UsedBy15 = true;
                         }
-                        candles5.AddRange(candles15);
                     }
-                
+                    newCandles.AddRange(candles15);
+                }
             }
-            var list30 = candles.Where(x => x.UsedBy30 == false).OrderBy(x => x.Timestamp).ToList();
+
+
+
+            list30 = candles.Where(x => x.UsedBy30 == false).OrderBy(x => x.Timestamp).ToList();
             if (list30.Count > 29)
             {
 
-                    candles30 = await Task.Run(() => TransformCandles(list30, 30));
-                    if (candles30.Count > 0)
+                candles30 = TransformCandles(list30, 30);
+                if (candles30.Count > 0)
+                {
+                    for (int i = 0, n = candles.Count; i < n; i++)
                     {
-                        for (int i = 0, n = candles.Count; i < n; i++)
+                        if (DateTime.Compare(candles[i].Timestamp, candles30[^1].Timestamp.AddMinutes(30)) < 0)
                         {
-                            if (DateTime.Compare(candles[i].Timestamp, candles30[^1].Timestamp.AddMinutes(30)) < 0)
-                            {
-                                candles[i].UsedBy30 = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            candles[i].UsedBy30 = true;
                         }
-                        candles5.AddRange(candles30);
                     }
-                
+                    newCandles.AddRange(candles30);
+                }
+
             }
-            var list45 = candles.Where(x => x.UsedBy45 == false).OrderBy(x => x.Timestamp).ToList();
+
+
+
+            list45 = candles.Where(x => x.UsedBy45 == false).OrderBy(x => x.Timestamp).ToList();
             if (list45.Count > 44)
             {
 
-                    candles45 = await Task.Run(() => TransformCandles(list45, 45));
-                    if (candles45.Count > 0)
+                candles45 = TransformCandles(list45, 45);
+                if (candles45.Count > 0)
+                {
+                    for (int i = 0, n = candles.Count; i < n; i++)
                     {
-                        for (int i = 0, n = candles.Count; i < n; i++)
+                        if (DateTime.Compare(candles[i].Timestamp, candles45[^1].Timestamp.AddMinutes(45)) < 0)
                         {
-                            if (DateTime.Compare(candles[i].Timestamp, candles45[^1].Timestamp.AddMinutes(45)) < 0)
-                            {
-                                candles[i].UsedBy45 = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            candles[i].UsedBy45 = true;
                         }
-                        candles5.AddRange(candles45);
                     }
-                
+                    newCandles.AddRange(candles45);
+                }
+
             }
-            var list60 = candles.Where(x => x.UsedBy60 == false).OrderBy(x => x.Timestamp).ToList();
+
+
+
+            list60 = candles.Where(x => x.UsedBy60 == false).OrderBy(x => x.Timestamp).ToList();
             if (list60.Count > 59)
             {
 
-                    candles60 = await Task.Run(() => TransformCandles(list60, 60));
-                    if (candles60.Count > 0)
+                candles60 = TransformCandles(list60, 60);
+                if (candles60.Count > 0)
+                {
+                    for (int i = 0, n = candles.Count; i < n; i++)
                     {
-                        for (int i = 0, n = candles.Count; i < n; i++)
+                        if (DateTime.Compare(candles[i].Timestamp, candles60[^1].Timestamp.AddMinutes(60)) < 0)
                         {
-                            if (DateTime.Compare(candles[i].Timestamp, candles60[^1].Timestamp.AddMinutes(60)) < 0)
-                            {
-                                candles[i].UsedBy60 = true;
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            candles[i].UsedBy60 = true;
                         }
-                        candles5.AddRange(candles60);
                     }
-                
+                    newCandles.AddRange(candles60);
+                }
             }
-            var list120 = candles.Where(x => x.UsedBy120 == false).OrderBy(x => x.Timestamp).ToList();
+
+            list120 = candles.Where(x => x.UsedBy120 == false).OrderBy(x => x.Timestamp).ToList();
             if (list120.Count > 119)
             {
-
-                candles120 = await Task.Run(() => TransformCandles(list120, 120));
+                candles120 = TransformCandles(list120, 120);
                 if (candles120.Count > 0)
                 {
                     for (int i = 0, n = candles.Count; i < n; i++)
@@ -574,20 +569,16 @@ namespace TradeMaster6000.Server.Services
                         {
                             candles[i].UsedBy120 = true;
                         }
-                        else
-                        {
-                            break;
-                        }
                     }
-                    candles5.AddRange(candles120);
+                    newCandles.AddRange(candles120);
                 }
-
             }
-            var list240 = candles.Where(x => x.UsedBy240 == false).OrderBy(x => x.Timestamp).ToList();
+
+            list240 = candles.Where(x => x.UsedBy240 == false).OrderBy(x => x.Timestamp).ToList();
             if (list240.Count > 239)
             {
 
-                candles240 = await Task.Run(() => TransformCandles(list240, 240));
+                candles240 = TransformCandles(list240, 240);
                 if (candles240.Count > 0)
                 {
                     for (int i = 0, n = candles.Count; i < n; i++)
@@ -596,22 +587,22 @@ namespace TradeMaster6000.Server.Services
                         {
                             candles[i].UsedBy240 = true;
                         }
-                        else
-                        {
-                            break;
-                        }
                     }
-                    candles5.AddRange(candles240);
+                    newCandles.AddRange(candles240);
                 }
 
             }
+
+            //logger.LogInformation($"transform done - elsapsed milisecs: {stopwatch.ElapsedMilliseconds}");
+            stopwatch.Restart();
+
             if (candles.Count > 0)
             {
                 for (int i = 0, n = candles.Count; i < n; i++)
                 {
                     if (candles[i].UsedBy5 || candles[i].UsedBy10 || candles[i].UsedBy15 || candles[i].UsedBy30 || candles[i].UsedBy45 || candles[i].UsedBy60 || candles[i].UsedBy120 || candles[i].UsedBy240)
                     {
-                        if(candles[i].UsedBy5 && candles[i].UsedBy10 && candles[i].UsedBy15 && candles[i].UsedBy30 && candles[i].UsedBy45 && candles[i].UsedBy60 && candles[i].UsedBy120 && candles[i].UsedBy240)
+                        if (candles[i].UsedBy5 && candles[i].UsedBy10 && candles[i].UsedBy15 && candles[i].UsedBy30 && candles[i].UsedBy45 && candles[i].UsedBy60 && candles[i].UsedBy120 && candles[i].UsedBy240)
                         {
                             candles[i].Used = true;
                         }
@@ -619,14 +610,18 @@ namespace TradeMaster6000.Server.Services
                     }
                 }
             }
+
+            //logger.LogInformation($"mark as used done - elsapsed milisecs: {stopwatch.ElapsedMilliseconds}");
+            stopwatch.Restart();
+
             await semaphoreSlim.WaitAsync();
             try
             {
-                if(candles5.Count > 0)
+                if (newCandles.Count > 0)
                 {
-                    await candleHelper.Add(candles5);
+                    await candleHelper.Add(newCandles);
                 }
-                if(updatedcandles.Count > 0)
+                if (updatedcandles.Count > 0)
                 {
                     await candleHelper.Update(updatedcandles);
                 }
@@ -635,6 +630,7 @@ namespace TradeMaster6000.Server.Services
             {
                 semaphoreSlim.Release();
             }
+            //logger.LogInformation($"adding and updating to db done - elsapsed milisecs: {stopwatch.ElapsedMilliseconds}");
             Ending:;
         }
 
@@ -673,11 +669,11 @@ namespace TradeMaster6000.Server.Services
             {
                 List<Candle> candlescurve = candles15.Where(x => x.UsedByCurve == false).OrderBy(x => x.Timestamp).ToList();
                 List<Candle> candlesentry = candles15.Where(x => x.UsedByEntry == false).OrderBy(x => x.Timestamp).ToList();
-                if(candlescurve.Count > 0)
+                if (candlescurve.Count > 0)
                 {
                     zones15curve = await Task.Run(() => MakeZones(candlescurve, instrument.TradingSymbol, instrument.Token, 15, curve));
                 }
-                if(candlesentry.Count > 0)
+                if (candlesentry.Count > 0)
                 {
                     zones15entry = await Task.Run(() => MakeZones(candlesentry, instrument.TradingSymbol, instrument.Token, 15, entry));
                 }
@@ -723,9 +719,9 @@ namespace TradeMaster6000.Server.Services
 
             if (zones5.Count > 0)
             {
-                for(int i = 0, n = candles5.Count; i < n; i++)
+                for (int i = 0, n = candles5.Count; i < n; i++)
                 {
-                    if(DateTime.Compare(candles5[i].Timestamp, zones5[^1].To.AddMinutes(zones5[^1].Timeframe)) < 0)
+                    if (DateTime.Compare(candles5[i].Timestamp, zones5[^1].To.AddMinutes(zones5[^1].Timeframe)) < 0)
                     {
                         candles5[i].Used = true;
                         updatedcandles.Add(candles5[i]);
@@ -765,15 +761,15 @@ namespace TradeMaster6000.Server.Services
                 }
                 zones5.AddRange(zones15entry);
             }
-            if(zones15curve.Count > 0 || zones15entry.Count > 0)
+            if (zones15curve.Count > 0 || zones15entry.Count > 0)
             {
                 for (int i = 0, n = candles15.Count; i < n; i++)
                 {
-                    if(candles15[i].UsedByEntry == true && candles15[i].UsedByCurve == true)
+                    if (candles15[i].UsedByEntry == true && candles15[i].UsedByCurve == true)
                     {
                         candles15[i].Used = true;
                     }
-                    if(candles15[i].Used || candles15[i].UsedByEntry || candles15[i].UsedByCurve)
+                    if (candles15[i].Used || candles15[i].UsedByEntry || candles15[i].UsedByCurve)
                     {
                         updatedcandles.Add(candles15[i]);
                     }
@@ -896,11 +892,11 @@ namespace TradeMaster6000.Server.Services
             await semaphoreSlim.WaitAsync();
             try
             {
-                if(zones5.Count > 0)
+                if (zones5.Count > 0)
                 {
                     await zoneHelper.Add(zones5);
                 }
-                if(updatedcandles.Count > 0)
+                if (updatedcandles.Count > 0)
                 {
                     await candleHelper.Update(updatedcandles);
                 }
@@ -962,7 +958,7 @@ namespace TradeMaster6000.Server.Services
                     testedbool = true;
                 }
 
-                if(brokenbool && testedbool)
+                if (brokenbool && testedbool)
                 {
                     return 2;
                 }
@@ -1099,7 +1095,7 @@ namespace TradeMaster6000.Server.Services
         private bool IsFitty(Candle candle)
         {
             var hl = Math.Abs(candle.Low - candle.High);
-            if(hl > 0)
+            if (hl > 0)
             {
                 if (Math.Abs(candle.Open - candle.Close) <= (hl * (decimal)0.5))
                 {
@@ -1113,19 +1109,19 @@ namespace TradeMaster6000.Server.Services
         {
             HalfZone forward = FindForward(candles, fittyCandle, factors.NoOfCandles, factors.ExplosiveFactor);
 
-            if(forward == default)
+            if (forward == default)
             {
                 return default;
             }
 
             HalfZone backward = FindBackwards(candles, fittyCandle, forward.Top, forward.Bottom, forward.BiggestBaseDiff, factors.NoOfCandles, factors.PreExplosiveFactor);
 
-            if(backward == default)
+            if (backward == default)
             {
                 return default;
             }
 
-            if(backward.BiggestBaseDiff > forward.BiggestBaseDiff)
+            if (backward.BiggestBaseDiff > forward.BiggestBaseDiff)
             {
                 forward = FindForward(candles, fittyCandle, backward.Top, backward.Bottom, backward.BiggestBaseDiff, factors.NoOfCandles, factors.ExplosiveFactor);
 
@@ -1136,23 +1132,23 @@ namespace TradeMaster6000.Server.Services
             }
 
             int range = forward.ExplosiveCandle.RangeFromFitty + backward.ExplosiveCandle.RangeFromFitty - 1;
-            if(range > factors.NoOfCandles)
+            if (range > factors.NoOfCandles)
             {
                 return default;
             }
 
             Zone zone = new Zone { From = backward.Timestamp, To = forward.Timestamp, InstrumentSymbol = symbol, InstrumentToken = token, Created = timeHelper.CurrentTime(), ExplosiveEndTime = forward.ExplosiveCandle.Candle.Timestamp, Timeframe = timeframe };
 
-            if(factors.Name == "curve")
+            if (factors.Name == "curve")
             {
                 zone.Entry = false;
             }
-            else if(factors.Name == "entry")
+            else if (factors.Name == "entry")
             {
                 zone.Entry = true;
             }
 
-            if(forward.Top > backward.Top)
+            if (forward.Top > backward.Top)
             {
                 zone.Top = forward.Top;
             }
@@ -1161,7 +1157,7 @@ namespace TradeMaster6000.Server.Services
                 zone.Top = backward.Top;
             }
 
-            if(forward.Bottom < backward.Bottom)
+            if (forward.Bottom < backward.Bottom)
             {
                 zone.Bottom = forward.Bottom;
             }
@@ -1186,7 +1182,7 @@ namespace TradeMaster6000.Server.Services
                     }
 
                     if (zoneWidthX2 <= RallyExplosiveWidthForward(candles, forward.ExplosiveCandle.Index, zone.Top, zone.Bottom)
-                        && zoneWidthX05 <= RallyExplosiveWidthBackward(candles, backward.ExplosiveCandle.Index, zone.Bottom , zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.PreBaseOvershootFactor)))
+                        && zoneWidthX05 <= RallyExplosiveWidthBackward(candles, backward.ExplosiveCandle.Index, zone.Bottom, zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.PreBaseOvershootFactor)))
                     {
                         zone.StayAway = StayAway.Good;
                     }
@@ -1305,7 +1301,7 @@ namespace TradeMaster6000.Server.Services
                     return halfZone;
                 }
 
-                if(halfZone.BiggestBaseDiff < candleDiff)
+                if (halfZone.BiggestBaseDiff < candleDiff)
                 {
                     halfZone.BiggestBaseDiff = candleDiff;
                 }

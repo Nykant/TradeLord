@@ -59,23 +59,29 @@ namespace TradeMaster6000.Server.Services
             foreach (var zone in zones)
             {
                 Zone updated = zone;
+                List<Zone> tradeableZones = new List<Zone>();
 
                 // 15htf
                 if (zone.Timeframe == 5)
                 {
-                    List<Zone> zones15 = allzones.Where(x => x.InstrumentToken == zone.InstrumentToken && x.Timeframe == 15 && !x.Entry).OrderBy(x => x.To).ToList();
+                    List<Zone> zones15 = allzones.Where(x => x.InstrumentToken == zone.InstrumentToken && x.Timeframe == 15 && !x.Entry).OrderBy(x => x.From).ToList();
                     if (zones15.Count > 0)
                     {
                         Zone motherZone = await Task.Run(() => zones15.Find(x => DateTime.Compare(x.From, zone.From) <= 0 && DateTime.Compare(x.To, zone.To) >= 0));
                         if (motherZone != default)
                         {
-                            Zone opposite = await Task.Run(() => FindOpposite(motherZone, zones15.Where(x => DateTime.Compare(motherZone.From, x.From) > 0).OrderBy(x => x.To).ToList()));
-                            Zone next = await Task.Run(() => FindNext(motherZone, zones15.Where(x => DateTime.Compare(motherZone.To.AddMinutes(motherZone.Timeframe), x.From) < 0).OrderBy(x => x.To).ToList()));
+                            Zone opposite = await Task.Run(() => FindOpposite(motherZone, zones15.Where(x => DateTime.Compare(motherZone.From, x.From) > 0).OrderBy(x => x.From).ToList()));
+                            Zone next = await Task.Run(() => FindNext(motherZone, zones15.Where(x => DateTime.Compare(motherZone.To.AddMinutes(motherZone.Timeframe), x.From) < 0).OrderBy(x => x.From).ToList()));
                             if (opposite != default)
                             {
                                 List<Candle> candles15 = candles.Where(x => x.InstrumentToken == opposite.InstrumentToken && DateTime.Compare(x.Timestamp, opposite.ExplosiveEndTime.AddMinutes(opposite.Timeframe)) > 0 && x.Timeframe == opposite.Timeframe).OrderBy(x => x.Timestamp).ToList();
 
-                                updated.Tradeable = IsTradeable(candles15, motherZone, next, opposite);
+                                motherZone.Tradeable = IsTradeable(candles15, motherZone, next, opposite);
+                                if (motherZone.Tradeable)
+                                {
+                                    tradeableZones.Add(motherZone);
+                                    updated.TradeOn = true;
+                                }
                             }
                         }
                     }
@@ -84,7 +90,6 @@ namespace TradeMaster6000.Server.Services
                         goto Ending;
                     }
                 }
-
 
                 // 30htf
                 if (zone.Timeframe == 10)
@@ -101,7 +106,12 @@ namespace TradeMaster6000.Server.Services
                             {
                                 List<Candle> candles30 = candles.Where(x => x.InstrumentToken == opposite.InstrumentToken && DateTime.Compare(x.Timestamp, opposite.ExplosiveEndTime.AddMinutes(opposite.Timeframe)) > 0 && x.Timeframe == opposite.Timeframe).OrderBy(x => x.Timestamp).ToList();
 
-                                updated.Tradeable = IsTradeable(candles30, motherZone, next, opposite);
+                                motherZone.Tradeable = IsTradeable(candles30, motherZone, next, opposite);
+                                if (motherZone.Tradeable)
+                                {
+                                    tradeableZones.Add(motherZone);
+                                    updated.TradeOn = true;
+                                }
                             }
                         }
                     }
@@ -127,7 +137,12 @@ namespace TradeMaster6000.Server.Services
                             {
                                 List<Candle> candles45 = candles.Where(x => x.InstrumentToken == opposite.InstrumentToken && DateTime.Compare(x.Timestamp, opposite.ExplosiveEndTime.AddMinutes(opposite.Timeframe)) > 0 && x.Timeframe == opposite.Timeframe).OrderBy(x => x.Timestamp).ToList();
 
-                                updated.Tradeable = IsTradeable(candles45, motherZone, next, opposite);
+                                motherZone.Tradeable = IsTradeable(candles45, motherZone, next, opposite);
+                                if (motherZone.Tradeable)
+                                {
+                                    tradeableZones.Add(motherZone);
+                                    updated.TradeOn = true;
+                                }
                             }
                         }
                     }
@@ -138,7 +153,7 @@ namespace TradeMaster6000.Server.Services
                 }
 
 
-                // 60htf
+                // 60htf -------- MAKE A METHOD FOR THIS SHIT PLEASE!
                 if (zone.Timeframe == 5 || zone.Timeframe == 10 || zone.Timeframe == 15)
                 {
                     List<Zone> zones60 = allzones.Where(x => x.InstrumentToken == zone.InstrumentToken && x.Timeframe == 60 && !x.Entry).OrderBy(x => x.To).ToList();
@@ -147,13 +162,18 @@ namespace TradeMaster6000.Server.Services
                         Zone motherZone = await Task.Run(() => zones60.Find(x => DateTime.Compare(x.From, zone.From) <= 0 && DateTime.Compare(x.To, zone.To) >= 0));
                         if (motherZone != default)
                         {
-                            Zone opposite = await Task.Run(() => FindOpposite(motherZone, zones60.Where(x => DateTime.Compare(motherZone.From, x.From) > 0).OrderBy(x => x.To).ToList()));
-                            Zone next = await Task.Run(() => FindNext(motherZone, zones60.Where(x => DateTime.Compare(motherZone.To.AddMinutes(motherZone.Timeframe), x.From) < 0).OrderBy(x => x.To).ToList()));
+                            Zone opposite = await Task.Run(() => FindOpposite(motherZone, zones60.Where(x => DateTime.Compare(motherZone.From, x.From) > 0).OrderBy(x => x.From).ToList()));
+                            Zone next = await Task.Run(() => FindNext(motherZone, zones60.Where(x => DateTime.Compare(motherZone.To.AddMinutes(motherZone.Timeframe), x.From) < 0).OrderBy(x => x.From).ToList()));
                             if (opposite != default)
                             {
                                 List<Candle> candles60 = candles.Where(x => x.InstrumentToken == opposite.InstrumentToken && DateTime.Compare(x.Timestamp, opposite.ExplosiveEndTime.AddMinutes(opposite.Timeframe)) > 0 && x.Timeframe == opposite.Timeframe).OrderBy(x => x.Timestamp).ToList();
 
-                                updated.Tradeable = IsTradeable(candles60, motherZone, next, opposite);
+                                motherZone.Tradeable = IsTradeable(candles60, motherZone, next, opposite);
+                                if (motherZone.Tradeable)
+                                {
+                                    tradeableZones.Add(motherZone);
+                                    updated.TradeOn = true;
+                                }
                             }
                         }
                     }
@@ -173,7 +193,12 @@ namespace TradeMaster6000.Server.Services
                             {
                                 List<Candle> candles120 = candles.Where(x => x.InstrumentToken == opposite.InstrumentToken && DateTime.Compare(x.Timestamp, opposite.ExplosiveEndTime.AddMinutes(opposite.Timeframe)) > 0 && x.Timeframe == opposite.Timeframe).OrderBy(x => x.Timestamp).ToList();
 
-                                updated.Tradeable = IsTradeable(candles120, motherZone, next, opposite);
+                                motherZone.Tradeable = IsTradeable(candles120, motherZone, next, opposite);
+                                if (motherZone.Tradeable)
+                                {
+                                    tradeableZones.Add(motherZone);
+                                    updated.TradeOn = true;
+                                }
                             }
                         }
                     }
@@ -193,7 +218,12 @@ namespace TradeMaster6000.Server.Services
                             {
                                 List<Candle> candles240 = candles.Where(x => x.InstrumentToken == opposite.InstrumentToken && DateTime.Compare(x.Timestamp, opposite.ExplosiveEndTime.AddMinutes(opposite.Timeframe)) > 0 && x.Timeframe == opposite.Timeframe).OrderBy(x => x.Timestamp).ToList();
 
-                                updated.Tradeable = IsTradeable(candles240, motherZone, next, opposite);
+                                motherZone.Tradeable = IsTradeable(candles240, motherZone, next, opposite);
+                                if (motherZone.Tradeable)
+                                {
+                                    tradeableZones.Add(motherZone);
+                                    updated.TradeOn = true;
+                                }
                             }
                         }
                     }
@@ -201,9 +231,13 @@ namespace TradeMaster6000.Server.Services
 
                 Ending:;
 
-                if (updated.Tradeable)
+                if (updated.TradeOn)
                 {
                     updatedZones.Add(updated);
+                }
+                if(tradeableZones.Count > 0)
+                {
+                    updatedZones.AddRange(tradeableZones);
                 }
             }
 
@@ -265,7 +299,7 @@ namespace TradeMaster6000.Server.Services
                             }
                             return true;
                         }
-                        break;
+                        return false;
                     }
                 }
             }
@@ -290,6 +324,7 @@ namespace TradeMaster6000.Server.Services
                             }
                             return true;
                         }
+                        return false;
                     }
                 }
             }

@@ -23,7 +23,6 @@ namespace TradeMaster6000.Server.Controllers
         IConfiguration Configuration { get; set; }
         private readonly IProtectionService protectionService;
 
-
         public ApiLoginController(IConfiguration configuration, IKiteService _kiteService, UserManager<ApplicationUser> _userManager, IProtectionService protectionService)
         {
             this.protectionService = protectionService;
@@ -44,7 +43,7 @@ namespace TradeMaster6000.Server.Controllers
             var kite = new Kite(apikey, Debug: true);
             kiteService.NewKiteInstance(kite, user.UserName);
 
-            return await Task.Run(()=>kite.GetLoginURL());
+            return kite.GetLoginURL();
         }
 
         [HttpGet]

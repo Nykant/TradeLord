@@ -64,14 +64,13 @@ namespace TradeMaster6000.Server.Hubs
             await candleDbHelper.LoadExcelCandles();
         }
 
-        public async Task StartCandleMagic()
-        {
-            
-            if (!tickerService.IsCandlesRunning())
-            {
-                await tickerService.RunCandles();
-            }
-        }
+        //public async Task StartCandleMagic()
+        //{
+        //    if (!tickerService.IsCandlesRunning())
+        //    {
+        //        await tickerService.RunCandles();
+        //    }
+        //}
 
         public void StopCandleMagic()
         {
@@ -83,35 +82,10 @@ namespace TradeMaster6000.Server.Hubs
             await zoneService.StartZoneServiceOnce();
         }
 
-        public void StartTrader()
-        {
-            DateTime current = timeHelper.CurrentTime();
-            DateTime opening = timeHelper.OpeningTime();
-            TimeSpan duration = timeHelper.GetDuration(opening, current);
-
-            backgroundJob.Schedule(() => RunTrader(), duration);
-        }
-
         public async Task MarkCandlesUnused()
         {
             await candleDbHelper.MarkAllCandlesUnused();
             logger.LogInformation("done marking candles as unused");
-        }
-
-        public async Task RunTrader()
-        {
-            if (!tickerService.IsCandlesRunning() && !zoneService.IsZoneServiceRunning())
-            {
-                await tickerService.RunCandles();
-                await zoneService.StartZoneService();
-            }
-        }
-
-        public void StopTrader()
-        {
-            tradeabilityService.Stop();
-            tickerService.StopCandles();
-            zoneService.CancelToken();
         }
 
         public async Task GetZones()

@@ -29,13 +29,20 @@ namespace TradeMaster6000.Server.Services
 
         public void InvalidateAll()
         {
-            var keypairs = KiteInstances.ToList();
-            foreach(var keypair in keypairs)
+            try
             {
-                var newinstance = keypair.Value;
-                newinstance.AccessToken = null;
-                newinstance.Kite = null;
-                KiteInstances.TryUpdate(keypair.Key, newinstance, keypair.Value);
+                var keypairs = KiteInstances.ToList();
+                foreach (var keypair in keypairs)
+                {
+                    var newinstance = keypair.Value;
+                    newinstance.AccessToken = null;
+                    newinstance.Kite = null;
+                    KiteInstances.TryUpdate(keypair.Key, newinstance, keypair.Value);
+                }
+            }
+            catch(Exception e)
+            {
+                throw new Exception(e.Message);
             }
         }
 
@@ -53,7 +60,7 @@ namespace TradeMaster6000.Server.Services
             var instance = GetKiteInstance(username);
             var newinstance = instance;
             newinstance.AccessToken = protectionService.ProtectToken(accessToken);
-            var result = KiteInstances.TryUpdate(username, newinstance, instance);
+            KiteInstances.TryUpdate(username, newinstance, instance);
         }
 
         public string GetAccessToken(string username)
@@ -101,8 +108,12 @@ namespace TradeMaster6000.Server.Services
 
         public KiteInstance GetKiteInstance(string username)
         {
-            KiteInstances.TryGetValue(username, out KiteInstance instance);
-            return instance;
+            var result = KiteInstances.TryGetValue(username, out KiteInstance instance);
+            if (result)
+            {
+                return instance;
+            }
+            return null;
         }
 
         public Kite GetKite(string username)

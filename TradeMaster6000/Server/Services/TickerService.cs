@@ -34,8 +34,9 @@ namespace TradeMaster6000.Server.Services
         private readonly IContextExtension contextExtension;
         private readonly ITradeOrderHelper tradeOrderHelper;
         private readonly IZoneService zoneService;
+        private readonly IProtectionService protectionService;
 
-        private static Ticker Ticker { get; set; }
+        private static readonly ConcurrentDictionary<string, Ticker> Tickers = new ConcurrentDictionary<string, Ticker>();
         private static readonly ConcurrentQueue<SomeLog> TickerLogs = new ConcurrentQueue<SomeLog>();
         private static readonly ConcurrentQueue<MyTick> MyTicks = new ConcurrentQueue<MyTick>();
         private static readonly ConcurrentQueue<Candle> Candles = new ConcurrentQueue<Candle>();
@@ -54,8 +55,9 @@ namespace TradeMaster6000.Server.Services
         private static bool OrderUpdatesOn { get; set; }
         private static bool IsTickerRunning = false;
 
-        public TickerService(IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger , ITradeOrderHelper tradeOrderHelper, IZoneService zoneService)
+        public TickerService(IProtectionService protectionService, IConfiguration configuration, IKiteService kiteService, IInstrumentHelper instrumentHelper, ITimeHelper timeHelper, ICandleDbHelper candleHelper, ITickDbHelper tickDbHelper, IOrderUpdatesDbHelper orderUpdatesDbHelper, IBackgroundJobClient backgroundJob, IContextExtension contextExtension, ILogger<TickerService> logger , ITradeOrderHelper tradeOrderHelper, IZoneService zoneService)
         {
+            this.protectionService = protectionService;
             this.kiteService = kiteService;
             Configuration = configuration;
             this.instrumentHelper = instrumentHelper;
@@ -70,28 +72,59 @@ namespace TradeMaster6000.Server.Services
             this.zoneService = zoneService;
         }
 
-        public void Start()
+        public void TickerForMaster(ApplicationUser user)
         {
             IsTickerRunning = true;
-            var accessToken = kiteService.GetAccessToken("2def1171-322a-453e-90e7-c5b89e92fd74");
-            Ticker = new Ticker(Configuration.GetValue<string>("APIKey"), accessToken);
+            Ticker ticker = new Ticker(protectionService.UnprotectApiKey(user.ApiKey), kiteService.GetAccessToken(user.UserName));
 
-            Ticker.OnTick += OnTick;
-            Ticker.OnOrderUpdate += OnOrderUpdate;
-            Ticker.OnNoReconnect += OnNoReconnect;
-            Ticker.OnError += OnError;
-            Ticker.OnReconnect += OnReconnect;
-            Ticker.OnClose += OnClose;
-            Ticker.OnConnect += OnConnect;
+            ticker.OnTick += OnTick;
+            ticker.OnOrderUpdate += OnOrderUpdate;
+            ticker.OnNoReconnect += OnNoReconnect;
+            ticker.OnError += OnError;
+            ticker.OnReconnect += OnReconnect;
+            ticker.OnClose += OnClose;
+            ticker.OnConnect += OnConnect;
 
-            Ticker.EnableReconnect(Interval: 5, Retries: 50);
-            Ticker.Connect();
+            ticker.EnableReconnect(Interval: 5, Retries: 50);
+            ticker.Connect();
+
+            var instruments = instrumentHelper.GetTradeInstruments().Result;
+            foreach(var instrument in instruments)
+            {
+                ticker.Subscribe(Tokens: new UInt32[] { instrument.Token });
+                ticker.SetMode(Tokens: new UInt32[] { instrument.Token }, Mode: Constants.MODE_LTP);
+            }
+
+            Tickers.TryAdd(user.UserName, ticker);
 
             TickManagerCancel.Source = new CancellationTokenSource();
             FlushingCancel.Source = new CancellationTokenSource();
 
             TickManagerCancel.HangfireId = backgroundJob.Enqueue(() => TickManager(TickManagerCancel.Source.Token));
             FlushingCancel.HangfireId = backgroundJob.Enqueue(() => StartFlushing(FlushingCancel.Source.Token));
+        }
+
+        public void TickerForFollower(ApplicationUser user)
+        {
+            Ticker ticker = new Ticker(protectionService.UnprotectApiKey(user.ApiKey), kiteService.GetAccessToken(user.UserName));
+
+            ticker.OnOrderUpdate += OnOrderUpdate;
+            ticker.OnNoReconnect += OnNoReconnect;
+            ticker.OnError += OnError;
+            ticker.OnReconnect += OnReconnect;
+            ticker.OnClose += OnClose;
+            ticker.OnConnect += OnConnect;
+
+            ticker.EnableReconnect(Interval: 5, Retries: 50);
+            ticker.Connect();
+
+            var instruments = instrumentHelper.GetTradeInstruments().Result;
+            foreach (var instrument in instruments)
+            {
+                ticker.Subscribe(Tokens: new UInt32[] { instrument.Token });
+            }
+
+            Tickers.TryAdd(user.UserName, ticker);
         }
 
         [AutomaticRetry(Attempts = 0)]
@@ -246,12 +279,12 @@ namespace TradeMaster6000.Server.Services
             return CandleManagerOn;
         }
 
-        public async Task RunCandles()
+        public async Task RunCandles(ApplicationUser user)
         {
             CandlesRunning = true;
             if (!IsTickerRunning)
             {
-                Start();
+                TickerForMaster(user);
             }
             await candleHelper.Flush();
             CandleManagerCancel.Source = new CancellationTokenSource();
@@ -269,16 +302,13 @@ namespace TradeMaster6000.Server.Services
             List<Task> tasks = new List<Task>();
             for (int i = 0, n = instruments.Count; i < n; i++)
             {
-                Subscribe(instruments[i].Token);
                 tasks.Add(Analyze(instruments[i], CandleCancel.Source.Token));
             }
 
             await Task.WhenAll(tasks);
 
-            if (!tradeOrderHelper.AnyRunning())
-            {
-                Stop();
-            }
+            StopMasterTicker();
+
             CandlesRunning = false;
 
             CandleManagerCancel.Source.Cancel();
@@ -347,7 +377,6 @@ namespace TradeMaster6000.Server.Services
                     }
                 }
 
-                UnSubscribe(instrument.Token);
             }
             catch (Exception e)
             {
@@ -393,22 +422,23 @@ namespace TradeMaster6000.Server.Services
             };
         }
 
-        public void SetTicker(Ticker ticker)
-        {
-            Ticker = ticker;
-        }
-
         public List<SomeLog> GetSomeLogs()
         {
             return TickerLogs.ToList();
         }
 
-        public void Stop()
+        public void StopMasterTicker()
         {
             IsTickerRunning = false;
-            Ticker.DisableReconnect();
-            Ticker.Close();
-            Ticker = null;
+            Ticker ticker = Tickers.FirstOrDefault(x => x.Key == "God").Value;
+            ticker.DisableReconnect();
+            ticker.Close();
+            Tickers.TryRemove("God", out _);
+
+            if (OrderUpdatesOn)
+            {
+                StopOrderUpdatesManager();
+            }
 
             FlushingCancel.Source.Cancel();
             backgroundJob.Delete(FlushingCancel.HangfireId);
@@ -419,15 +449,12 @@ namespace TradeMaster6000.Server.Services
             zoneService.CancelToken();
         }
 
-        public void Subscribe(uint token)
+        public void StopFollowerTicker(string username)
         {
-            Ticker.Subscribe(Tokens: new UInt32[] { token });
-            Ticker.SetMode(Tokens: new UInt32[] { token }, Mode: Constants.MODE_LTP);
-        }
-
-        public void UnSubscribe(uint token)
-        {
-            Ticker.UnSubscribe(Tokens: new UInt32[] { token });
+            Ticker ticker = Tickers.FirstOrDefault(x => x.Key == username).Value;
+            ticker.DisableReconnect();
+            ticker.Close();
+            Tickers.TryRemove(username, out _);
         }
 
         private void AddLog(string log, LogType logType)
@@ -498,14 +525,13 @@ namespace TradeMaster6000.Server.Services
     public interface ITickerService
     {
         Task<OrderUpdate> GetOrder(string id, string username);
-        void Subscribe(uint token);
-        void UnSubscribe(uint token);
-        void Start();
-        void Stop();
+        void TickerForMaster(ApplicationUser user);
+        void TickerForFollower(ApplicationUser user);
+        void StopMasterTicker();
+        void StopFollowerTicker(string username);
         List<SomeLog> GetSomeLogs();
-        void SetTicker(Ticker ticker);
         Task StartFlushing(CancellationToken token);
-        Task RunCandles();
+        Task RunCandles(ApplicationUser user);
         Task Analyze(TradeInstrument instrument, CancellationToken token);
         Task AnalyzeCandles();
         void StopCandles();

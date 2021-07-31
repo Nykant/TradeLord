@@ -86,7 +86,7 @@ namespace TradeMaster6000.Server.DataHelpers
                             switch (col)
                             {
                                 case 1:
-                                    if (value.ToString() == "stockname")
+                                    if (value.ToString() == "stockname" || value.ToString() == "BANKNIFTY")
                                     {
                                         goto Skip;
                                     }
@@ -173,7 +173,7 @@ namespace TradeMaster6000.Server.DataHelpers
 
             using (var context = contextFactory.CreateDbContext())
             {
-                await context.Candles.AddRangeAsync(excelCandles);
+                context.Candles.AddRange(excelCandles);
                 await context.SaveChangesAsync();
             }
 
@@ -273,7 +273,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                EntityEntry<Candle> entry = await context.Candles.AddAsync(candle);
+                EntityEntry<Candle> entry = context.Candles.Add(candle);
                 await context.SaveChangesAsync();
                 return entry.Entity;
             }
@@ -283,7 +283,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                await context.AddRangeAsync(candles);
+                context.Candles.AddRange(candles);
                 await context.SaveChangesAsync();
             }
         }

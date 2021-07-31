@@ -227,7 +227,7 @@ namespace TradeMaster6000.Server
             });
         }
 
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IRecurringJobManager recurringJobManager, IKiteService kiteService, IInstrumentHelper instrumentHelper, IInstrumentService instrumentService)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IRecurringJobManager recurringJobManager, IKiteService kiteService, IInstrumentHelper instrumentHelper, IInstrumentService instrumentService, IOrderManagerService orderManagerService)
         {
 
             app.UseForwardedHeaders();
@@ -269,8 +269,9 @@ namespace TradeMaster6000.Server
                 endpoints.MapFallbackToFile("index.html");
             });
 
-            recurringJobManager.AddOrUpdate("Invalidate-Kite",() => kiteService.InvalidateAll(), Cron.Daily());
             instrumentHelper.LoadInstruments(instrumentService.GetInstruments());
+            recurringJobManager.AddOrUpdate("Invalidate-Kite",() => kiteService.InvalidateAll(), Cron.Daily());
+            recurringJobManager.AddOrUpdate("Flush-TradeQueue", () => orderManagerService.FlushTradeQueue(), Cron.Daily());
         }
     }
 }

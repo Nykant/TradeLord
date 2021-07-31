@@ -20,8 +20,10 @@ namespace TradeMaster6000.Server.Controllers
         private readonly IBackgroundJobClient backgroundJob;
         private readonly IZoneService zoneService;
         private readonly IWebHostEnvironment env;
-        public StatusController(ITickerService tickerService, IBackgroundJobClient backgroundJob, IZoneService zoneService, IWebHostEnvironment env)
+        private readonly IOrderManagerService orderManagerService;
+        public StatusController(ITickerService tickerService, IBackgroundJobClient backgroundJob, IZoneService zoneService, IWebHostEnvironment env, IOrderManagerService orderManagerService)
         {
+            this.orderManagerService = orderManagerService;
             this.backgroundJob = backgroundJob;
             this.tickerService = tickerService;
             this.zoneService = zoneService;
@@ -63,6 +65,12 @@ namespace TradeMaster6000.Server.Controllers
         public string IsZoneServiceOn()
         {
             return zoneService.IsZoneServiceRunning().ToString();
+        }
+
+        [HttpGet]
+        public string IsUserQueued()
+        {
+            return orderManagerService.HasEnteredQueue(User.Identity.Name).ToString();
         }
 
         [HttpGet]

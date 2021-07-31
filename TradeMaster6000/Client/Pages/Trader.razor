@@ -12,6 +12,7 @@
     if (IsConnected)
     {
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StartTrader" Text="Start Trader" Disabled="disabled" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@EnterTrades" Text="Enter Trades" Disabled="disabled" />
         <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@StopTrader" Text="Stop Trader" Disabled="disabledstop" />
     }
     else
@@ -60,12 +61,21 @@
     {
         disabled = true;
         StateHasChanged();
-        await hubConnection.SendAsync("StartTrader");
+        await Http.GetAsync("Trading/StartTrader");
         await Task.Delay(5000);
         disabled = false;
         StateHasChanged();
     }
 
+    private async Task EnterTrades()
+    {
+        disabled = true;
+        StateHasChanged();
+        var response = await Http.GetAsync("Trading/EnterTrades");
+        await Task.Delay(5000);
+        disabled = false;
+        StateHasChanged();
+    }
 
     private async Task StopTrader()
     {

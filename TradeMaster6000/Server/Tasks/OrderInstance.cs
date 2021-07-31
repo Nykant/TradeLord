@@ -208,7 +208,7 @@ namespace TradeMaster6000.Server.Tasks
 
             TradeOrder.Status = Status.DONE;
             await OrderHelper.UpdateTradeOrder(TradeOrder);
-            await orderManager.StopOrder(TradeOrder);
+            await LogHelper.AddLog(order.Id, $"order stopped...").ConfigureAwait(false);
         }
 
 

@@ -139,6 +139,24 @@
             }
         }
     </div>
+
+    <div class="status-box">
+        <p>Is Queued For Trades</p>
+        @{
+            if (isQueuedForTrades)
+            {
+                <div class="on">
+                    on
+                </div>
+            }
+            else
+            {
+                <div class="off">
+                    off
+                </div>
+            }
+        }
+    </div>
 </div>
 
     @code {
@@ -150,6 +168,7 @@
         bool tickManagerOn = false;
         bool apiLoggedIn = false;
         bool zoneServiceOn = false;
+        bool isQueuedForTrades = false;
         string buttontext = "hide";
         private bool collapse = false;
         string buttonclass = "toggle-button";
@@ -179,6 +198,7 @@
             await IsTickManagerOn().ConfigureAwait(false);
             await IsLoggedIn().ConfigureAwait(false);
             await IsZoneServiceOn().ConfigureAwait(false);
+            await IsQueuedForTrades().ConfigureAwait(false);
         }
 
         private async Task IsZoneServiceOn()
@@ -192,6 +212,21 @@
             else
             {
                 zoneServiceOn = true;
+            }
+            StateHasChanged();
+        }
+
+        private async Task IsQueuedForTrades()
+        {
+            var response = await Http.GetAsync("Status/IsUserQueued");
+            var strin = await response.Content.ReadAsStringAsync();
+            if (strin == "False")
+            {
+                isQueuedForTrades = false;
+            }
+            else
+            {
+                isQueuedForTrades = true;
             }
             StateHasChanged();
         }

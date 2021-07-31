@@ -17,9 +17,9 @@ namespace TradeMaster6000.Shared
         public int Timeframe { get; set; }
         public DateTime Created { get; set; }
         public bool Entry { get; set; }
-        public bool Traded { get; set; } = false;
         public bool Tested { get; set; } = false;
         public bool Broken { get; set; } = false;
+        public bool TradeOn { get; set; } = false;
         public bool Tradeable { get; set; } = false;
         public DateTime From { get; set; }
         public DateTime To { get; set; }

@@ -59,7 +59,7 @@ namespace TradeMaster6000.Server.Controllers
                     var appsecret = protectionService.UnprotectAppSecret(user.AppSecret);
                     User kiteuser = newinstance.Kite.GenerateSession(requestUri.Request_token, appsecret);
                     newinstance.Kite.SetAccessToken(kiteuser.AccessToken);
-                    newinstance.AccessToken = kiteuser.AccessToken;
+                    newinstance.AccessToken = protectionService.ProtectToken(kiteuser.AccessToken);
                     newinstance.Kite.SetSessionExpiryHook(() => kiteService.InvalidateOne(user.UserName));
                     kiteService.UpdateKiteInstance(newinstance, instance, user.UserName);
                 }
