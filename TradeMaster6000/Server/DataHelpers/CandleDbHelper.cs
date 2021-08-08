@@ -70,6 +70,7 @@ namespace TradeMaster6000.Server.DataHelpers
             FileInfo existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\Sheet1.xlsx");
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             List<Candle> excelCandles = new List<Candle>();
+
             using (ExcelPackage package = new ExcelPackage(existingFile))
             {
                 ExcelWorksheet worksheet = package.Workbook.Worksheets[0];
@@ -173,8 +174,8 @@ namespace TradeMaster6000.Server.DataHelpers
 
             using (var context = contextFactory.CreateDbContext())
             {
-                context.Candles.AddRange(excelCandles);
-                await context.SaveChangesAsync();
+                await context.Candles.BulkInsertAsync(excelCandles);
+                await context.BulkSaveChangesAsync();
             }
 
             stopwatch.Stop();
@@ -185,7 +186,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.Timeframe == timeframe);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.Timeframe == timeframe);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -194,7 +195,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.InstrumentToken == instrumentToken);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -203,7 +204,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.Timeframe == 5);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.Timeframe == 5);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -212,7 +213,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken && x.Used == false && x.Timeframe == timeframe);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.InstrumentToken == instrumentToken && x.Used == false && x.Timeframe == timeframe);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -220,7 +221,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.Used == false && x.Timeframe != 1);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.Used == false && x.Timeframe != 1);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -228,7 +229,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.Timeframe != 1);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.Timeframe != 1);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -236,7 +237,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) < 0 && x.Timeframe == timeframe);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) < 0 && x.Timeframe == timeframe);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -246,7 +247,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles.Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0 && x.Timeframe == timeframe);
+                IQueryable<Candle> candles = context.Candles.AsNoTracking().Where(x => x.InstrumentToken == instrumentToken && DateTime.Compare(x.Timestamp, time) > 0 && x.Timeframe == timeframe);
                 return await candles.OrderBy(x => x.Timestamp).ToListAsync();
             }
         }
@@ -255,7 +256,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                return await context.Candles.FirstOrDefaultAsync(x => x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute && x.Timeframe == timeframe);
+                return await context.Candles.AsNoTracking().FirstOrDefaultAsync(x => x.Timestamp.Hour == time.Hour && x.Timestamp.Minute == time.Minute && x.Timeframe == timeframe);
             }
         }
 
@@ -263,7 +264,7 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                IQueryable<Candle> candles = context.Candles;
+                IQueryable<Candle> candles = context.Candles.AsNoTracking();
                 var candleslist = await candles.Where(x => x.Timeframe == timeframe).OrderBy(x => x.Timestamp).ToListAsync();
                 return candleslist[^1];
             }
@@ -283,8 +284,9 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                context.Candles.AddRange(candles);
-                await context.SaveChangesAsync();
+                context.Database.SetCommandTimeout(TimeSpan.FromSeconds(50000));
+                await context.Candles.BulkInsertAsync(candles);
+                await context.BulkSaveChangesAsync();
             }
         }
 
@@ -333,8 +335,9 @@ namespace TradeMaster6000.Server.DataHelpers
         {
             using (var context = contextFactory.CreateDbContext())
             {
-                context.Candles.UpdateRange(candles);
-                await context.SaveChangesAsync();
+                context.Database.SetCommandTimeout(TimeSpan.FromSeconds(50000));
+                await context.Candles.BulkUpdateAsync(candles);
+                await context.BulkSaveChangesAsync();
             }
         }
 

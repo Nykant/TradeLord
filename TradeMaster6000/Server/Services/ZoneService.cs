@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TradeMaster6000.Server.DataHelpers;
 using TradeMaster6000.Server.Helpers;
+using TradeMaster6000.Server.Models;
 using TradeMaster6000.Shared;
 
 namespace TradeMaster6000.Server.Services
@@ -62,7 +63,7 @@ namespace TradeMaster6000.Server.Services
             this.tradeabilityService = tradeabilityService;
             candleHelper = candleDbHelper;
             zoneHelper = zoneDbHelper;
-            semaphoreSlim = new SemaphoreSlim(50, 50);
+            semaphoreSlim = new SemaphoreSlim(20, 20);
         }
 
         public List<Candle> GetZoneCandles()
@@ -286,7 +287,7 @@ namespace TradeMaster6000.Server.Services
         {
 
             List<Candle> newCandles = new List<Candle>();
-            DateTime time = new DateTime(candles[0].Timestamp.Year, candles[0].Timestamp.Month, candles[0].Timestamp.Day, 09, 00, 00);
+            DateTime time = new DateTime(candles[0].Timestamp.Year, candles[0].Timestamp.Month, candles[0].Timestamp.Day, 09, 15, 00);
             time = time.AddMinutes(timeframe);
 
             Candle temp = new();
@@ -361,7 +362,7 @@ namespace TradeMaster6000.Server.Services
                         if (current.Timestamp.Hour == 15 && current.Timestamp.Minute == 29)
                         {
                             time = time.AddDays(1);
-                            time = new DateTime(time.Year, time.Month, time.Day, 09, 00, 00);
+                            time = new DateTime(time.Year, time.Month, time.Day, 09, 15, 00);
                         }
 
                         time = time.AddMinutes(timeframe);
@@ -381,7 +382,7 @@ namespace TradeMaster6000.Server.Services
                     if (time.Day != current.Timestamp.Day)
                     {
                         time = time.AddDays(1);
-                        time = new DateTime(time.Year, time.Month, time.Day, 09, 00, 00);
+                        time = new DateTime(time.Year, time.Month, time.Day, 09, 15, 00);
                     }
 
                     time = time.AddMinutes(timeframe);
@@ -997,14 +998,26 @@ namespace TradeMaster6000.Server.Services
             return 0;
         }
 
-        private decimal RallyExplosiveWidthBackward(List<Candle> candles, int explosiveIndex, decimal zoneLow, decimal overshoot)
+        private StayAwayRM RallyStayAwayBackwardCheck(List<Candle> candles, int explosiveIndex, decimal zoneLow, decimal selftesting)
         {
             decimal low = zoneLow;
+            StayAwayRM stayAway = new StayAwayRM();
             for (int i = explosiveIndex; i >= 0; i--)
             {
                 if (IsFitty(candles[i]))
                 {
-                    return Math.Abs(low - zoneLow);
+                    stayAway.ExplosiveWidth = Math.Abs(low - zoneLow);
+
+                    if (candles[i].High > zoneLow)
+                    {
+                        stayAway.Good = false;
+                    }
+                    else
+                    {
+                        stayAway.Good = true;
+                    }
+
+                    return stayAway;
                 }
 
                 if (low > candles[i].Low)
@@ -1012,23 +1025,39 @@ namespace TradeMaster6000.Server.Services
                     low = candles[i].Low;
                 }
 
-                if (candles[i].High >= overshoot)
+                if (i != explosiveIndex)
                 {
-                    return default;
+                    if (candles[i].High > selftesting)
+                    {
+                        break;
+                    }
                 }
             }
 
-            return default;
+            stayAway.Discard = true;
+            return stayAway;
         }
 
-        private decimal DropExplosiveWidthBackward(List<Candle> candles, int explosiveIndex, decimal zoneHigh, decimal overshoot)
+        private StayAwayRM DropStayAwayBackwardCheck(List<Candle> candles, int explosiveIndex, decimal zoneHigh, decimal selftesting)
         {
             decimal high = zoneHigh;
+            StayAwayRM stayAway = new StayAwayRM();
             for (int i = explosiveIndex; i >= 0; i--)
             {
                 if (IsFitty(candles[i]))
                 {
-                    return Math.Abs(high - zoneHigh);
+                    stayAway.ExplosiveWidth = Math.Abs(high - zoneHigh);
+
+                    if (candles[i].Low < zoneHigh)
+                    {
+                        stayAway.Good = false;
+                    }
+                    else
+                    {
+                        stayAway.Good = true;
+                    }
+
+                    return stayAway;
                 }
 
                 if (high < candles[i].High)
@@ -1036,60 +1065,97 @@ namespace TradeMaster6000.Server.Services
                     high = candles[i].High;
                 }
 
-                if (candles[i].Low <= overshoot)
+                if (i != explosiveIndex)
                 {
-                    return default;
+                    if (candles[i].Low < selftesting)
+                    {
+                        break;
+                    }
                 }
             }
 
-            return default;
+            stayAway.Discard = true;
+            return stayAway;
         }
 
-        private decimal RallyExplosiveWidthForward(List<Candle> candles, int explosiveIndex, decimal zoneHigh, decimal overshoot)
+        private StayAwayRM RallyStayAwayForwardCheck(List<Candle> candles, int explosiveIndex, decimal zoneHigh, decimal selftesting)
         {
             decimal high = zoneHigh;
+            StayAwayRM stayAway = new StayAwayRM();
             for (int i = explosiveIndex, n = candles.Count; i < n; i++)
             {
-                if (IsFitty(candles[i]))
-                {
-                    return Math.Abs(high - zoneHigh);
-                }
-
                 if (high < candles[i].High)
                 {
                     high = candles[i].High;
                 }
 
-                if (candles[i].Low <= overshoot)
+                if (IsFitty(candles[i]))
                 {
-                    return default;
+                    stayAway.ExplosiveWidth = Math.Abs(high - zoneHigh);
+
+                    if(candles[i].Low < zoneHigh)
+                    {
+                        stayAway.Good = false;
+                    }
+                    else
+                    {
+                        stayAway.Good = true;
+                    }
+
+                    return stayAway;
+                }
+
+                if(i != explosiveIndex)
+                {
+                    if (candles[i].Low < selftesting)
+                    {
+                        break;
+                    }
                 }
             }
 
-            return default;
+            stayAway.Discard = true;
+            return stayAway;
         }
-        private decimal DropExplosiveWidthForward(List<Candle> candles, int explosiveIndex, decimal zoneLow, decimal overshoot)
+
+        private StayAwayRM DropStayAwayForwardCheck(List<Candle> candles, int explosiveIndex, decimal zoneLow, decimal selftesting)
         {
             decimal low = zoneLow;
+            StayAwayRM stayAway = new StayAwayRM();
             for (int i = explosiveIndex, n = candles.Count; i < n; i++)
             {
-                if (IsFitty(candles[i]))
-                {
-                    return Math.Abs(low - zoneLow);
-                }
-
                 if (low > candles[i].Low)
                 {
                     low = candles[i].Low;
                 }
 
-                if (candles[i].High >= overshoot)
+                if (IsFitty(candles[i]))
                 {
-                    return default;
+                    stayAway.ExplosiveWidth = Math.Abs(low - zoneLow);
+
+                    if (candles[i].High > zoneLow)
+                    {
+                        stayAway.Good = false;
+                    }
+                    else
+                    {
+                        stayAway.Good = true;
+                    }
+
+                    return stayAway;
+                }
+
+                if (i != explosiveIndex)
+                {
+                    if (candles[i].High > selftesting)
+                    {
+                        break;
+                    }
                 }
             }
 
-            return default;
+            stayAway.Discard = true;
+            return stayAway;
         }
 
         private bool IsFitty(Candle candle)
@@ -1172,7 +1238,7 @@ namespace TradeMaster6000.Server.Services
             {
                 if (forward.ExplosiveCandle.Candle.Open < forward.ExplosiveCandle.Candle.Close)
                 {
-                    if (backward.ExplosiveCandle.Candle.High > (zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor)))
+                    if (backward.ExplosiveCandle.Candle.High > (zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.PreBaseOvershootFactor)))
                     {
                         return default;
                     }
@@ -1181,10 +1247,25 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    if (zoneWidthX2 <= RallyExplosiveWidthForward(candles, forward.ExplosiveCandle.Index, zone.Top, zone.Bottom)
-                        && zoneWidthX05 <= RallyExplosiveWidthBackward(candles, backward.ExplosiveCandle.Index, zone.Bottom, zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.PreBaseOvershootFactor)))
+                    var stayAwayForward = RallyStayAwayForwardCheck(candles, forward.ExplosiveCandle.Index, zone.Top, zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+                    var stayAwayBackward = RallyStayAwayBackwardCheck(candles, backward.ExplosiveCandle.Index, zone.Bottom, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+
+                    if(stayAwayForward.Discard == true || stayAwayBackward.Discard == true)
                     {
-                        zone.StayAway = StayAway.Good;
+                        return default;
+                    }
+
+                    if (zoneWidthX2 < stayAwayForward.ExplosiveWidth
+                        && zoneWidthX05 < stayAwayBackward.ExplosiveWidth)
+                    {
+                        if(stayAwayForward.Good == true && stayAwayBackward.Good == true)
+                        {
+                            zone.StayAway = StayAway.Good;
+                        }
+                        else
+                        {
+                            zone.StayAway = StayAway.Bad;
+                        }
                     }
                     else
                     {
@@ -1204,12 +1285,26 @@ namespace TradeMaster6000.Server.Services
                     {
                         return default;
                     }
-                    var one = DropExplosiveWidthForward(candles, forward.ExplosiveCandle.Index, zone.Bottom, zone.Top);
-                    var two = RallyExplosiveWidthBackward(candles, backward.ExplosiveCandle.Index, zone.Bottom, zone.Top);
-                    if (zoneWidthX2 < one
-                        && zoneWidthX05 < two)
+
+                    var stayAwayForward = DropStayAwayForwardCheck(candles, forward.ExplosiveCandle.Index, zone.Bottom, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+                    var stayAwayBackward = RallyStayAwayBackwardCheck(candles, backward.ExplosiveCandle.Index, zone.Bottom, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+
+                    if (stayAwayForward.Discard == true || stayAwayBackward.Discard == true)
                     {
-                        zone.StayAway = StayAway.Good;
+                        return default;
+                    }
+
+                    if (zoneWidthX2 < stayAwayForward.ExplosiveWidth
+                       && zoneWidthX05 < stayAwayBackward.ExplosiveWidth)
+                    {
+                        if (stayAwayForward.Good == true && stayAwayBackward.Good == true)
+                        {
+                            zone.StayAway = StayAway.Good;
+                        }
+                        else
+                        {
+                            zone.StayAway = StayAway.Bad;
+                        }
                     }
                     else
                     {
@@ -1233,10 +1328,25 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    if (zoneWidthX2 < RallyExplosiveWidthForward(candles, forward.ExplosiveCandle.Index, zone.Top, zone.Bottom)
-                        && zoneWidthX05 < DropExplosiveWidthBackward(candles, backward.ExplosiveCandle.Index, zone.Top, zone.Bottom))
+                    var stayAwayForward = RallyStayAwayForwardCheck(candles, forward.ExplosiveCandle.Index, zone.Top, zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+                    var stayAwayBackward = DropStayAwayBackwardCheck(candles, backward.ExplosiveCandle.Index, zone.Top, zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+
+                    if (stayAwayForward.Discard == true || stayAwayBackward.Discard == true)
                     {
-                        zone.StayAway = StayAway.Good;
+                        return default;
+                    }
+
+                    if (zoneWidthX2 < stayAwayForward.ExplosiveWidth
+                       && zoneWidthX05 < stayAwayBackward.ExplosiveWidth)
+                    {
+                        if (stayAwayForward.Good == true && stayAwayBackward.Good == true)
+                        {
+                            zone.StayAway = StayAway.Good;
+                        }
+                        else
+                        {
+                            zone.StayAway = StayAway.Bad;
+                        }
                     }
                     else
                     {
@@ -1248,7 +1358,7 @@ namespace TradeMaster6000.Server.Services
                 }
                 else
                 {
-                    if (backward.ExplosiveCandle.Candle.Low < (zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor)))
+                    if (backward.ExplosiveCandle.Candle.Low < (zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.PreBaseOvershootFactor)))
                     {
                         return default;
                     }
@@ -1257,10 +1367,25 @@ namespace TradeMaster6000.Server.Services
                         return default;
                     }
 
-                    if (zoneWidthX2 < DropExplosiveWidthForward(candles, forward.ExplosiveCandle.Index, zone.Bottom, zone.Top)
-                        && zoneWidthX05 < DropExplosiveWidthBackward(candles, backward.ExplosiveCandle.Index, zone.Top, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.PreBaseOvershootFactor)))
+                    var stayAwayForward = DropStayAwayForwardCheck(candles, forward.ExplosiveCandle.Index, zone.Bottom, zone.Bottom - (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+                    var stayAwayBackward = DropStayAwayBackwardCheck(candles, backward.ExplosiveCandle.Index, zone.Top, zone.Top + (Math.Abs(zone.Top - zone.Bottom) * (decimal)factors.SelfTestingFactor));
+
+                    if (stayAwayForward.Discard == true || stayAwayBackward.Discard == true)
                     {
-                        zone.StayAway = StayAway.Good;
+                        return default;
+                    }
+
+                    if (zoneWidthX2 < stayAwayForward.ExplosiveWidth
+                       && zoneWidthX05 < stayAwayBackward.ExplosiveWidth)
+                    {
+                        if (stayAwayForward.Good == true && stayAwayBackward.Good == true)
+                        {
+                            zone.StayAway = StayAway.Good;
+                        }
+                        else
+                        {
+                            zone.StayAway = StayAway.Bad;
+                        }
                     }
                     else
                     {
