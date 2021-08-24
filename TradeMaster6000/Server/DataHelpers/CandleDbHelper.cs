@@ -172,6 +172,60 @@ namespace TradeMaster6000.Server.DataHelpers
                 }
             }
 
+            existingFile = new FileInfo(@"C:\Users\Christian\Documents\excel_candles\Sheet3.xlsx");
+            using (ExcelPackage package = new ExcelPackage(existingFile))
+            {
+                for(int i = 0, n = package.Workbook.Worksheets.Count; i < n; i++)
+                {
+                    ExcelWorksheet worksheet = package.Workbook.Worksheets[i];
+                    int colCount = worksheet.Dimension.End.Column;
+                    int rowCount = worksheet.Dimension.End.Row;
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        Candle candle = new Candle();
+                        for (int col = 1; col <= colCount; col++)
+                        {
+                            var value = worksheet.Cells[row, col].Value;
+                            if (value != null)
+                            {
+                                switch (col)
+                                {
+                                    case 1:
+                                        if (value.ToString() == "stockname")
+                                        {
+                                            goto Skip;
+                                        }
+                                        uint token = instruments.Find(x => x.TradingSymbol == value.ToString()).Token;
+                                        candle.InstrumentToken = token;
+                                        break;
+                                    case 2:
+                                        Decimal.TryParse(value.ToString(), out decimal result1);
+                                        candle.Open = result1;
+                                        break;
+                                    case 3:
+                                        Decimal.TryParse(value.ToString(), out decimal result3);
+                                        candle.High = result3;
+                                        break;
+                                    case 4:
+                                        Decimal.TryParse(value.ToString(), out decimal result2);
+                                        candle.Low = result2;
+                                        break;
+                                    case 5:
+                                        Decimal.TryParse(value.ToString(), out decimal result4);
+                                        candle.Close = result4;
+                                        break;
+                                    case 6:
+                                        candle.Timestamp = DateTime.FromOADate((double)value);
+                                        break;
+                                }
+                            }
+                        }
+                        excelCandles.Add(candle);
+                        Skip:;
+                    }
+                }
+            }
+
             using (var context = contextFactory.CreateDbContext())
             {
                 await context.Candles.BulkInsertAsync(excelCandles);
